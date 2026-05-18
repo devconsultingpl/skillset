@@ -1,0 +1,39 @@
+{
+  "name": "skillset",
+  "version": "0.1.0-dev",
+  "description": "Install agent skills across Claude Code, pi, opencode, and Copilot from a single canonical source.",
+  "type": "module",
+  "bin": {
+    "skillset": "dist/cli.js"
+  },
+  "files": ["dist", "src/skills"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-skills.mjs",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prepare": "node scripts/prepare.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["claude-code", "skills", "agents", "copilot", "opencode", "pi"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "commander": "^14.0.0",
+    "gray-matter": "^4.0.3",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
