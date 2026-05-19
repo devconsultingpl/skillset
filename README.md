@@ -68,7 +68,7 @@ Copilot doesn't have an auto-trigger concept; `auto` is rejected with a clear me
 ## Commands
 
 ```
-skillset install <skills...> --agent <agents> --mode <mode> [--global|--local]
+skillset install <skills...> --agent <agents> --mode <mode> [--global|--local] [--force]
 skillset uninstall <skills...> [--agent ...] [--global|--local]
 skillset set-mode <skill> <mode> [--agent ...] [--global|--local]
 skillset update                       # re-sync every install from bundled sources
@@ -78,6 +78,15 @@ skillset emit <skill>                 # used by SessionStart hooks; prints JSON
 ```
 
 `--agent` accepts a comma-separated list (e.g. `claude-code,pi`) or `all`.
+
+## Reinstall guard
+
+Installing a skill that's already installed for the same `(skill, agent, scope)` triple but with a **different mode** fails by default — old-mode artifacts would otherwise silently linger alongside the new ones. Two ways past the guard:
+
+- **`skillset set-mode <skill> <mode>`** — preferred for plain mode switches. Atomically swaps the install's mode in place.
+- **`skillset install ... --force`** — uninstalls the prior record, then installs fresh. Use when you actually want a clean re-install (e.g. after a corrupt state, or to pick up changed install-time config).
+
+Same-mode reinstalls are idempotent and need neither flag.
 
 ## How it stays safe
 
