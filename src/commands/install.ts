@@ -1,7 +1,12 @@
 import pc from "picocolors";
 import { loadBundledSkill } from "../core/bundle.js";
-import { parseSkill } from "../core/parse.js";
-import { readState, upsertInstall, writeState } from "../core/state.js";
+import {
+  matchInstall,
+  readState,
+  removeInstall,
+  upsertInstall,
+  writeState,
+} from "../core/state.js";
 import { applyConfig } from "../core/template.js";
 import type { AgentName, Mode, ParsedSkill, Scope } from "../core/types.js";
 import { AGENTS, MODES } from "../core/types.js";
@@ -15,6 +20,8 @@ export interface InstallOptions {
   projectRoot?: string;
   /** Configurable values that override frontmatter.config keys. */
   configOverrides?: Record<string, unknown>;
+  /** If true, replace any prior install for the same (skill, agent, scope) regardless of mode. */
+  force?: boolean;
 }
 
 function parseList<T extends string>(input: string, allowed: readonly T[]): T[] {
@@ -62,6 +69,7 @@ function applyConfigToSkill(skill: ParsedSkill, overrides?: Record<string, unkno
 
 export async function install(opts: InstallOptions): Promise<void> {
   const projectRoot = opts.projectRoot ?? process.cwd();
+  const projectPath = opts.scope === "local" ? projectRoot : undefined;
 
   let state = await readState();
   for (const skillName of opts.skills) {
@@ -77,6 +85,19 @@ export async function install(opts: InstallOptions): Promise<void> {
         );
         continue;
       }
+
+      const key = { skill: skillName, agent, scope: opts.scope, projectPath };
+      const prior = state.installs.find((r) => matchInstall(r, key));
+      if (prior && prior.mode !== opts.mode) {
+        if (!opts.force) {
+          throw new Error(
+            `${skillName} already installed for ${agent} as "${prior.mode}" (${opts.scope}); use --force or run 'skillset set-mode ${skillName} ${opts.mode} --agent ${agent} --${opts.scope}'`,
+          );
+        }
+        await target.uninstall(prior);
+        state = removeInstall(state, prior);
+      }
+
       const record = await target.install({
         skill,
         scope: opts.scope,

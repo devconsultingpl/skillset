@@ -1,135 +1,198 @@
-import { spawnSync } from "node:child_process";
-import { constants } from "node:fs";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { type Sandbox, exists, makeSandbox, run } from "./helpers.js";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const cli = resolve(here, "..", "dist", "cli.js");
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path, constants.F_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function run(args: string[], cwd: string, env: NodeJS.ProcessEnv = {}) {
-  return spawnSync("node", [cli, ...args], {
-    cwd,
-    encoding: "utf8",
-    env: { ...process.env, ...env },
-  });
-}
-
-let projectRoot: string;
-let stateRoot: string;
+let sb: Sandbox;
 
 beforeEach(async () => {
-  projectRoot = await mkdtemp(join(tmpdir(), "skillset-cli-"));
-  stateRoot = await mkdtemp(join(tmpdir(), "skillset-home-"));
+  sb = await makeSandbox("skillset-cli");
 });
 
 afterEach(async () => {
-  await rm(projectRoot, { recursive: true, force: true });
-  await rm(stateRoot, { recursive: true, force: true });
+  await sb.cleanup();
 });
 
-// Re-route HOME so state.json lands in our temp dir, not the developer's
-// real ~/.skillset.
-const sandbox = () => ({ HOME: stateRoot, USERPROFILE: stateRoot });
-
-describe("cli end-to-end", () => {
-  it("installs confidence into claude-code (slash) and uninstalls it", async () => {
-    const install = run(
-      ["install", "confidence", "--agent", "claude-code", "--mode", "slash", "--local"],
-      projectRoot,
-      sandbox(),
-    );
-    expect(install.status).toBe(0);
-    const cmdPath = join(projectRoot, ".claude", "commands", "confidence.md");
-    expect(await exists(cmdPath)).toBe(true);
-
-    const list = run(["list"], projectRoot, sandbox());
-    expect(list.status).toBe(0);
-    expect(list.stdout).toContain("confidence");
-    expect(list.stdout).toContain("claude-code");
-
-    const uninstall = run(["uninstall", "confidence", "--local"], projectRoot, sandbox());
-    expect(uninstall.status).toBe(0);
-    expect(await exists(cmdPath)).toBe(false);
-  });
-
+describe("cli — cross-cutting", () => {
   it("init convention scaffolds docs/ idempotently", async () => {
-    const first = run(["init", "convention"], projectRoot, sandbox());
+    const first = run(["init", "convention"], sb.projectRoot, sb.env);
     expect(first.status).toBe(0);
-    expect(await exists(join(projectRoot, "docs", "goals.md"))).toBe(true);
-    expect(await exists(join(projectRoot, "docs", "conventions.md"))).toBe(true);
-    expect(await exists(join(projectRoot, "docs", "plans", ".gitkeep"))).toBe(true);
+    expect(await exists(join(sb.projectRoot, "docs", "goals.md"))).toBe(true);
+    expect(await exists(join(sb.projectRoot, "docs", "conventions.md"))).toBe(true);
+    expect(await exists(join(sb.projectRoot, "docs", "plans", ".gitkeep"))).toBe(true);
 
     // Mutate a file and re-init — must not overwrite.
-    const { writeFile } = await import("node:fs/promises");
-    await writeFile(join(projectRoot, "docs", "goals.md"), "MY GOALS\n");
-    const second = run(["init", "convention"], projectRoot, sandbox());
+    await writeFile(join(sb.projectRoot, "docs", "goals.md"), "MY GOALS\n");
+    const second = run(["init", "convention"], sb.projectRoot, sb.env);
     expect(second.status).toBe(0);
-    expect(await readFile(join(projectRoot, "docs", "goals.md"), "utf8")).toBe("MY GOALS\n");
+    expect(await readFile(join(sb.projectRoot, "docs", "goals.md"), "utf8")).toBe("MY GOALS\n");
   });
 
-  it("emit confidence prints additionalContext JSON", async () => {
-    const out = run(["emit", "confidence"], projectRoot, sandbox());
+  it("emit confidence prints additionalContext JSON", () => {
+    const out = run(["emit", "confidence"], sb.projectRoot, sb.env);
     expect(out.status).toBe(0);
     const parsed = JSON.parse(out.stdout);
     expect(typeof parsed.additionalContext).toBe("string");
     expect(parsed.additionalContext).toContain("# confidence");
   });
+});
 
-  it("always mode wires SessionStart hook into local settings.json", async () => {
-    const install = run(
-      ["install", "confidence", "--agent", "claude-code", "--mode", "always", "--local"],
-      projectRoot,
-      sandbox(),
-    );
-    expect(install.status).toBe(0);
-    const settingsPath = join(projectRoot, ".claude", "settings.json");
-    const settings = JSON.parse(await readFile(settingsPath, "utf8"));
-    expect(settings.hooks.SessionStart).toHaveLength(1);
-    expect(settings.hooks.SessionStart[0].hooks[0].command).toContain("skillset emit confidence");
+describe("cli — cross-mode reinstall guard", () => {
+  const installArgs = (mode: string, extra: string[] = []) => [
+    "install",
+    "confidence",
+    "--agent",
+    "claude-code",
+    "--mode",
+    mode,
+    "--local",
+    ...extra,
+  ];
 
-    const uninstall = run(["uninstall", "confidence", "--local"], projectRoot, sandbox());
-    expect(uninstall.status).toBe(0);
-    expect(await exists(settingsPath)).toBe(false);
+  const readStateInstalls = async () => {
+    const statePath = join(sb.home, ".skillset", "state.json");
+    if (!(await exists(statePath))) return [];
+    const raw = JSON.parse(await readFile(statePath, "utf8"));
+    return raw.installs as Array<{ skill: string; agent: string; scope: string; mode: string }>;
+  };
+
+  it("same-mode reinstall is idempotent (one state record)", async () => {
+    expect(run(installArgs("slash"), sb.projectRoot, sb.env).status).toBe(0);
+    expect(run(installArgs("slash"), sb.projectRoot, sb.env).status).toBe(0);
+    const installs = await readStateInstalls();
+    expect(installs).toHaveLength(1);
+    expect(installs[0]).toMatchObject({ skill: "confidence", agent: "claude-code", mode: "slash" });
   });
 
-  it("set-mode switches an install's mode", async () => {
-    run(
-      ["install", "confidence", "--agent", "claude-code", "--mode", "slash", "--local"],
-      projectRoot,
-      sandbox(),
-    );
-    expect(await exists(join(projectRoot, ".claude", "commands", "confidence.md"))).toBe(true);
-
-    const swap = run(
-      ["set-mode", "confidence", "always", "--agent", "claude-code", "--local"],
-      projectRoot,
-      sandbox(),
-    );
-    expect(swap.status).toBe(0);
-    expect(await exists(join(projectRoot, ".claude", "commands", "confidence.md"))).toBe(false);
-    expect(await exists(join(projectRoot, ".claude", "settings.json"))).toBe(true);
+  it("conflicting mode without --force errors with a helpful message", async () => {
+    expect(run(installArgs("slash"), sb.projectRoot, sb.env).status).toBe(0);
+    const out = run(installArgs("always"), sb.projectRoot, sb.env);
+    expect(out.status).toBe(1);
+    expect(out.stderr).toContain("already installed");
+    expect(out.stderr).toContain("--force");
+    expect(out.stderr).toContain("set-mode");
+    // Prior artifact must still exist; nothing changed.
+    expect(await exists(join(sb.projectRoot, ".claude", "commands", "confidence.md"))).toBe(true);
+    expect(await exists(join(sb.projectRoot, ".claude", "settings.json"))).toBe(false);
+    const installs = await readStateInstalls();
+    expect(installs).toHaveLength(1);
+    expect(installs[0].mode).toBe("slash");
   });
 
-  it("rejects auto mode for copilot with a helpful message", async () => {
-    const out = run(
-      ["install", "confidence", "--agent", "copilot", "--mode", "auto", "--local"],
-      projectRoot,
-      sandbox(),
-    );
-    // Install command skips unsupported modes with a warning rather than erroring.
+  it("conflicting mode with --force cleans up prior artifact and replaces the record", async () => {
+    expect(run(installArgs("slash"), sb.projectRoot, sb.env).status).toBe(0);
+    expect(run(installArgs("always", ["--force"]), sb.projectRoot, sb.env).status).toBe(0);
+    expect(await exists(join(sb.projectRoot, ".claude", "commands", "confidence.md"))).toBe(false);
+    expect(await exists(join(sb.projectRoot, ".claude", "settings.json"))).toBe(true);
+    const installs = await readStateInstalls();
+    expect(installs).toHaveLength(1);
+    expect(installs[0].mode).toBe("always");
+  });
+});
+
+describe("cli — list across agents and skills", () => {
+  it("shows every installed (skill, agent) pair", async () => {
+    expect(
+      run(
+        ["install", "confidence", "--agent", "claude-code,pi", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    expect(
+      run(
+        ["install", "convention", "--agent", "opencode", "--mode", "always", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+
+    const out = run(["list"], sb.projectRoot, sb.env);
     expect(out.status).toBe(0);
-    expect(out.stderr).toContain("not supported");
+    expect(out.stdout).toContain("confidence");
+    expect(out.stdout).toContain("convention");
+    expect(out.stdout).toContain("claude-code");
+    expect(out.stdout).toContain("pi");
+    expect(out.stdout).toContain("opencode");
+    expect(out.stdout).toMatch(/slash/);
+    expect(out.stdout).toMatch(/always/);
   });
+});
+
+describe("cli — update re-syncs installed artifacts", () => {
+  it("overwrites a manually edited install with the bundled source", async () => {
+    expect(
+      run(
+        ["install", "confidence", "--agent", "claude-code", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    const path = join(sb.projectRoot, ".claude", "commands", "confidence.md");
+    const original = await readFile(path, "utf8");
+    expect(original).toContain("# confidence");
+
+    await writeFile(path, "TAMPERED\n", "utf8");
+    expect(await readFile(path, "utf8")).toBe("TAMPERED\n");
+
+    expect(run(["update"], sb.projectRoot, sb.env).status).toBe(0);
+    expect(await readFile(path, "utf8")).toBe(original);
+  });
+});
+
+describe("cli — set-mode round-trips on every agent", () => {
+  const cases: Array<{
+    agent: string;
+    slashPath: (sb: Sandbox) => string;
+    alwaysPath: (sb: Sandbox) => string;
+  }> = [
+    {
+      agent: "pi",
+      slashPath: (s) => join(s.projectRoot, ".pi", "prompts", "confidence.md"),
+      alwaysPath: (s) => join(s.projectRoot, ".pi", "APPEND_SYSTEM.md"),
+    },
+    {
+      agent: "opencode",
+      slashPath: (s) => join(s.projectRoot, ".opencode", "commands", "confidence.md"),
+      alwaysPath: (s) => join(s.projectRoot, "AGENTS.md"),
+    },
+    {
+      agent: "copilot",
+      slashPath: (s) => join(s.projectRoot, ".github", "prompts", "confidence.prompt.md"),
+      alwaysPath: (s) => join(s.projectRoot, ".github", "copilot-instructions.md"),
+    },
+  ];
+
+  for (const tc of cases) {
+    it(`${tc.agent}: slash → always → slash`, async () => {
+      expect(
+        run(
+          ["install", "confidence", "--agent", tc.agent, "--mode", "slash", "--local"],
+          sb.projectRoot,
+          sb.env,
+        ).status,
+      ).toBe(0);
+      expect(await exists(tc.slashPath(sb))).toBe(true);
+
+      expect(
+        run(
+          ["set-mode", "confidence", "always", "--agent", tc.agent, "--local"],
+          sb.projectRoot,
+          sb.env,
+        ).status,
+      ).toBe(0);
+      expect(await exists(tc.slashPath(sb))).toBe(false);
+      expect(await exists(tc.alwaysPath(sb))).toBe(true);
+
+      expect(
+        run(
+          ["set-mode", "confidence", "slash", "--agent", tc.agent, "--local"],
+          sb.projectRoot,
+          sb.env,
+        ).status,
+      ).toBe(0);
+      expect(await exists(tc.slashPath(sb))).toBe(true);
+      expect(await exists(tc.alwaysPath(sb))).toBe(false);
+    });
+  }
 });

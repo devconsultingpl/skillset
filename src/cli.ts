@@ -35,12 +35,17 @@ program
   .option("--mode <mode>", "invocation mode: slash | auto | always", "slash")
   .option("--global", "install at the user-global level")
   .option("--local", "install into the current project (default)")
+  .option(
+    "--force",
+    "replace any prior install for the same skill+agent+scope, even if its mode differs",
+  )
   .action(async (skills: string[], opts) => {
     await install({
       skills,
       agents: parseAgentArg(opts.agent),
       mode: parseModeArg(opts.mode),
       scope: scopeOf(opts),
+      force: Boolean(opts.force),
     });
   });
 

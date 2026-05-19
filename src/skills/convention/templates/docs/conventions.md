@@ -21,3 +21,7 @@
 ## What not to do
 
 <!-- Frequent foot-guns. Anti-patterns specific to this project. -->
+
+## Plans
+
+<!-- Active plans live in `docs/plans/`. As soon as a plan is fully done, move it to `docs/plans/completed/` so it stops crowding the context of active work. The completed/ tree is the development log — never delete. -->

@@ -2,14 +2,16 @@
 
 ## Goal
 
-Build `skillset` — TypeScript CLI that installs agent skills across multiple coding agents (Claude Code, pi, opencode, copilot) from a single canonical source. Cross-platform via npm (`npm i -g skillset` / `npx skillset`). Day-one ships two skills: `confidence` (planning loop) and `convention` (project goals + conventions). Tool is itself a vehicle for an opinionated workflow: ask questions until aligned, write plan, wait for go.
+Build `skillset` — TypeScript CLI that installs agent skills across multiple coding agents (Claude Code, pi, opencode, copilot) from a single canonical source. Cross-platform Node. Day-one ships two skills: `confidence` (planning loop) and `convention` (project goals + conventions). Tool is itself a vehicle for an opinionated workflow: ask questions until aligned, write plan, wait for go.
+
+**Update (2026-05-19):** npm publishing is deferred — distribution is local-clone install only for now. Step 10 below is shelved.
 
 ## Decisions
 
 **Distribution**
-- npm package, cross-platform Node.
+- Cross-platform Node CLI. Distribution: local-clone install (`npm install -g .`). npm registry publish deferred.
 - Skills bundled inside CLI package (v0). Future: optional registry.
-- License: MIT. Lint/format: biome. Test: vitest. CI: GitHub Actions (lint + test + publish on tag).
+- License: MIT. Lint/format: biome. Test: vitest. CI: GitHub Actions (lint + test).
 
 **Canonical skill format**
 - One source file per skill — markdown body + YAML frontmatter.
@@ -104,9 +106,9 @@ Self-host: skillset itself uses its own `docs/` convention. This file is the fir
    - Write canonical `src/skills/convention/SKILL.md` + `templates/docs/*`.
 6. `update` + `set-mode` commands.
 7. `init` command for `convention` scaffold.
-8. Integration tests: install into temp dirs simulating each agent's layout; verify file shapes; verify clean uninstall via markers.
+8. Integration tests: install into temp dirs simulating each agent's layout; verify file shapes; verify clean uninstall via markers. **Done — see `completed/0002-step-8-agent-coverage.md`.**
 9. README + usage docs.
-10. Publish v0.1.0.
+10. ~~Publish v0.1.0.~~ **Deferred — no npm release planned in the near term. Local-clone install is the supported path.**
 
 ## Open questions
 
