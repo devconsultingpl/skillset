@@ -1,4 +1,5 @@
 import pc from "picocolors";
+import { alwaysWarnLines, bodyLineCount } from "../core/body-size.js";
 import { loadBundledSkill } from "../core/bundle.js";
 import { readState, upsertInstall, writeState } from "../core/state.js";
 import { applyConfig } from "../core/template.js";
@@ -43,6 +44,18 @@ export async function setMode(opts: SetModeOptions): Promise<void> {
   }
 
   const skill = applyConfigToSkill(await loadBundledSkill(opts.skill));
+
+  if (opts.mode === "always") {
+    const lines = bodyLineCount(skill.body);
+    const limit = alwaysWarnLines();
+    if (lines > limit) {
+      console.error(
+        pc.yellow(
+          `warning: ${opts.skill} body is ${lines} lines (>${limit}); always-mode artifacts load every session. Consider slash/auto, or trim the body.`,
+        ),
+      );
+    }
+  }
 
   for (const rec of matches) {
     const target = targetFor(rec.agent);

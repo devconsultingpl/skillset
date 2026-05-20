@@ -9,19 +9,21 @@ config:
 ---
 # confidence
 
-When this skill is active, run the planning loop **before** any non-trivial code change.
+Run the planning loop **before** any non-trivial code change.
 
-## The loop
+## Loop
 
-1. State your current confidence as a number 0–100 each turn.
-2. Ask the user **one** question at a time. Never batch. Lead with your recommended answer when you have one.
-3. Skip questions whose answers are already in the code, docs, or commits — read first, ask second.
-4. Keep going until confidence reaches ≥ {{start}}%.
+1. State current confidence 0–100 each turn.
+2. Ask **one** question. Recommend an answer first. Never batch.
+3. Read code, docs, commits before asking — don't ask what's already written.
+4. Continue until confidence ≥ {{start}}%.
 
-## When threshold reached
+Confidence is ≥ {{start}}% only if constraints are written down, edge cases have stated recipes, assumptions are validated against code (not memory), and you know your fallback if the next step fails.
 
-1. Pick the next plan number: look at `docs/plans/`, find the highest `NNNN-*.md`, increment by one, zero-pad to 4 digits.
-2. Write `docs/plans/NNNN-<slug>.md` with these sections:
+## At threshold
+
+1. Next plan number: scan `docs/plans/`, take the highest `NNNN-*.md`, increment, zero-pad to 4.
+2. Write `docs/plans/NNNN-<slug>.md`:
 
    ```
    # NNNN — <title>
@@ -34,27 +36,9 @@ When this skill is active, run the planning loop **before** any non-trivial code
    ## Confidence
    ```
 
-3. Print a short inline summary (2–4 sentences max) plus the plan path.
-4. **Stop. Wait for explicit "go" or "proceed" from the user before any code change.**
+3. Print a 2–4 sentence summary plus the plan path.
+4. **Stop. Wait for explicit "go" before any code change.**
 
-## During work
+## Mid-task drop
 
-If confidence drops below {{resume}}% — surprising codebase, contradictory requirement, broken assumption — stop. Re-enter the loop until back at ≥ {{start}}%. Update the plan rather than improvising silently.
-
-## What confidence means here
-
-A working estimate. Factors:
-
-- Are the constraints clear and written down?
-- Do edge cases have a stated recipe, not a vague intention?
-- Have you validated assumptions against code, not memory?
-- If the next step fails, do you know what you'd try next?
-
-If any of those is "no", confidence is not ≥ {{start}}%.
-
-## Question style
-
-- Conversational sentences, not numbered drops.
-- One ask per turn, even if you have ten in your head.
-- Frame trade-offs explicitly; recommend before you ask.
-- It's fine to interleave questions with short code reads.
+If confidence drops below {{resume}}% — surprising code, contradictory requirement, broken assumption — stop. Re-enter the loop. Update the plan; don't improvise silently.

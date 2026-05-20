@@ -60,6 +60,8 @@ skillset init convention
 
 Copilot doesn't have an auto-trigger concept; `auto` is rejected with a clear message. Use `slash` or `always` instead.
 
+`always` artifacts cost tokens every session. Keep bodies tight — the installer prints a warning when the rendered body is over **80 lines**. Override with `SKILLSET_ALWAYS_WARN_LINES=<n>`.
+
 ## Scopes
 
 - `--local` (default) — installs under the current project (`.claude/…`, `.pi/…`, etc.). Travels with the repo.

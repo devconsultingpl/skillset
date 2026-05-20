@@ -140,6 +140,57 @@ describe("cli — update re-syncs installed artifacts", () => {
   });
 });
 
+describe("cli — always-mode body-size warning", () => {
+  it("warns on install when rendered body exceeds the threshold", () => {
+    const out = run(
+      ["install", "confidence", "--agent", "claude-code", "--mode", "always", "--local"],
+      sb.projectRoot,
+      { ...sb.env, SKILLSET_ALWAYS_WARN_LINES: "5" },
+    );
+    expect(out.status).toBe(0);
+    expect(out.stderr).toContain("warning: confidence body is");
+    expect(out.stderr).toContain("lines (>5)");
+    expect(out.stderr).toContain("always-mode");
+  });
+
+  it("stays quiet on install below threshold", () => {
+    const out = run(
+      ["install", "confidence", "--agent", "claude-code", "--mode", "always", "--local"],
+      sb.projectRoot,
+      { ...sb.env, SKILLSET_ALWAYS_WARN_LINES: "10000" },
+    );
+    expect(out.status).toBe(0);
+    expect(out.stderr).not.toContain("warning:");
+  });
+
+  it("stays quiet for non-always installs even with a tiny threshold", () => {
+    const out = run(
+      ["install", "confidence", "--agent", "claude-code", "--mode", "slash", "--local"],
+      sb.projectRoot,
+      { ...sb.env, SKILLSET_ALWAYS_WARN_LINES: "1" },
+    );
+    expect(out.status).toBe(0);
+    expect(out.stderr).not.toContain("warning:");
+  });
+
+  it("warns when set-mode switches into always above threshold", () => {
+    expect(
+      run(
+        ["install", "confidence", "--agent", "claude-code", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    const out = run(
+      ["set-mode", "confidence", "always", "--agent", "claude-code", "--local"],
+      sb.projectRoot,
+      { ...sb.env, SKILLSET_ALWAYS_WARN_LINES: "5" },
+    );
+    expect(out.status).toBe(0);
+    expect(out.stderr).toContain("warning: confidence body is");
+  });
+});
+
 describe("cli — set-mode round-trips on every agent", () => {
   const cases: Array<{
     agent: string;

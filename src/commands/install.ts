@@ -1,4 +1,5 @@
 import pc from "picocolors";
+import { alwaysWarnLines, bodyLineCount } from "../core/body-size.js";
 import { loadBundledSkill } from "../core/bundle.js";
 import {
   matchInstall,
@@ -52,6 +53,18 @@ export function parseModeArg(arg: string): Mode {
   return arg as Mode;
 }
 
+function warnIfBodyLarge(body: string, skillName: string): void {
+  const lines = bodyLineCount(body);
+  const limit = alwaysWarnLines();
+  if (lines > limit) {
+    console.error(
+      pc.yellow(
+        `warning: ${skillName} body is ${lines} lines (>${limit}); always-mode artifacts load every session. Consider slash/auto, or trim the body.`,
+      ),
+    );
+  }
+}
+
 function applyConfigToSkill(skill: ParsedSkill, overrides?: Record<string, unknown>): ParsedSkill {
   const effective = { ...(skill.frontmatter.config ?? {}), ...(overrides ?? {}) };
   if (Object.keys(effective).length === 0) return skill;
@@ -75,6 +88,7 @@ export async function install(opts: InstallOptions): Promise<void> {
   for (const skillName of opts.skills) {
     const raw = await loadBundledSkill(skillName);
     const skill = applyConfigToSkill(raw, opts.configOverrides);
+    if (opts.mode === "always") warnIfBodyLarge(skill.body, skillName);
     for (const agent of opts.agents) {
       const target = targetFor(agent);
       if (!target.supportedModes.includes(opts.mode)) {
