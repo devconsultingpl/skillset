@@ -74,8 +74,15 @@ program
 program
   .command("update")
   .description("Re-sync every installed skill from the current bundle.")
-  .action(async () => {
-    await update();
+  .option("--force", "overwrite every install, including ones with local edits, without prompting")
+  .option("--dry-run", "report what would happen per install; write nothing")
+  .option("--skip-customized", "non-interactively skip installs with local edits")
+  .action(async (opts) => {
+    await update({
+      force: Boolean(opts.force),
+      dryRun: Boolean(opts.dryRun),
+      skipCustomized: Boolean(opts.skipCustomized),
+    });
   });
 
 program

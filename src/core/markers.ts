@@ -19,6 +19,12 @@ function blockRegex(skill: string, commentOpen: string, commentClose: string): R
   return new RegExp(`\\n?${open}[\\s\\S]*?${close}\\n?`, "g");
 }
 
+function interiorRegex(skill: string, commentOpen: string, commentClose: string): RegExp {
+  const open = `${escapeRe(commentOpen)}\\s*${BEGIN}\\s+${escapeRe(skill)}\\s*${escapeRe(commentClose)}`;
+  const close = `${escapeRe(commentOpen)}\\s*${END}\\s+${escapeRe(skill)}\\s*${escapeRe(commentClose)}`;
+  return new RegExp(`${open}\\n([\\s\\S]*?)\\n${close}`);
+}
+
 export interface MarkerStyle {
   /** Opening comment delimiter (e.g. `<!--`, `//`). */
   open: string;
@@ -37,6 +43,15 @@ export function wrap(skill: string, body: string, style: MarkerStyle = MD): stri
 
 export function remove(haystack: string, skill: string, style: MarkerStyle = MD): string {
   return haystack.replace(blockRegex(skill, style.open, style.close), "");
+}
+
+/**
+ * Return the interior of a skill's marker block (the bytes `wrap` placed between
+ * begin/end — i.e. the trimmed body), or null if no such block is present.
+ */
+export function extract(haystack: string, skill: string, style: MarkerStyle = MD): string | null {
+  const m = interiorRegex(skill, style.open, style.close).exec(haystack);
+  return m ? m[1] : null;
 }
 
 export function upsert(

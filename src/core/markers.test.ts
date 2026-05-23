@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { JS, MD, remove, upsert, wrap } from "./markers.js";
+import { JS, MD, extract, remove, upsert, wrap } from "./markers.js";
 
 describe("markers", () => {
   it("wraps in html-style markers by default", () => {
@@ -44,5 +44,19 @@ describe("markers", () => {
   it("remove is a no-op if marker absent", () => {
     const base = "no markers here\n";
     expect(remove(base, "x")).toBe(base);
+  });
+
+  it("extract returns the block interior (the trimmed body wrap stored)", () => {
+    const base = `before\n${wrap("confidence", "line one\nline two", MD)}after\n`;
+    expect(extract(base, "confidence", MD)).toBe("line one\nline two");
+  });
+
+  it("extract returns null when the block is absent", () => {
+    expect(extract("just user content\n", "confidence", MD)).toBeNull();
+  });
+
+  it("extract targets only the named block among several", () => {
+    const base = `${wrap("a", "AA", MD)}${wrap("b", "BB", MD)}`;
+    expect(extract(base, "b", MD)).toBe("BB");
   });
 });

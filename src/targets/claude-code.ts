@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import { dirname, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { compose } from "../core/frontmatter.js";
 import { readMaybe, writeAtomic } from "../core/fs.js";
 import { layoutFor } from "../core/locations.js";
@@ -163,6 +163,15 @@ export const claudeCodeTarget: AgentTarget = {
         }
       }
     }
+  },
+
+  async preview(ctx, record) {
+    // slash → command file; auto/always → the SKILL.md file. The settings.json
+    // hook (always mode) is generated deterministically, so it isn't compared.
+    const next = ctx.mode === "slash" ? renderCommandFile(ctx) : renderSkillFile(ctx);
+    const filePath = record.files[0] ? join(record.location, record.files[0]) : null;
+    const current = filePath ? await readMaybe(filePath) : null;
+    return { current, next };
   },
 };
 

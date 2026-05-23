@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type Sandbox, exists, makeSandbox, run } from "./helpers.js";
@@ -119,24 +119,113 @@ describe("cli — list across agents and skills", () => {
   });
 });
 
-describe("cli — update re-syncs installed artifacts", () => {
-  it("overwrites a manually edited install with the bundled source", async () => {
+describe("cli — update protects local edits", () => {
+  const installSlash = () =>
+    run(
+      ["install", "confidence", "--agent", "claude-code", "--mode", "slash", "--local"],
+      sb.projectRoot,
+      sb.env,
+    );
+  const cmdPath = () => join(sb.projectRoot, ".claude", "commands", "confidence.md");
+
+  it("non-interactively skips a diverged install and warns", async () => {
+    expect(installSlash().status).toBe(0);
+    await writeFile(cmdPath(), "TAMPERED\n", "utf8");
+
+    const out = run(["update"], sb.projectRoot, sb.env);
+    expect(out.status).toBe(0);
+    expect(out.stderr).toContain("skip");
+    expect(out.stderr).toContain("--force");
+    // Local edit survives.
+    expect(await readFile(cmdPath(), "utf8")).toBe("TAMPERED\n");
+  });
+
+  it("restores a missing install without prompting (not a divergence)", async () => {
+    expect(installSlash().status).toBe(0);
+    const original = await readFile(cmdPath(), "utf8");
+    await rm(cmdPath());
+
+    expect(run(["update"], sb.projectRoot, sb.env).status).toBe(0);
+    expect(await readFile(cmdPath(), "utf8")).toBe(original);
+  });
+
+  it("--force overwrites a diverged install", async () => {
+    expect(installSlash().status).toBe(0);
+    const original = await readFile(cmdPath(), "utf8");
+    await writeFile(cmdPath(), "TAMPERED\n", "utf8");
+
+    expect(run(["update", "--force"], sb.projectRoot, sb.env).status).toBe(0);
+    expect(await readFile(cmdPath(), "utf8")).toBe(original);
+  });
+
+  it("--dry-run reports divergence and writes nothing", async () => {
+    expect(installSlash().status).toBe(0);
+    await writeFile(cmdPath(), "TAMPERED\n", "utf8");
+
+    const out = run(["update", "--dry-run"], sb.projectRoot, sb.env);
+    expect(out.status).toBe(0);
+    expect(out.stdout).toContain("diverged");
+    // Nothing written: the tamper stays exactly as-is.
+    expect(await readFile(cmdPath(), "utf8")).toBe("TAMPERED\n");
+  });
+
+  it("--skip-customized leaves diverged files untouched", async () => {
+    expect(installSlash().status).toBe(0);
+    await writeFile(cmdPath(), "TAMPERED\n", "utf8");
+
+    expect(run(["update", "--skip-customized"], sb.projectRoot, sb.env).status).toBe(0);
+    expect(await readFile(cmdPath(), "utf8")).toBe("TAMPERED\n");
+  });
+
+  it("ignores edits outside a marker block but protects edits inside it", async () => {
     expect(
       run(
-        ["install", "confidence", "--agent", "claude-code", "--mode", "slash", "--local"],
+        ["install", "confidence", "--agent", "opencode", "--mode", "always", "--local"],
         sb.projectRoot,
         sb.env,
       ).status,
     ).toBe(0);
-    const path = join(sb.projectRoot, ".claude", "commands", "confidence.md");
-    const original = await readFile(path, "utf8");
-    expect(original).toContain("# confidence");
+    const anchor = join(sb.projectRoot, "AGENTS.md");
 
-    await writeFile(path, "TAMPERED\n", "utf8");
-    expect(await readFile(path, "utf8")).toBe("TAMPERED\n");
+    // Edit only OUTSIDE the marker block — not a divergence; update rewrites silently.
+    const withSurround = `# my own heading\n\n${await readFile(anchor, "utf8")}\ntrailing note\n`;
+    await writeFile(anchor, withSurround, "utf8");
+    const outside = run(["update"], sb.projectRoot, sb.env);
+    expect(outside.status).toBe(0);
+    expect(outside.stderr).not.toContain("skip");
+    const afterOutside = await readFile(anchor, "utf8");
+    expect(afterOutside).toContain("my own heading");
+    expect(afterOutside).toContain("trailing note");
 
-    expect(run(["update"], sb.projectRoot, sb.env).status).toBe(0);
-    expect(await readFile(path, "utf8")).toBe(original);
+    // Now edit INSIDE the marker interior — that is a divergence; skipped non-interactively.
+    const beginMarker = "<!-- skillset:begin confidence -->";
+    const tampered = afterOutside.replace(beginMarker, `${beginMarker}\nHAND EDITED`);
+    expect(tampered).not.toBe(afterOutside);
+    await writeFile(anchor, tampered, "utf8");
+    const inside = run(["update"], sb.projectRoot, sb.env);
+    expect(inside.status).toBe(0);
+    expect(inside.stderr).toContain("skip");
+    expect(await readFile(anchor, "utf8")).toContain("HAND EDITED");
+  });
+
+  it("mixes a diverged and a clean install in one run", async () => {
+    expect(installSlash().status).toBe(0);
+    expect(
+      run(
+        ["install", "convention", "--agent", "claude-code", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    const conventionPath = join(sb.projectRoot, ".claude", "commands", "convention.md");
+    const conventionOriginal = await readFile(conventionPath, "utf8");
+    await writeFile(cmdPath(), "TAMPERED\n", "utf8");
+
+    const out = run(["update"], sb.projectRoot, sb.env);
+    expect(out.status).toBe(0);
+    // Diverged one skipped; clean one rewritten to match the bundle.
+    expect(await readFile(cmdPath(), "utf8")).toBe("TAMPERED\n");
+    expect(await readFile(conventionPath, "utf8")).toBe(conventionOriginal);
   });
 });
 
@@ -246,4 +335,148 @@ describe("cli — set-mode round-trips on every agent", () => {
       expect(await exists(tc.alwaysPath(sb))).toBe(false);
     });
   }
+});
+
+describe("cli — caveman bundled skill", () => {
+  const slashPaths: Array<[string, (sb: Sandbox) => string]> = [
+    ["claude-code", (s) => join(s.projectRoot, ".claude", "commands", "caveman.md")],
+    ["pi", (s) => join(s.projectRoot, ".pi", "prompts", "caveman.md")],
+    ["opencode", (s) => join(s.projectRoot, ".opencode", "commands", "caveman.md")],
+    ["copilot", (s) => join(s.projectRoot, ".github", "prompts", "caveman.prompt.md")],
+  ];
+
+  it("is listed among bundled skills", () => {
+    const out = run(["list"], sb.projectRoot, sb.env);
+    expect(out.status).toBe(0);
+    expect(out.stdout).toContain("caveman");
+  });
+
+  it("installs slash on claude-code with description and body", async () => {
+    expect(
+      run(
+        ["install", "caveman", "--agent", "claude-code", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    const body = await readFile(slashPaths[0][1](sb), "utf8");
+    expect(body).toContain("description:");
+    expect(body).toContain("telegraphic");
+    expect(body).toContain("/caveman off");
+  });
+
+  it("installs slash on every agent", async () => {
+    expect(
+      run(
+        ["install", "caveman", "--agent", "all", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    for (const [, path] of slashPaths) {
+      expect(await exists(path(sb))).toBe(true);
+    }
+  });
+});
+
+describe("cli — uninstall fan-out", () => {
+  const installsOf = async (skill: string) => {
+    const statePath = join(sb.home, ".skillset", "state.json");
+    if (!(await exists(statePath))) return [];
+    const raw = JSON.parse(await readFile(statePath, "utf8"));
+    return (raw.installs as Array<{ skill: string; agent: string; scope: string }>).filter(
+      (r) => r.skill === skill,
+    );
+  };
+  const ccLocal = () => join(sb.projectRoot, ".claude", "commands", "confidence.md");
+  const ccGlobal = () => join(sb.home, ".claude", "commands", "confidence.md");
+  const piLocal = () => join(sb.projectRoot, ".pi", "prompts", "confidence.md");
+
+  it("bare uninstall removes installs across every agent", async () => {
+    expect(
+      run(
+        ["install", "confidence", "--agent", "claude-code,pi", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    expect(await exists(ccLocal())).toBe(true);
+    expect(await exists(piLocal())).toBe(true);
+
+    expect(run(["uninstall", "confidence"], sb.projectRoot, sb.env).status).toBe(0);
+    expect(await exists(ccLocal())).toBe(false);
+    expect(await exists(piLocal())).toBe(false);
+    expect(await installsOf("confidence")).toHaveLength(0);
+  });
+
+  it("bare uninstall removes installs across every scope", async () => {
+    expect(
+      run(
+        ["install", "confidence", "--agent", "claude-code", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    expect(
+      run(
+        ["install", "confidence", "--agent", "claude-code", "--mode", "slash", "--global"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    expect(await exists(ccLocal())).toBe(true);
+    expect(await exists(ccGlobal())).toBe(true);
+
+    expect(run(["uninstall", "confidence"], sb.projectRoot, sb.env).status).toBe(0);
+    expect(await exists(ccLocal())).toBe(false);
+    expect(await exists(ccGlobal())).toBe(false);
+    expect(await installsOf("confidence")).toHaveLength(0);
+  });
+
+  it("--agent filter leaves other agents' installs untouched", async () => {
+    expect(
+      run(
+        ["install", "confidence", "--agent", "claude-code,pi", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+
+    expect(
+      run(["uninstall", "confidence", "--agent", "claude-code"], sb.projectRoot, sb.env).status,
+    ).toBe(0);
+    expect(await exists(ccLocal())).toBe(false);
+    expect(await exists(piLocal())).toBe(true);
+    const left = await installsOf("confidence");
+    expect(left).toHaveLength(1);
+    expect(left[0].agent).toBe("pi");
+  });
+
+  it("--global filter leaves local installs untouched (and vice versa)", async () => {
+    expect(
+      run(
+        ["install", "confidence", "--agent", "claude-code", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    expect(
+      run(
+        ["install", "confidence", "--agent", "claude-code", "--mode", "slash", "--global"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+
+    expect(run(["uninstall", "confidence", "--global"], sb.projectRoot, sb.env).status).toBe(0);
+    expect(await exists(ccGlobal())).toBe(false);
+    expect(await exists(ccLocal())).toBe(true);
+    const left = await installsOf("confidence");
+    expect(left).toHaveLength(1);
+    expect(left[0].scope).toBe("local");
+
+    expect(run(["uninstall", "confidence", "--local"], sb.projectRoot, sb.env).status).toBe(0);
+    expect(await exists(ccLocal())).toBe(false);
+    expect(await installsOf("confidence")).toHaveLength(0);
+  });
 });

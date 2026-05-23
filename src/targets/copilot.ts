@@ -1,9 +1,9 @@
 import { rm } from "node:fs/promises";
-import { dirname, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { compose } from "../core/frontmatter.js";
 import { readMaybe, writeAtomic } from "../core/fs.js";
 import { layoutFor } from "../core/locations.js";
-import { MD, remove, upsert } from "../core/markers.js";
+import { MD, extract, remove, upsert } from "../core/markers.js";
 import type { AgentTarget, InstallContext } from "../core/target.js";
 import type { InstallRecord } from "../core/types.js";
 
@@ -80,5 +80,20 @@ export const copilotTarget: AgentTarget = {
         }
       }
     }
+  },
+
+  async preview(ctx, record) {
+    if (ctx.mode === "always") {
+      // Marker interior in .github/copilot-instructions.md.
+      const anchor = record.insertions?.[0];
+      const existing = anchor ? await readMaybe(anchor) : null;
+      const current = existing ? extract(existing, record.skill, MD) : null;
+      return { current, next: ctx.skill.body.trim() };
+    }
+    // copilot only supports slash + always; slash writes a .prompt.md file.
+    const next = renderPromptFile(ctx);
+    const filePath = record.files[0] ? join(record.location, record.files[0]) : null;
+    const current = filePath ? await readMaybe(filePath) : null;
+    return { current, next };
   },
 };

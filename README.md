@@ -50,6 +50,7 @@ skillset init convention
 - **`confidence`** — drives a question-led planning loop. Asks one question at a time until confidence ≥ 98%, writes a plan to `docs/plans/NNNN-slug.md`, waits for explicit *go* before code changes. If confidence drops below 95% mid-task, it stops and re-questions.
 - **`convention`** — points the agent at `docs/goals.md` and `docs/conventions.md` for project context. Use `skillset init convention` to scaffold the tree.
 - **`builder`** — senior-engineer build posture for *writing* code: search before abstracting, minimal diffs, small functions, verify before done. Defers planning to `confidence`/`architect`. Lean toward `auto`/`slash` mode — the body loads cheaply on demand rather than every session.
+- **`caveman`** — compresses your communication to terse, telegraphic style for fast iteration loops. `/caveman on` (default) or `/caveman off`. Slash-only — `auto`/`always` make no sense for a manual mode switch.
 
 ## Modes
 
@@ -74,13 +75,26 @@ Copilot doesn't have an auto-trigger concept; `auto` is rejected with a clear me
 skillset install <skills...> --agent <agents> --mode <mode> [--global|--local] [--force]
 skillset uninstall <skills...> [--agent ...] [--global|--local]
 skillset set-mode <skill> <mode> [--agent ...] [--global|--local]
-skillset update                       # re-sync every install from bundled sources
+skillset update [--force|--dry-run|--skip-customized]   # re-sync every install from bundled sources
 skillset list                         # what's available + what's installed
 skillset init <skill>                 # scaffold a skill's templates into cwd
 skillset emit <skill>                 # used by SessionStart hooks; prints JSON
 ```
 
 `--agent` accepts a comma-separated list (e.g. `claude-code,pi`) or `all`.
+
+## Uninstall
+
+A **bare** `skillset uninstall <skill>` removes *every* recorded install of that skill — across all agents and all scopes. Narrow it with filters:
+
+```sh
+skillset uninstall confidence                      # every install, all agents + scopes
+skillset uninstall confidence --agent claude-code  # only this agent (comma-separated list OK)
+skillset uninstall confidence --global             # only the global install
+skillset uninstall confidence --local              # only this project's local install
+```
+
+> ⚠️ Bare uninstall and `--global` are **not** project-scoped: they fan out across every install in `~/.skillset/state.json`, including local installs recorded in *other* project directories. Only `--local` restricts to the current project. Run `skillset list` first to see what would be removed. Nothing to match exits 0 with a warning.
 
 ## Reinstall guard
 
@@ -90,6 +104,18 @@ Installing a skill that's already installed for the same `(skill, agent, scope)`
 - **`skillset install ... --force`** — uninstalls the prior record, then installs fresh. Use when you actually want a clean re-install (e.g. after a corrupt state, or to pick up changed install-time config).
 
 Same-mode reinstalls are idempotent and need neither flag.
+
+## Updating without clobbering local edits
+
+`skillset update` re-renders every recorded install from the current bundle. Installs that still match the bundle are rewritten silently. An install whose on-disk content has **drifted** from the bundle (you hand-edited it) is protected:
+
+- **Interactive TTY** — prompts per diverged install: `[s]kip` (default) / `[o]verwrite` / `[d]iff` / `[a]bort`.
+- **Non-interactive** (CI, hooks) — skips diverged installs with a warning, exits 0.
+- **`--force`** — overwrite everything, no prompt.
+- **`--skip-customized`** — non-interactively skip diverged installs; still rewrite untouched ones.
+- **`--dry-run`** — report what each install would do; write nothing.
+
+For marker-block installs (`always` mode), only the bytes inside the `skillset:begin/end` markers count — editing surrounding user content never triggers a prompt.
 
 ## How it stays safe
 
