@@ -68,6 +68,8 @@ Research-and-design. Implementation after brainstorming.
 
 ## Design pass — converged decisions (2026-05-26)
 
+**Renamed `security-review` → `appsec-review`** (post-ship, 2026-05-26) to avoid a slug collision with Claude Code's built-in `/security-review`; references to `security-review` below are the renamed skill.
+
 Brainstorm resolved scope, severity, and noise posture. These override the originals where they differ; originals kept as the pre-brainstorm record. Reference point confirmed: Claude Code ships a built-in diff-scoped `/security-review`; building ours makes the same posture cross-agent (pi / opencode / copilot).
 
 **Scope → diff by default, argument targets an area.** A no-arg run reviews the branch diff vs `origin`'s default branch — same surface and detection as `code-review` (`origin/HEAD` → `origin/main` → `origin/master`, merge-base to working tree). An argument redirects to a path for a standalone deep audit regardless of diff: `/security-review src/auth`. This also partially fills the "unchanged code is never audited" gap, on the security axis.

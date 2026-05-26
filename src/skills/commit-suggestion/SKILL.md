@@ -29,7 +29,7 @@ Always give two ready-to-paste commands, one-liner first (the favored default):
 
 ## Flag, don't block
 - **Multi-concern:** if the diff spans clearly unrelated paths/types, still emit working message(s), then add "looks like N concerns; consider splitting" with the suggested split. Never withhold a usable message.
-- **Secrets:** if the diff touches `.env`, `*.key`, `*.pem`, or `secrets/`, add a one-line heads-up before the suggestion — the moment of commit is when it matters. Depth is `security-review`'s job.
+- **Secrets:** if the diff touches `.env`, `*.key`, `*.pem`, or `secrets/`, add a one-line heads-up before the suggestion — the moment of commit is when it matters. Depth is `appsec-review`'s job.
 
 ## Don't
 Execute the commit, push, amend, or add a `Co-Authored-By` line. This skill only *suggests* — the user runs git.

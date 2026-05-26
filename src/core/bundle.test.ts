@@ -4,6 +4,7 @@ import { listBundledSkills, loadBundledSkill } from "./bundle.js";
 describe("bundled skills", () => {
   it("includes the known skills", async () => {
     const names = await listBundledSkills();
+    expect(names).toContain("appsec-review");
     expect(names).toContain("architect");
     expect(names).toContain("builder");
     expect(names).toContain("code-review");
@@ -12,7 +13,6 @@ describe("bundled skills", () => {
     expect(names).toContain("convention");
     expect(names).toContain("declutter");
     expect(names).toContain("intent-review");
-    expect(names).toContain("security-review");
   });
 
   // Generic validity gate — covers every bundled skill, current and future.
