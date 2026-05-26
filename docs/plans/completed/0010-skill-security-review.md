@@ -65,3 +65,27 @@ Research-and-design. Implementation after brainstorming.
 ## Confidence
 
 ≥90% on this discovery plan.
+
+## Design pass — converged decisions (2026-05-26)
+
+Brainstorm resolved scope, severity, and noise posture. These override the originals where they differ; originals kept as the pre-brainstorm record. Reference point confirmed: Claude Code ships a built-in diff-scoped `/security-review`; building ours makes the same posture cross-agent (pi / opencode / copilot).
+
+**Scope → diff by default, argument targets an area.** A no-arg run reviews the branch diff vs `origin`'s default branch — same surface and detection as `code-review` (`origin/HEAD` → `origin/main` → `origin/master`, merge-base to working tree). An argument redirects to a path for a standalone deep audit regardless of diff: `/security-review src/auth`. This also partially fills the "unchanged code is never audited" gap, on the security axis.
+
+**Reads beyond the diff to trace exploitability.** Unlike `code-review`'s narrow dup-check reach, security-review *must* follow data flow — a tainted input in the diff may reach a sink outside it, or the guarding authz check may live elsewhere. Reading surrounding code to confirm whether a path is actually exploitable is core to the job, not scope creep.
+
+**Severity → impact-based: Critical / High / Medium / Low / Info.** Tied to exploitability + impact, not merge-urgency (the axis security reviewers expect). Every finding also carries an OWASP/CWE-rooted category tag.
+
+**Noise → conservative; a concrete exploit path is required to flag C/H/M/L.** Each such finding states how it would be abused. This is the primary defense against security-theater and hallucinated vulns. Findings with no concrete exploit path but real hardening value go under **Info**, kept sparse — the release valve so "require an exploit path" doesn't suppress legitimate defense-in-depth notes.
+
+**Report-only.** Never applies fixes — a wrong security auto-fix is worse than none. Report mirrors `code-review`'s shape: grouped (by severity here), each finding = `file:line`, category, the exploit path, impact, recommended fix.
+
+**Seam with `code-review`.** `code-review` flags *obvious* security issues as part of a broad pass and defers depth here; `security-review` is the dedicated deep pass you run when you want thoroughness on the security axis. Overlap on an obvious finding is fine — you don't run both routinely. No hard chaining; it may point, never auto-invokes.
+
+**Decided defaults (veto-able).**
+- *Categories:* fixed, OWASP Top 10 + CWE Top 25 rooted — a bounded list keeps the report scannable.
+- *Dependencies:* read `package.json` / manifests for context only; no CVE scanning (that's `npm audit` / tooling, not an LLM).
+- *Mode:* slash + auto, recommend auto (mirrors `code-review`); discourage `always`.
+- *Out of scope (unchanged):* infra / IaC review, architecture-level threat modeling, dependency CVE scanning.
+
+Purpose now locked at ≥98%. What remains is authoring: the SKILL.md body + a `bundle.test.ts` assertion. Research (OWASP/CWE lists, public prompts) optional — category vocab is well-established.

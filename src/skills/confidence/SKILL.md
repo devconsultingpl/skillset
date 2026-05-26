@@ -23,7 +23,7 @@ Confidence is ≥ {{start}}% only if constraints are written down, edge cases ha
 ## At threshold
 
 1. Next plan number: scan `docs/plans/`, take the highest `NNNN-*.md`, increment, zero-pad to 4.
-2. Write `docs/plans/NNNN-<slug>.md`:
+2. Write *or update* `docs/plans/NNNN-<slug>.md` (architect may already own this file — refine it, don't clobber it):
 
    ```
    # NNNN — <title>

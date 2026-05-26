@@ -130,3 +130,25 @@ Research + design plan. Implementation steps emerge from brainstorming.
 ≥90% on research + design plan. Implementation confidence assessed after design pass.
 
 Heredoc multi-line approach is borrowed from Claude Code's own commit flow and is known-good in bash + zsh; verification step is included as a courtesy, not because the pattern is suspect.
+
+## Design pass — converged decisions (2026-05-26)
+
+Brainstorm resolved output shape and multi-concern handling; the rest is locked from the plan's own leanings. Heredoc form **verified** in the user's zsh — `$VARS`, backticks, and `!bang` survive a single-quoted heredoc, and the block assembles as one paste — so no first-run verification ceremony lives in the skill.
+
+**Output → always emit both, one-liner first.** Every run prints two ready-to-paste commands: (1) the concise `git commit -m "..."` one-liner (the favored default, listed first), and (2) the heredoc multi-line form whose body scales to the change. The user picks. For a trivial change the heredoc body may be just the subject — still provided, so a body is one paste away.
+
+**Multi-concern → craft a usable message, then flag the split.** When the diff spans unrelated concerns (heuristic: changes across very different paths/types), still output working message(s) for everything staged, then append a note — "looks like N concerns; consider splitting" — with the suggested split. Never blocks.
+
+**Style → mirror the repo, fall back gracefully.** Sample `git log -20`; match the dominant prefix style, length, capitalization, imperative vs descriptive. If the log is sparse or inconsistent, fall back to imperative / concise / no forced prefix. Never impose Conventional Commits unless the repo already uses them.
+
+**Source → staged if present, else all uncommitted.** Describe the staged diff when anything is staged; otherwise describe everything uncommitted and note "run `git add` first." A clean tree → say there's nothing to commit.
+
+**Safety / read-only.** Runs only `git status` / `diff` / `log` / `diff --staged`; never executes `git commit`; emits no `Co-Authored-By` line. A cheap heads-up if the diff touches `.env` / `*.key` / `*.pem` / `secrets/` — the moment of commit is when it matters; security *depth* stays with `security-review`.
+
+**Slug & mode.** Dir `commit-suggestion`, slash `/commit-suggest`; modes slash + auto (auto on "suggest a commit message / commit this / what should I commit this as"). Discourage `always`.
+
+**Shell note in body, not ceremony.** Heredoc is bash/zsh-compatible (fish differs — flag if the user switches). State it; don't run a paste-test on first use.
+
+**Out of scope v0 (unchanged).** Executing / pushing the commit, amend-message suggestions, PR descriptions, squashing, Conventional Commits enforcement. The PR-description followup renumbers **0016 → 0017** (builder took 0016).
+
+Purpose locked at ≥98%. Remaining is authoring: the SKILL.md body + a `bundle.test.ts` assertion + a README mention.

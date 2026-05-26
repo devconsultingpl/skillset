@@ -48,8 +48,14 @@ skillset init convention
 ## Bundled skills (v0.1)
 
 - **`confidence`** — drives a question-led planning loop. Asks one question at a time until confidence ≥ 98%, writes a plan to `docs/plans/NNNN-slug.md`, waits for explicit *go* before code changes. If confidence drops below 95% mid-task, it stops and re-questions.
+- **`architect`** — plan posture for non-trivial work: orients in the project, generates design options scaled to the stakes, recommends one with risks named, and writes the plan to `docs/plans/NNNN-slug.md`. Hands off to `confidence` to drive the loop to *go*; defers building to `builder`. Lean toward `auto`/`slash` — the body loads on demand, not every session.
+- **`intent-review`** — read-only check of pending changes against the plan that motivated them: flags drift, scope creep, missing pieces, and overengineering. Auto-activates on uncommitted changes plus an open plan in `docs/plans/`. Reports; never edits. Lean toward `auto`/`slash`.
 - **`convention`** — points the agent at `docs/goals.md` and `docs/conventions.md` for project context. Use `skillset init convention` to scaffold the tree.
 - **`builder`** — senior-engineer build posture for *writing* code: search before abstracting, minimal diffs, small functions, verify before done. Defers planning to `confidence`/`architect`. Lean toward `auto`/`slash` mode — the body loads cheaply on demand rather than every session.
+- **`code-review`** — read-only review of the changes on this branch (local vs `origin`'s default branch, or a path/range you name): flags correctness, readability, convention breaks, newly-introduced bloat, and obvious security/perf at `file:line` with a blocker/important/nit severity. Reports; never edits. Lean toward `auto`/`slash`.
+- **`declutter`** — whole-codebase anti-bloat survey: hunts *pre-existing* dead code, duplication, and collapsible abstractions, ranks the biggest maintenance wins, and applies the fixes you approve. `/declutter` or `/declutter <area>`. Slash-only — a whole-repo survey that then edits shouldn't fire on a weak match.
+- **`security-review`** — deep, read-only security audit of the changes (or a path you name): conservative — flags a vulnerability only with a concrete exploit path, ranked Critical→Info with an OWASP/CWE category. The cross-agent counterpart to Claude Code's built-in `/security-review`. Reports; never edits. Lean toward `auto`/`slash`.
+- **`commit-suggestion`** — suggests a ready-to-paste `git commit` command for the current changes, matching your repo's log style. Emits a concise one-liner and a heredoc multi-line form every run; flags multi-concern diffs and secret-file touches. Read-only — never runs git. `/commit-suggest`. Lean toward `auto`/`slash`.
 - **`caveman`** — compresses your communication to terse, telegraphic style for fast iteration loops. `/caveman on` (default) or `/caveman off`. Slash-only — `auto`/`always` make no sense for a manual mode switch.
 
 ## Modes

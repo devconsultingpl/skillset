@@ -235,3 +235,116 @@ Followup plan number: `0014-split-convention-skill.md`.
 ≥90% on the research + design plan itself. Implementation confidence assessed after design pass.
 
 Followup A and B are flagged here for traceability but live in their own plans (0013, 0014). 0012 is complete without them.
+
+---
+
+## Design pass — converged decisions (2026-05-23)
+
+Brainstorm resolved the three design axes and the open questions. Where these differ from the original Decisions above, **these win**; the originals are kept as the pre-brainstorm record.
+
+**Structure → two skills, split** (was: leaning single-skill, Option A). `architect` (plan-only) and `intent-review` (check pending changes against the governing plan). Each orthogonal, own slash trigger, own auto-activation. Rationale: cleaner single-responsibility; intent-checking is a distinct posture from generating a plan, and is distinct from the line-level review trio.
+
+**Artifact seam → architect writes, confidence drives.** architect owns `docs/plans/NNNN`: it orients, generates options, recommends, and writes the file. `confidence` drives the question loop to ≥98% and the go-wait but does not write the file — it refines architect's doc. Coordination: `confidence`'s body says "write a plan" at threshold; to avoid a double-write, architect's body states it owns the artifact, plus a one-line tweak to `confidence` ("write *or update*", see Implementation).
+
+**Modes → slash + auto, recommend auto, discourage `always`.** Both skills support explicit invocation and description-triggered auto-activation. `always` is discouraged (per-session token cost; planning/checking are task-specific). Each body owns its skip-threshold so auto-activation doesn't become process theater.
+
+**Option depth → adaptive, with a floor.** Low-stakes / clear path: one recommendation + one named rejected alternative. High-stakes / ambiguous: 2–3 real options with named tradeoffs + a recommendation. Floor: always name ≥1 road not taken. Body defines the cutoff. Bias to the simplest design that meets the goal.
+
+**architect scope → sharp, plan doc only** (was: propose ADRs + arch/conventions edits). architect writes only the plan. It flags ADR-worthy or architecture-affecting decisions inline ("→ worth an ADR: X") but never drafts ADRs or edits `docs/decisions/`, `docs/architecture.md`, or `docs/conventions.md` in v0. ADR-authoring can be its own skill later.
+
+### Recorded leanings (ratify or adjust at "go")
+
+- **intent-review name** — `intent-review` (reads alongside `code-review`/`security-review`). Alternatives if preferred: `intent-check`, `drift-review`.
+- **intent-review triggers** — auto-activates on uncommitted changes + an open plan in `docs/plans/`, or on "did I cover the plan / am I doing too much". Self-contained: does *not* chain off the review trio. If no plan or stated intent exists, it stops and asks rather than inventing intent.
+- **Web-research budget (architect)** — opt-in per task, ≤3 searches by default, expandable on request. Most project work needs only code + docs.
+- **Plan numbering (architect)** — picks the next available number (highest `NNNN` in `docs/plans/` incl. `completed/`, +1) and names it in the proposal.
+
+### Deltas from original 0012 (stale since `builder` shipped)
+
+- **"No separate implementer skill" → superseded** by `builder` (ADR `0001-builder-skill-vs-conventions.md`). Composition seam is now: `architect` (plan) → `confidence` (loop + ≥98% gate + go-wait) → `builder` (build) → `code-review`/`simplify`/`security-review` (after).
+- **Followup A (`0013-coder-conventions`) → superseded** by `builder`, which carries the universal coder posture. Dead.
+- **Followup B (`0014-split-convention-skill`) → unaffected**, still open.
+
+## Implementation
+
+Two bundled skills under `src/skills/`. Discovery is a directory scan (`listBundledSkills` in `src/core/bundle.ts`) — no registry to edit; adding the directories is enough. `dist/` regenerates via `npm run build` (`tsc` + `scripts/copy-skills.mjs`). Both bodies stay tight (builder is 38 lines, confidence 45) to keep auto/always token cost low.
+
+### `src/skills/architect/SKILL.md`
+
+```
+---
+name: architect
+version: "0.1.0"
+description: Plan posture for non-trivial work — orient in the project, frame the problem, generate design options scaled to the stakes, recommend one with risks named, and write the plan to docs/plans. Hands off to confidence to drive the question loop to a "go". Skips trivial edits.
+slug: architect
+---
+# architect
+
+Plan posture for *non-trivial* work — multi-file design, ambiguous scope, architectural impact, or "should we do X". Skip trivial edits (rename, typo, single-file localized fix): say nothing and let building proceed. This body owns that threshold.
+
+## Orient first
+- Read the code and docs before proposing. If `docs/` carries goals/conventions/architecture, read what's relevant (the `convention` skill loads them when active).
+- Frame the actual problem in one or two sentences. Name the constraints and the unknowns.
+- Fill gaps by reading and asking, not guessing. Web research is opt-in — only when prior art genuinely decides the call (library, protocol, algorithm), ≤3 searches unless asked for more.
+
+## Options, scaled to the stakes
+- Low-stakes / one clear path: state the recommendation and name one alternative you rejected, and why.
+- High-stakes / ambiguous: 2–3 real options, each a short paragraph, with named tradeoffs (complexity, risk, surface). Recommend one. No manufactured options.
+- Floor: always name at least one road not taken. Bias to the simplest design that meets the goal — complexity must justify itself.
+
+## Write the plan, then hand off
+- You own the artifact: write `docs/plans/NNNN-<slug>.md` (next number = highest in `docs/plans/` incl. `completed/`, +1). Capture goal, the options, the chosen direction, risks, open questions.
+- Flag decisions that outlive this plan inline — "→ worth an ADR: X" — but don't draft ADRs or edit architecture/conventions docs.
+- Hand the floor to `confidence` to drive questions to ≥98% and wait for an explicit "go". `confidence` refines this same doc; you own it.
+
+## Hard rule
+Never jump to implementation without an explicit "go". Plan mode ends at the written plan + handoff. Building is `builder`'s job, after "go".
+```
+
+### `src/skills/intent-review/SKILL.md`
+
+```
+---
+name: intent-review
+version: "0.1.0"
+description: Read-only check of pending changes against the plan that motivated them. Flags drift from the plan, scope creep, missing pieces, and overengineering. Auto-activates when there are uncommitted changes and an open plan in docs/plans. Reports; never edits.
+slug: intent-review
+---
+# intent-review
+
+Read-only check: does the pending change match the intent it was meant to deliver? Activates when there are uncommitted changes and an open plan in `docs/plans/`, or when asked "did I cover the plan / am I doing too much". Skip if there's no stated intent to check against — say so rather than inventing one.
+
+## Establish intent
+- Find the governing plan in `docs/plans/` (the one matching the work), or use the intent the user states. If neither exists, stop and ask what to check against.
+- Read the plan's goal, decisions, and steps. That's the spec.
+
+## Check the diff against it
+- **Drift** — changes that contradict a decision the plan made.
+- **Scope creep** — changes the plan didn't call for (drive-by refactors, extra features).
+- **Missing pieces** — plan steps with no corresponding change.
+- **Overengineering** — abstraction, flexibility, or config the plan didn't ask for and nothing yet needs.
+
+## Report
+- Group findings under those four headings. Each: `file:line`, what it is, why it diverges from the plan.
+- Read-only — propose nothing into files. End with a one-line verdict: faithful to the plan, drifting, or incomplete.
+```
+
+### Other changes
+
+- **README** — add two bullets under "## Bundled skills (v0.1)" (builder's bullet already references `architect`). Mirror existing tone; note `auto`/`slash`, `always` discouraged.
+- **`src/skills/confidence/SKILL.md`** — change "At threshold" step 2 from "Write `docs/plans/NNNN-<slug>.md`" to "Write *or update* `docs/plans/NNNN-<slug>.md`" so it refines an architect-authored plan rather than clobbering it.
+- **Tests** — in `src/core/bundle.test.ts`, add `expect(names).toContain("architect")` and `expect(names).toContain("intent-review")`. The existing iterate-all-skills frontmatter test and `body-size.test.ts` auto-cover both — keep bodies tight.
+- **Move plan** — once shipped, move `0012-skill-architect.md` to `docs/plans/completed/` (per `docs/conventions.md`).
+
+### Steps
+
+1. Write `src/skills/architect/SKILL.md` and `src/skills/intent-review/SKILL.md`.
+2. Add the two README bullets.
+3. Apply the one-line `confidence` tweak.
+4. Add the two `toContain` assertions to `bundle.test.ts`.
+5. `npm run build`, `npm test`, `npm run lint:fix`, `npm run typecheck`.
+6. Move 0012 to `completed/`.
+
+## Confidence (implementation)
+
+≥98%. Structure and behaviors are specified with recipes; mechanics validated against code (directory-scan discovery, build, README, test patterns); fallback is to mirror the shipped `builder`/`confidence` skills. Awaiting explicit "go".

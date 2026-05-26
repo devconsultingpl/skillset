@@ -61,3 +61,30 @@ This is a research-and-design plan. Implementation comes after brainstorming con
 ## Confidence
 
 ≥90% on the *research + design plan* itself. Implementation confidence will be assessed when the design is picked.
+
+## Design pass — converged decisions (2026-05-23)
+
+Brainstorm with the user fixed scope, posture, and the seam with the other review skills. These override the originals where they differ; originals are kept as the pre-brainstorm record.
+
+**Scope → diff against the repo's default branch on `origin`.** A default run reviews everything that diverges from `origin/<default>` — working tree + staged + local commits ahead of it, i.e. "what this branch would introduce." Detect the default branch (`origin/HEAD`, falling back to `origin/main` then `origin/master`); never hardcode `main`. Uncommitted work gets the hardest look; committed-but-unpushed work is in scope too.
+
+**Adjustable target.** An argument narrows or redirects scope: `/code-review in the payments module` reviews that path; a commit range or path also works. No argument → the default-branch diff.
+
+**Cross-codebase reach is narrow.** Reads outside the diff *only* to check "are we duplicating something that already exists / reinventing a local pattern." It does not sweep the whole codebase — that's `simplify`'s job.
+
+**Report-only.** Emits findings, applies nothing. Severity rubric: blocker / important / nit, each with `file:line`, rationale, and a suggested fix where obvious.
+
+**Concerns it flags.** Correctness, readability, and convention adherence of the delta, **plus obvious security and performance landmines** in the changed code. It defers *deep* security analysis to `security-review` and deep perf work elsewhere — but it never stays silent on a visible injection, unsafe input, or O(n²)-in-a-hot-path that's right there in the diff. Flag the obvious, defer the depth.
+
+**Bloat boundary with `declutter` (renamed from `simplify`) — in-the-diff vs across-the-repo.** If a change *introduces* bloat (a premature abstraction with one caller, dead branches, or new code that duplicates existing code), `code-review` flags it — it's in the delta. `declutter` owns only *pre-existing, codebase-wide* bloat. The shared "are we reinventing existing X" check is `code-review`'s when the new code is the offender; `declutter`'s when it's a repo-wide duplication cluster.
+
+**Seam with the review family — one boundary line in the body.** Whether the change matches the plan = `intent-review`. Applying fixes / pre-existing codebase-wide bloat = `declutter`. Security *depth* = `security-review`. `code-review` owns line-level quality of the delta, including newly-introduced bloat and obvious security/perf.
+
+**Trigger mode → slash + auto, recommend auto; discourage `always`.** Matches `intent-review`/`architect`/`builder`: auto-loads when a task matches ("review my changes"), still invokable explicitly. `always` is wasteful — review is task-specific, not every-session.
+
+**Decided defaults (veto-able).**
+- *Default-branch detection:* resolve `origin/HEAD` via `git symbolic-ref refs/remotes/origin/HEAD`; fall back to `origin/main`, then `origin/master`. Review surface = `git diff <merge-base>...` plus the working tree, so local commits and uncommitted edits both show.
+- *Conventions:* read `docs/conventions.md` if present and judge against it; no hard dependency (loose coupling, same as `architect`).
+- *No hard chaining:* reports and may point ("run `/declutter` for codebase-wide bloat"), but never auto-invokes another skill.
+
+Design now locked at ≥98%. Purpose and the implementation-shaping calls (scope, mode, concerns, default-branch detection) are all fixed; what remains is pure authoring — SKILL.md body wording and the bundle test. Research skim (Cloudflare review ref, ecosystem prompts) optional before writing, no longer a blocker.

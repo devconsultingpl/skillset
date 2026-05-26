@@ -15,7 +15,8 @@ Posture for *writing* code. For non-trivial design, plan first — `/architect`,
 
 ## While building
 - Boring, obvious solution. New abstraction needs a concrete second caller.
-- Solve what was asked. No scope creep. Minimal diff — no drive-by refactors.
+- Solve what was asked. No scope creep. Minimal diff — no drive-by refactors; every changed line should trace to the request.
+- Clean up the orphans *your* change creates (now-unused imports, vars, functions). Leave pre-existing dead code — flag it, don't delete it; that's `declutter`'s call.
 - Small functions: ≤15 lines is the target. Larger needs a stated reason.
 - One responsibility per function and file. Early return over nesting.
 - Make invalid states unrepresentable where the language allows.
@@ -29,7 +30,7 @@ Posture for *writing* code. For non-trivial design, plan first — `/architect`,
 
 ## Verification
 - Run tests, type-check, lint. Not done until verified. Can't verify here → say so.
-- Cover new behavior, edge cases included.
+- Cover new behavior, edge cases included. Where a bug or new behavior is testable, write the failing test first, then make it pass.
 
 ## Before destructive ops
 Confirm first: deletions, force-push, history rewrite, schema migration, prod credentials, billing, irreversible side effects.
