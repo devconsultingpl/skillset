@@ -6,6 +6,8 @@
 
 Biome (`biome.json`). Default line length. Run `npm run lint:fix` before commit.
 
+Executable artifacts under `src/skills/<skill>/assets/` (opencode plugin, pi extension, Copilot hook) are foreign-runtime code — excluded from `tsc` and `biome`, copied verbatim to `dist/`. Don't import them from skillset source; read them at install time via `assetPath`.
+
 ## Naming
 
 - Source: kebab-case files, camelCase exports.

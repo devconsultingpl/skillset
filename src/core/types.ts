@@ -12,6 +12,11 @@ export interface SkillFrontmatter {
   name: string;
   version: string;
   description: string;
+  /** Optional explicit slug for slash/command file names (defaults to `name`). */
+  slug?: string;
+  /** Marks the one bundled reader skill (`skillset-status`): its slash command
+   * reports the active set instead of recording itself as an active mode. */
+  statusReader?: boolean;
   config?: Record<string, unknown>;
   targets?: Partial<Record<AgentName, Record<string, unknown>>>;
 }
@@ -42,6 +47,16 @@ export interface InstallRecord {
   insertions?: string[];
   /** Hook entries added to settings/config (agent-defined opaque identifier). */
   hooks?: string[];
+  /** The exact statusLine command this install wrote into settings (decision 9).
+   * Uninstall removes the statusLine only if it still equals this — so a user
+   * who later set their own statusLine is never clobbered. */
+  statusLine?: string;
+  /** Absolute path of the settings file holding our statusLine, so uninstall
+   * removes it without re-deriving an agent-specific path. */
+  statusLinePath?: string;
+  /** Absolute paths to standalone executable artifacts (opencode plugin, pi
+   * extension, Copilot CLI hook). Removed verbatim on uninstall (decision 8). */
+  assets?: string[];
   projectPath?: string;
   installedAt: string;
 }

@@ -16,5 +16,5 @@
     "verbatimModuleSyntax": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "test", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "test", "**/*.test.ts", "src/skills/**"]
 }

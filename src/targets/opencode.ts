@@ -1,14 +1,24 @@
-import { rm } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
+import { assetPath } from "../core/bundle.js";
 import { compose } from "../core/frontmatter.js";
 import { readMaybe, writeAtomic } from "../core/fs.js";
 import { layoutFor } from "../core/locations.js";
 import { MD, extract, remove, upsert } from "../core/markers.js";
 import type { AgentTarget, InstallContext } from "../core/target.js";
-import type { InstallRecord } from "../core/types.js";
+import type { InstallRecord, Scope } from "../core/types.js";
 
 function targetOverrides(skill: InstallContext["skill"]): Record<string, unknown> {
   return skill.frontmatter.targets?.opencode ?? {};
+}
+
+/** opencode plugin path: `.opencode/plugins/skillset.js` (local) or
+ * `~/.config/opencode/plugins/skillset.js` (global). */
+function pluginPath(scope: Scope, projectRoot: string): string {
+  const base =
+    scope === "global" ? join(homedir(), ".config", "opencode") : join(projectRoot, ".opencode");
+  return join(base, "plugins", "skillset.js");
 }
 
 function renderSkillFile(ctx: InstallContext): string {
@@ -16,12 +26,18 @@ function renderSkillFile(ctx: InstallContext): string {
   return compose({ name, description, ...targetOverrides(ctx.skill) }, ctx.skill.body);
 }
 
+/** Only the status-reader command gets a shell trailer (a project-scoped read).
+ * Tracking is owned by the plugin (`command.execute.before`), which is more
+ * reliable than a per-command trailer and avoids a double-write race. */
 function renderCommandFile(ctx: InstallContext): string {
   const { description } = ctx.skill.frontmatter;
   const overrides = targetOverrides(ctx.skill);
   const { name: _omit, ...rest } = overrides as { name?: unknown };
   void _omit;
-  return compose({ description, ...rest }, ctx.skill.body);
+  if (ctx.mode !== "slash" || !ctx.skill.frontmatter.statusReader) {
+    return compose({ description, ...rest }, ctx.skill.body);
+  }
+  return compose({ description, ...rest }, `${ctx.skill.body.trimEnd()}\n\n!\`skillset status\``);
 }
 
 export const opencodeTarget: AgentTarget = {
@@ -35,6 +51,7 @@ export const opencodeTarget: AgentTarget = {
     const slug = (skill.frontmatter as { slug?: string }).slug ?? name;
     const files: string[] = [];
     const insertions: string[] = [];
+    const assets: string[] = [];
     let installRoot: string;
 
     if (mode === "auto") {
@@ -47,6 +64,15 @@ export const opencodeTarget: AgentTarget = {
       installRoot = dirname(path);
       await writeAtomic(path, renderCommandFile(ctx));
       files.push(relative(installRoot, path));
+      // The status-reader skill ships the tracking plugin (decision 8).
+      if (skill.frontmatter.statusReader) {
+        const dest = pluginPath(scope, projectRoot);
+        await writeAtomic(
+          dest,
+          await readFile(assetPath("skillset-status", "opencode-plugin.js"), "utf8"),
+        );
+        assets.push(dest);
+      }
     } else {
       // always: marker-wrapped block in AGENTS.md.
       const anchor = layout.always(scope, projectRoot);
@@ -65,6 +91,7 @@ export const opencodeTarget: AgentTarget = {
       location: installRoot,
       files,
       insertions: insertions.length > 0 ? insertions : undefined,
+      assets: assets.length > 0 ? assets : undefined,
       projectPath: scope === "local" ? projectRoot : undefined,
       installedAt: new Date().toISOString(),
     } satisfies InstallRecord;
@@ -73,6 +100,9 @@ export const opencodeTarget: AgentTarget = {
   async uninstall(record) {
     for (const rel of record.files) {
       await rm(`${record.location}/${rel}`, { force: true });
+    }
+    for (const asset of record.assets ?? []) {
+      await rm(asset, { force: true });
     }
     if (record.mode === "auto") {
       await rm(record.location, { force: true, recursive: true });

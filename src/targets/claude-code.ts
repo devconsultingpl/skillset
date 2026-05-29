@@ -4,6 +4,7 @@ import { compose } from "../core/frontmatter.js";
 import { readMaybe, writeAtomic } from "../core/fs.js";
 import { layoutFor } from "../core/locations.js";
 import { MD, remove, upsert } from "../core/markers.js";
+import { STATUSLINE_COMMAND, addStatusLine, dropStatusLine } from "../core/statusline.js";
 import type { AgentTarget, InstallContext } from "../core/target.js";
 import type { InstallRecord } from "../core/types.js";
 
@@ -16,6 +17,7 @@ interface SessionStartEntry {
 
 interface ClaudeSettings {
   hooks?: { SessionStart?: SessionStartEntry[] } & Record<string, unknown>;
+  statusLine?: { type?: string; command?: string; [k: string]: unknown };
   [k: string]: unknown;
 }
 
@@ -29,13 +31,35 @@ function renderSkillFile(ctx: InstallContext): string {
   return compose({ name, description, ...overrides }, ctx.skill.body);
 }
 
+/** Write-on-invoke trailer for a slash command: invoking the skill records its
+ * own on/off state (or, for the status reader, prints the active set). Returns
+ * null for non-slash modes — tracking is slash-only (plan 0017 decision 1).
+ *
+ * The command MUST NOT contain shell expansion (`${…}`): Claude Code's
+ * permission gate rejects any `!`-command with expansion, so it would never
+ * match `allowed-tools: Bash(skillset *)` and the command would be blocked.
+ * `skillset` reads `CLAUDE_CODE_SESSION_ID` from the env in-process instead
+ * (see `resolveSessionKey`, plan 0018). */
+function slashTrailer(ctx: InstallContext, slug: string): string | null {
+  if (ctx.mode !== "slash") return null;
+  const cmd = ctx.skill.frontmatter.statusReader
+    ? "skillset status"
+    : `skillset track ${slug} $ARGUMENTS`;
+  return `!\`${cmd}\``;
+}
+
 function renderCommandFile(ctx: InstallContext): string {
   const { description } = ctx.skill.frontmatter;
   const overrides = targetOverrides(ctx.skill);
   // Commands use `description` only; allowed-tools etc. travel along if user added them.
   const { name: _omit, ...rest } = overrides as { name?: unknown };
   void _omit;
-  return compose({ description, ...rest }, ctx.skill.body);
+  const slug = ctx.skill.frontmatter.slug ?? ctx.skill.frontmatter.name;
+  const trailer = slashTrailer(ctx, slug);
+  if (!trailer) return compose({ description, ...rest }, ctx.skill.body);
+  // Pre-approve the skillset call so invoking the command never prompts for Bash.
+  const frontmatter = { description, "allowed-tools": "Bash(skillset *)", ...rest };
+  return compose(frontmatter, `${ctx.skill.body.trimEnd()}\n\n${trailer}`);
 }
 
 function hookCommand(skill: string): string {
@@ -56,25 +80,28 @@ async function writeSettings(path: string, settings: ClaudeSettings): Promise<vo
   await writeAtomic(path, `${JSON.stringify(settings, null, 2)}\n`);
 }
 
-function addHook(settings: ClaudeSettings, skill: string): ClaudeSettings {
+// A SessionStart entry is identified for removal by a `# skillset:…` tag in its
+// command string. `tag` distinguishes the per-skill emit hooks (always mode)
+// from the single reset hook (status feature).
+function upsertSessionStart(
+  settings: ClaudeSettings,
+  tag: string,
+  matcher: string,
+  command: string,
+): ClaudeSettings {
   const next = structuredClone(settings);
   next.hooks = next.hooks ?? {};
   const list = next.hooks.SessionStart ?? [];
-  const filtered = list.filter(
-    (entry) => !entry.hooks.some((h) => h.command.includes(`${HOOK_TAG}${skill}`)),
-  );
-  filtered.push({
-    matcher: "",
-    hooks: [{ type: "command", command: hookCommand(skill) }],
-  });
+  const filtered = list.filter((entry) => !entry.hooks.some((h) => h.command.includes(tag)));
+  filtered.push({ matcher, hooks: [{ type: "command", command }] });
   next.hooks.SessionStart = filtered;
   return next;
 }
 
-function dropHook(settings: ClaudeSettings, skill: string): ClaudeSettings {
+function removeSessionStart(settings: ClaudeSettings, tag: string): ClaudeSettings {
   if (!settings.hooks?.SessionStart) return structuredClone(settings);
   const remaining = settings.hooks.SessionStart.filter(
-    (entry) => !entry.hooks.some((h) => h.command.includes(`${HOOK_TAG}${skill}`)),
+    (entry) => !entry.hooks.some((h) => h.command.includes(tag)),
   );
   // Rebuild settings from scratch, omitting empty hook subtrees so the final
   // JSON faithfully reflects what's still meaningful.
@@ -89,6 +116,24 @@ function dropHook(settings: ClaudeSettings, skill: string): ClaudeSettings {
   return { ...structuredClone(rest), hooks: nextHooks } as ClaudeSettings;
 }
 
+const addHook = (settings: ClaudeSettings, skill: string) =>
+  upsertSessionStart(settings, `${HOOK_TAG}${skill}`, "", hookCommand(skill));
+const dropHook = (settings: ClaudeSettings, skill: string) =>
+  removeSessionStart(settings, `${HOOK_TAG}${skill}`);
+
+// Reset hook: clears the active set after `/clear` or `/compact` (both fire
+// SessionStart, with source clear|compact and session_id on stdin). Installed
+// with the status-reader skill.
+const RESET_TAG = "# skillset:reset";
+const addResetHook = (settings: ClaudeSettings) =>
+  upsertSessionStart(
+    settings,
+    RESET_TAG,
+    "clear|compact",
+    `skillset reset --stdin-json ${RESET_TAG}`,
+  );
+const dropResetHook = (settings: ClaudeSettings) => removeSessionStart(settings, RESET_TAG);
+
 export const claudeCodeTarget: AgentTarget = {
   name: "claude-code",
   supportedModes: ["slash", "auto", "always"],
@@ -97,9 +142,11 @@ export const claudeCodeTarget: AgentTarget = {
     const { skill, scope, mode, projectRoot } = ctx;
     const layout = layoutFor("claude-code");
     const name = skill.frontmatter.name;
-    const slug = (skill.frontmatter as { slug?: string }).slug ?? name;
+    const slug = skill.frontmatter.slug ?? name;
     const files: string[] = [];
     const insertions: string[] = [];
+    let statusLine: string | undefined;
+    let statusLinePath: string | undefined;
 
     let installRoot: string;
 
@@ -113,6 +160,22 @@ export const claudeCodeTarget: AgentTarget = {
       installRoot = dirname(path);
       await writeAtomic(path, renderCommandFile(ctx));
       files.push(relative(installRoot, path));
+      // The status-reader skill wires the statusLine indicator (decision 9) plus
+      // a SessionStart hook that resets the active set on /clear or /compact.
+      if (skill.frontmatter.statusReader) {
+        const settingsPath = layout.always(scope, projectRoot);
+        const withReset = addResetHook(await readSettings(settingsPath));
+        const { settings, installed } = addStatusLine(withReset);
+        await writeSettings(settingsPath, settings);
+        statusLinePath = settingsPath; // reset hook lives here too — clean up on uninstall
+        if (installed) {
+          statusLine = STATUSLINE_COMMAND;
+        } else {
+          console.error(
+            "skillset: left your existing statusLine untouched — run `skillset status` or add it to your statusline script to show active skills.",
+          );
+        }
+      }
     } else {
       // always: write skill file too (for emit fallback + discoverability),
       // then register a SessionStart hook in settings.json.
@@ -135,6 +198,8 @@ export const claudeCodeTarget: AgentTarget = {
       location: installRoot,
       files,
       insertions: insertions.length > 0 ? insertions : undefined,
+      statusLine,
+      statusLinePath,
       projectPath: scope === "local" ? projectRoot : undefined,
       installedAt: new Date().toISOString(),
     } satisfies InstallRecord;
@@ -161,6 +226,17 @@ export const claudeCodeTarget: AgentTarget = {
         } else {
           await writeSettings(settingsPath, next);
         }
+      }
+    }
+    // Remove the status-reader's settings edits: the reset hook (by tag) and our
+    // statusLine (only if it's still ours, decision 9). Both are no-ops if absent.
+    if (record.statusLinePath) {
+      const settings = await readSettings(record.statusLinePath);
+      const next = dropStatusLine(dropResetHook(settings));
+      if (Object.keys(next).length === 0) {
+        await rm(record.statusLinePath, { force: true });
+      } else {
+        await writeSettings(record.statusLinePath, next);
       }
     }
   },

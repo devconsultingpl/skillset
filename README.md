@@ -57,6 +57,29 @@ skillset init convention
 - **`appsec-review`** — deep, read-only application-security audit of the changes (or a path you name): conservative — flags a vulnerability only with a concrete exploit path, ranked Critical→Info with an OWASP/CWE category. Distinct from Claude Code's built-in `/security-review` — this is the cross-agent, exploit-path-disciplined version. Reports; never edits. Lean toward `auto`/`slash`.
 - **`commit-suggestion`** — suggests a ready-to-paste `git commit` command for the current changes, matching your repo's log style. Emits a concise one-liner and a heredoc multi-line form every run; flags multi-concern diffs and secret-file touches. Read-only — never runs git. `/commit-suggest`. Lean toward `auto`/`slash`.
 - **`caveman`** — compresses your communication to terse, telegraphic style for fast iteration loops. `/caveman on` (default) or `/caveman off`. Slash-only — `auto`/`always` make no sense for a manual mode switch.
+- **`skillset-status`** — shows which **slash-installed** skills are currently active (toggled on) in this session. `/skillset-status`. Installing it also wires per-agent tracking so `/<skill>` and `/<skill> off` flip a skill on and off (see **Active-skill status** below). Slash-only.
+
+## Active-skill status
+
+Slash skills are treated as session-scoped, toggleable **modes**: invoking `/builder` marks it active, `/builder off` clears it, and `/skillset-status` reports the set. (auto- and always-mode skills are never tracked — they have no on/off moment.) Install the feature with:
+
+```sh
+skillset install skillset-status --agent all --mode slash --local   # or --global
+```
+
+State lives in `~/.skillset/active/<session>.json`. How each agent records and shows it:
+
+| agent | tracking (write) | status command | live indicator |
+|---|---|---|---|
+| **Claude Code** | `` !`skillset track` `` trailer in each slash command (session-scoped) | `/skillset-status` (inline) | `statusLine` in `settings.json` |
+| **opencode** | `.opencode/plugins/skillset.js` via `command.execute.before` (project-scoped) | `/skillset-status` (inline) | — (no statusline API) |
+| **pi** | `.pi/extensions/skillset.ts` via the `input` event (session-scoped) | `/skillset-status` (model-driven) | footer via `ctx.ui.setStatus` |
+| **Copilot CLI** | `~/.copilot/hooks/skillset.json` parses `/skill` in the prompt (on-only) | — (no custom commands) | `statusLine` in `~/.copilot/settings.json` |
+| **VS Code Copilot** | — (no hooks) | `/skillset-status` (model-driven) | — |
+
+The Copilot CLI hook + statusline install on `--global` only (CLI config is user-global). A user's existing `statusLine` is never overwritten — skillset fills only an empty slot and removes only what it wrote.
+
+**Reset on compact/clear.** Because a slash skill's body lives in the transcript only until the conversation is summarized or wiped, the active set is cleared automatically when that happens — so the status never claims a skill is on after its guidance is gone. Per agent: Claude Code a `SessionStart` `clear|compact` hook; Copilot CLI a `preCompact` hook; opencode the plugin's `session.compacted` event; pi the extension's `session_compact` (and `session_shutdown`). These are wired by the `skillset-status` install and removed on uninstall. Note this is *status* reset — Claude Code has no API to selectively remove text from a live transcript, so `/<skill> off` is a label, not a token refund; use `/compact` to actually shrink the conversation.
 
 ## Modes
 
@@ -85,6 +108,10 @@ skillset update [--force|--dry-run|--skip-customized]   # re-sync every install 
 skillset list                         # what's available + what's installed
 skillset init <skill>                 # scaffold a skill's templates into cwd
 skillset emit <skill>                 # used by SessionStart hooks; prints JSON
+skillset status [--session <id>]      # print the slash skills active in a session
+skillset track <skill> [on|off]       # record a toggle (used by the write surfaces)
+skillset reset [--session <id>]       # clear the active set (compact/clear hooks)
+skillset scan-prompt                  # Copilot CLI hook: scan a prompt for /skill tokens
 ```
 
 `--agent` accepts a comma-separated list (e.g. `claude-code,pi`) or `all`.
@@ -127,7 +154,8 @@ For marker-block installs (`always` mode), only the bytes inside the `skillset:b
 
 - Every artifact skillset writes into shared files is wrapped in begin/end markers (`<!-- skillset:begin <skill> -->`). Uninstall removes only the marked block.
 - `settings.json` hook entries carry a `# skillset:<skill>` shell comment for safe identification on removal.
-- State file at `~/.skillset/state.json` records every install (skill, agent, scope, mode, path) so `update` and `uninstall` know exactly what to touch.
+- A singular `statusLine` field is never clobbered: skillset fills only an empty slot (or refreshes its own) and on uninstall removes only the command it wrote.
+- State file at `~/.skillset/state.json` records every install (skill, agent, scope, mode, paths, plus any executable `assets` and `statusLine`) so `update` and `uninstall` know exactly what to touch.
 - `init` never overwrites existing files.
 
 ## Canonical skill format

@@ -62,6 +62,72 @@ describe("copilot target", () => {
     });
   });
 
+  describe("skillset-status CLI surface (global only)", () => {
+    const hookPath = (sb: Sandbox) => join(sb.home, ".copilot", "hooks", "skillset.json");
+    const settingsPath = (sb: Sandbox) => join(sb.home, ".copilot", "settings.json");
+
+    it("global: writes the userPromptSubmitted hook + statusLine, and uninstall removes both", async () => {
+      expect(
+        run(
+          ["install", "skillset-status", "--agent", "copilot", "--mode", "slash", "--global"],
+          sb.projectRoot,
+          sb.env,
+        ).status,
+      ).toBe(0);
+      expect(await exists(hookPath(sb))).toBe(true);
+      const hookJson = JSON.parse(await readFile(hookPath(sb), "utf8"));
+      expect(hookJson.hooks.userPromptSubmitted[0].command).toBe("skillset scan-prompt");
+      // Resets the active set before compaction.
+      expect(hookJson.hooks.preCompact[0].command).toBe("skillset reset --stdin-json");
+      expect(JSON.parse(await readFile(settingsPath(sb), "utf8")).statusLine.command).toBe(
+        "skillset status --stdin-json",
+      );
+
+      expect(run(["uninstall", "skillset-status", "--global"], sb.projectRoot, sb.env).status).toBe(
+        0,
+      );
+      expect(await exists(hookPath(sb))).toBe(false);
+      // settings.json held only our statusLine → removed.
+      expect(await exists(settingsPath(sb))).toBe(false);
+    });
+
+    it("local: does NOT touch ~/.copilot (CLI config is user-global)", async () => {
+      expect(
+        run(
+          ["install", "skillset-status", "--agent", "copilot", "--mode", "slash", "--local"],
+          sb.projectRoot,
+          sb.env,
+        ).status,
+      ).toBe(0);
+      expect(await exists(hookPath(sb))).toBe(false);
+      expect(await exists(settingsPath(sb))).toBe(false);
+    });
+
+    it("global: never clobbers a user's existing Copilot statusLine", async () => {
+      const { mkdir, writeFile } = await import("node:fs/promises");
+      await mkdir(join(sb.home, ".copilot"), { recursive: true });
+      const mine = { statusLine: { type: "command", command: "my-line.sh" } };
+      await writeFile(settingsPath(sb), JSON.stringify(mine, null, 2));
+
+      expect(
+        run(
+          ["install", "skillset-status", "--agent", "copilot", "--mode", "slash", "--global"],
+          sb.projectRoot,
+          sb.env,
+        ).status,
+      ).toBe(0);
+      expect(JSON.parse(await readFile(settingsPath(sb), "utf8")).statusLine.command).toBe(
+        "my-line.sh",
+      );
+
+      // Uninstall leaves the user's statusLine intact.
+      run(["uninstall", "skillset-status", "--global"], sb.projectRoot, sb.env);
+      expect(JSON.parse(await readFile(settingsPath(sb), "utf8")).statusLine.command).toBe(
+        "my-line.sh",
+      );
+    });
+  });
+
   describe("always mode", () => {
     it("local: writes marker block to .github/copilot-instructions.md", async () => {
       const out = run(

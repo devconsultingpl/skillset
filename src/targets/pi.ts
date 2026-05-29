@@ -1,14 +1,23 @@
-import { rm } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
+import { assetPath } from "../core/bundle.js";
 import { compose } from "../core/frontmatter.js";
 import { readMaybe, writeAtomic } from "../core/fs.js";
 import { layoutFor } from "../core/locations.js";
 import { MD, extract, remove, upsert } from "../core/markers.js";
 import type { AgentTarget, InstallContext } from "../core/target.js";
-import type { InstallRecord } from "../core/types.js";
+import type { InstallRecord, Scope } from "../core/types.js";
 
 function targetOverrides(skill: InstallContext["skill"]): Record<string, unknown> {
   return skill.frontmatter.targets?.pi ?? {};
+}
+
+/** pi extension path: `.pi/extensions/skillset.ts` (local) or
+ * `~/.pi/agent/extensions/skillset.ts` (global). */
+function extensionPath(scope: Scope, projectRoot: string): string {
+  const base = scope === "global" ? join(homedir(), ".pi", "agent") : join(projectRoot, ".pi");
+  return join(base, "extensions", "skillset.ts");
 }
 
 function renderSkillFile(ctx: InstallContext): string {
@@ -37,6 +46,7 @@ export const piTarget: AgentTarget = {
     const slug = (skill.frontmatter as { slug?: string }).slug ?? name;
     const files: string[] = [];
     const insertions: string[] = [];
+    const assets: string[] = [];
     let installRoot: string;
 
     if (mode === "auto") {
@@ -49,6 +59,15 @@ export const piTarget: AgentTarget = {
       installRoot = dirname(path);
       await writeAtomic(path, renderPromptFile(ctx));
       files.push(relative(installRoot, path));
+      // The status-reader skill ships the tracking + footer extension (decision 8).
+      if (skill.frontmatter.statusReader) {
+        const dest = extensionPath(scope, projectRoot);
+        await writeAtomic(
+          dest,
+          await readFile(assetPath("skillset-status", "pi-extension.ts"), "utf8"),
+        );
+        assets.push(dest);
+      }
     } else {
       // always: marker-wrapped append to APPEND_SYSTEM.md (no separate skill file).
       const anchor = layout.always(scope, projectRoot);
@@ -67,6 +86,7 @@ export const piTarget: AgentTarget = {
       location: installRoot,
       files,
       insertions: insertions.length > 0 ? insertions : undefined,
+      assets: assets.length > 0 ? assets : undefined,
       projectPath: scope === "local" ? projectRoot : undefined,
       installedAt: new Date().toISOString(),
     } satisfies InstallRecord;
@@ -75,6 +95,9 @@ export const piTarget: AgentTarget = {
   async uninstall(record) {
     for (const rel of record.files) {
       await rm(`${record.location}/${rel}`, { force: true });
+    }
+    for (const asset of record.assets ?? []) {
+      await rm(asset, { force: true });
     }
     if (record.mode === "auto") {
       await rm(record.location, { force: true, recursive: true });

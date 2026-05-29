@@ -51,6 +51,31 @@ describe("pi target", () => {
     });
   });
 
+  describe("skillset-status extension", () => {
+    it("installs the tracking extension alongside the status prompt and removes it on uninstall", async () => {
+      expect(
+        run(
+          ["install", "skillset-status", "--agent", "pi", "--mode", "slash", "--local"],
+          sb.projectRoot,
+          sb.env,
+        ).status,
+      ).toBe(0);
+      const ext = join(sb.projectRoot, ".pi", "extensions", "skillset.ts");
+      expect(await exists(ext)).toBe(true);
+      const body = await readFile(ext, "utf8");
+      expect(body).toContain('pi.on("input"');
+      expect(body).toContain("setStatus");
+      // Resets the active set on compaction and session end.
+      expect(body).toContain('pi.on("session_compact"');
+      expect(body).toContain('pi.on("session_shutdown"');
+
+      expect(run(["uninstall", "skillset-status", "--local"], sb.projectRoot, sb.env).status).toBe(
+        0,
+      );
+      expect(await exists(ext)).toBe(false);
+    });
+  });
+
   describe("auto mode", () => {
     it("local: writes SKILL.md and uninstall removes the skill dir", async () => {
       const out = run(

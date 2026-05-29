@@ -30,6 +30,8 @@ describe("opencode target", () => {
       expect(body).toMatch(/^description:/m);
       expect(body).not.toMatch(/^name:/m);
       expect(body).toContain("# confidence");
+      // Non-reader commands carry NO trailer — the plugin owns tracking.
+      expect(body).not.toContain("skillset track");
 
       expect(run(["uninstall", "confidence", "--local"], sb.projectRoot, sb.env).status).toBe(0);
       expect(await exists(cmdPath)).toBe(false);
@@ -47,6 +49,32 @@ describe("opencode target", () => {
 
       expect(run(["uninstall", "confidence", "--global"], sb.projectRoot, sb.env).status).toBe(0);
       expect(await exists(cmdPath)).toBe(false);
+    });
+  });
+
+  describe("skillset-status plugin", () => {
+    it("installs the tracking plugin alongside the status command and removes it on uninstall", async () => {
+      expect(
+        run(
+          ["install", "skillset-status", "--agent", "opencode", "--mode", "slash", "--local"],
+          sb.projectRoot,
+          sb.env,
+        ).status,
+      ).toBe(0);
+      const plugin = join(sb.projectRoot, ".opencode", "plugins", "skillset.js");
+      expect(await exists(plugin)).toBe(true);
+      const pluginBody = await readFile(plugin, "utf8");
+      expect(pluginBody).toContain("command.execute.before");
+      // Resets the active set when a session is compacted.
+      expect(pluginBody).toContain("session.compacted");
+      // The status command reads project-scoped state.
+      const cmd = join(sb.projectRoot, ".opencode", "commands", "skillset-status.md");
+      expect(await readFile(cmd, "utf8")).toContain("!`skillset status`");
+
+      expect(run(["uninstall", "skillset-status", "--local"], sb.projectRoot, sb.env).status).toBe(
+        0,
+      );
+      expect(await exists(plugin)).toBe(false);
     });
   });
 

@@ -22,11 +22,20 @@ export function run(
   args: string[],
   cwd: string,
   env: NodeJS.ProcessEnv = {},
+  opts: { input?: string } = {},
 ): SpawnSyncReturns<string> {
+  const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env };
+  // resolveSessionKey honors CLAUDE_CODE_SESSION_ID as a fallback. When tests
+  // run inside Claude Code the dev's real session id leaks in via process.env,
+  // making project-key-fallback assertions non-deterministic. Strip it unless
+  // a test explicitly opts in by setting it in `env`.
+  // biome-ignore lint: assigning `undefined` keeps the key (and on process.env coerces to the string "undefined"); the key must be absent so resolveSessionKey() falls through.
+  if (!("CLAUDE_CODE_SESSION_ID" in env)) delete childEnv.CLAUDE_CODE_SESSION_ID;
   return spawnSync("node", [cliPath, ...args], {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, ...env },
+    env: childEnv,
+    input: opts.input,
   });
 }
 

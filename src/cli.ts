@@ -5,7 +5,11 @@ import { emit } from "./commands/emit.js";
 import { init } from "./commands/init.js";
 import { install, parseAgentArg, parseModeArg } from "./commands/install.js";
 import { list } from "./commands/list.js";
+import { resetCmd } from "./commands/reset.js";
+import { scanPromptCmd } from "./commands/scan-prompt.js";
 import { setMode } from "./commands/set-mode.js";
+import { statusCmd } from "./commands/status.js";
+import { trackCmd } from "./commands/track.js";
 import { uninstall } from "./commands/uninstall.js";
 import { update } from "./commands/update.js";
 import type { Scope } from "./core/types.js";
@@ -120,6 +124,46 @@ program
   .allowExcessArguments()
   .action(async (skill: string) => {
     await emit(skill);
+  });
+
+program
+  .command("track")
+  .description("Record that a slash-mode skill toggled on/off for a session.")
+  .argument("<skill>", "skill slug")
+  .argument("[state]", "on (default) or off", "on")
+  .option("--session <id>", "session key (defaults to a project-scoped key)")
+  .option("--known-only", "no-op unless the skill is one skillset installed")
+  // `$ARGUMENTS` may expand to extra tokens; tolerate them and take the first.
+  .allowExcessArguments()
+  .action(async (skill: string, state: string, opts) => {
+    await trackCmd({ skill, state, session: opts.session, knownOnly: Boolean(opts.knownOnly) });
+  });
+
+program
+  .command("scan-prompt")
+  .description(
+    "Copilot CLI hook: scan a userPromptSubmitted JSON payload (stdin) for /skill tokens.",
+  )
+  .action(async () => {
+    await scanPromptCmd();
+  });
+
+program
+  .command("status")
+  .description("Print the slash-mode skills currently active in a session.")
+  .option("--session <id>", "session key (defaults to a project-scoped key)")
+  .option("--stdin-json", "read session_id from a JSON statusline payload on stdin")
+  .action(async (opts) => {
+    await statusCmd({ session: opts.session, stdinJson: Boolean(opts.stdinJson) });
+  });
+
+program
+  .command("reset")
+  .description("Clear the active slash-skill set for a session (compact/clear hooks).")
+  .option("--session <id>", "session key (defaults to a project-scoped key)")
+  .option("--stdin-json", "read session_id from a JSON hook payload on stdin")
+  .action(async (opts) => {
+    await resetCmd({ session: opts.session, stdinJson: Boolean(opts.stdinJson) });
   });
 
 program.parseAsync(process.argv).catch((err) => {

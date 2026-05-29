@@ -1,14 +1,32 @@
-import { rm } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
+import { assetPath } from "../core/bundle.js";
 import { compose } from "../core/frontmatter.js";
 import { readMaybe, writeAtomic } from "../core/fs.js";
 import { layoutFor } from "../core/locations.js";
 import { MD, extract, remove, upsert } from "../core/markers.js";
+import { STATUSLINE_COMMAND, addStatusLine, dropStatusLine } from "../core/statusline.js";
 import type { AgentTarget, InstallContext } from "../core/target.js";
 import type { InstallRecord } from "../core/types.js";
 
 function targetOverrides(skill: InstallContext["skill"]): Record<string, unknown> {
   return skill.frontmatter.targets?.copilot ?? {};
+}
+
+// Copilot CLI config is user-global (`~/.copilot/`), distinct from the VS Code
+// prompt files this target normally writes. The CLI hook + statusLine only ship
+// on a global install, where writing under `~/.copilot/` isn't a surprise.
+const copilotHome = () => join(homedir(), ".copilot");
+
+async function readJsonSettings(path: string): Promise<Record<string, unknown>> {
+  const raw = await readMaybe(path);
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch (err) {
+    throw new Error(`failed to parse ${path}: ${(err as Error).message}`);
+  }
 }
 
 function renderPromptFile(ctx: InstallContext): string {
@@ -35,6 +53,9 @@ export const copilotTarget: AgentTarget = {
     const slug = (skill.frontmatter as { slug?: string }).slug ?? name;
     const files: string[] = [];
     const insertions: string[] = [];
+    const assets: string[] = [];
+    let statusLine: string | undefined;
+    let statusLinePath: string | undefined;
     let installRoot: string;
 
     if (mode === "slash") {
@@ -42,6 +63,27 @@ export const copilotTarget: AgentTarget = {
       installRoot = dirname(path);
       await writeAtomic(path, renderPromptFile(ctx));
       files.push(relative(installRoot, path));
+      // The status-reader skill wires the Copilot CLI surface (global only).
+      if (scope === "global" && skill.frontmatter.statusReader) {
+        const hookDest = join(copilotHome(), "hooks", "skillset.json");
+        await writeAtomic(
+          hookDest,
+          await readFile(assetPath("skillset-status", "copilot-hook.json"), "utf8"),
+        );
+        assets.push(hookDest);
+
+        const settingsDest = join(copilotHome(), "settings.json");
+        const { settings, installed } = addStatusLine(await readJsonSettings(settingsDest));
+        if (installed) {
+          await writeAtomic(settingsDest, `${JSON.stringify(settings, null, 2)}\n`);
+          statusLine = STATUSLINE_COMMAND;
+          statusLinePath = settingsDest;
+        } else {
+          console.error(
+            "skillset: left your existing Copilot CLI statusLine untouched — run `skillset status` to see active skills.",
+          );
+        }
+      }
     } else {
       // always: marker-wrapped block in .github/copilot-instructions.md.
       const anchor = layout.always(scope, projectRoot);
@@ -60,6 +102,9 @@ export const copilotTarget: AgentTarget = {
       location: installRoot,
       files,
       insertions: insertions.length > 0 ? insertions : undefined,
+      assets: assets.length > 0 ? assets : undefined,
+      statusLine,
+      statusLinePath,
       projectPath: scope === "local" ? projectRoot : undefined,
       installedAt: new Date().toISOString(),
     } satisfies InstallRecord;
@@ -68,6 +113,18 @@ export const copilotTarget: AgentTarget = {
   async uninstall(record) {
     for (const rel of record.files) {
       await rm(`${record.location}/${rel}`, { force: true });
+    }
+    for (const asset of record.assets ?? []) {
+      await rm(asset, { force: true });
+    }
+    if (record.statusLine && record.statusLinePath) {
+      const settings = await readJsonSettings(record.statusLinePath);
+      const next = dropStatusLine(settings);
+      if (Object.keys(next).length === 0) {
+        await rm(record.statusLinePath, { force: true });
+      } else {
+        await writeAtomic(record.statusLinePath, `${JSON.stringify(next, null, 2)}\n`);
+      }
     }
     if (record.mode === "always" && record.insertions) {
       for (const anchor of record.insertions) {

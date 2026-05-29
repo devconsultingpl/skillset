@@ -11,7 +11,8 @@ Developers who use more than one AI coding agent and want one source of truth fo
 ## Done means
 
 - One `SKILL.md` installs correctly into all four agents, in every mode the agent supports, at either scope.
-- `install` / `uninstall` / `update` / `set-mode` / `list` / `init` / `emit` all work and are covered by unit + end-to-end tests.
+- `install` / `uninstall` / `update` / `set-mode` / `list` / `init` / `emit` — plus the active-skill verbs `track` / `status` / `scan-prompt` — all work and are covered by unit + end-to-end tests.
+- The `skillset-status` feature reports which slash skills are toggled on, per agent's best native surface (ADRs 0002 / 0003).
 - Edits into shared files are marker-wrapped, so `uninstall`/`update` never disturb surrounding user content.
 - `update` re-syncs from the bundle without clobbering files the user hand-edited.
 - Cross-platform: Node ≥ 20 on macOS, Linux, Windows.

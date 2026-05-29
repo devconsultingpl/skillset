@@ -34,3 +34,9 @@ export async function loadBundledSkill(name: string): Promise<ParsedSkill> {
 export function templatesRoot(skillName: string): string {
   return resolve(skillsRoot, skillName, "templates");
 }
+
+/** Path to a bundled executable artifact shipped alongside a skill (e.g. the
+ * opencode plugin / pi extension installed with `skillset-status`). */
+export function assetPath(skillName: string, file: string): string {
+  return resolve(skillsRoot, skillName, "assets", file);
+}
