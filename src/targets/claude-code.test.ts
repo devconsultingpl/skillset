@@ -71,11 +71,15 @@ Report active skills.
       "utf8",
     );
     expect(contents).toContain('allowed-tools: "Bash(skillset *)"');
-    expect(contents).toContain("!`skillset track confidence $ARGUMENTS`");
+    expect(contents).toContain("!`skillset track confidence`");
     // Trailer must not embed `${…}`: Claude Code's permission gate rejects any
     // `!`-command with shell expansion (plan 0018). `skillset` reads the env
     // var in-process instead.
     expect(contents).not.toContain("${CLAUDE_CODE_SESSION_ID}");
+    // Trailer must not forward `$ARGUMENTS`: Claude Code substitutes it as raw
+    // text into the backticked command, so a backtick or newline in slash args
+    // closes the outer backticks and breaks the permission-gate parser.
+    expect(contents).not.toContain("$ARGUMENTS");
   });
 
   it("the status reader prints status and never tracks itself", async () => {

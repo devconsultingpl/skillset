@@ -2,7 +2,7 @@
 name: convention
 version: "0.1.0"
 description: Project goals, conventions, and decisions live under docs/. Read docs/goals.md and docs/conventions.md at session start. Reference docs/architecture.md, docs/glossary.md, docs/plans/, and docs/decisions/ on demand.
-slug: convention
+slug: sk-convention
 ---
 # convention
 

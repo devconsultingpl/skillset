@@ -1,5 +1,5 @@
 // skillset opencode plugin — records which slash command is active (per project)
-// so `/skillset-status` can report it. `command.execute.before` fires per slash
+// so `/sk-status` can report it. `command.execute.before` fires per slash
 // invocation with the command name + arguments, which is more reliable than
 // parsing prompt text. Writes are project-scoped (no session id is exposed to a
 // command's shell block, so reader and writer agree on the project key).
@@ -9,7 +9,7 @@
 export const SkillsetPlugin = async ({ $ }) => ({
   "command.execute.before": async (input) => {
     const name = input && input.command;
-    if (!name || name === "skillset-status") return;
+    if (!name || name === "sk-status") return;
     const state = String((input && input.arguments) || "").trim().split(/\s+/)[0] || "on";
     await $`skillset track ${name} ${state} --known-only`.quiet().nothrow();
   },

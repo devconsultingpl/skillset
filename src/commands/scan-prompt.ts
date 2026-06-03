@@ -33,12 +33,20 @@ export async function scanPromptCmd(): Promise<void> {
     (typeof payload.session_id === "string" && payload.session_id) ||
     undefined;
 
-  const known = new Set((await readState()).installs.map((i) => i.skill));
+  // Users type the slug, not the name — but pre-`slug` state records only
+  // carry the name. Accept either to cover both.
+  const installs = (await readState()).installs;
+  const known = new Set<string>();
+  for (const i of installs) {
+    known.add(i.skill);
+    if (i.slug) known.add(i.slug);
+  }
+  const statusReaderSlugs = new Set(["sk-status", "skillset-status"]);
   const key = resolveSessionKey(sessionId);
   const seen = new Set<string>();
   for (const m of prompt.matchAll(SLASH_TOKEN)) {
     const skill = m[1];
-    if (skill === "skillset-status" || seen.has(skill) || !known.has(skill)) continue;
+    if (statusReaderSlugs.has(skill) || seen.has(skill) || !known.has(skill)) continue;
     seen.add(skill);
     await track(key, skill, true);
   }

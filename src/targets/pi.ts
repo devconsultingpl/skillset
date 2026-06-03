@@ -79,6 +79,7 @@ export const piTarget: AgentTarget = {
 
     return {
       skill: name,
+      slug,
       version: skill.frontmatter.version,
       agent: "pi",
       scope,

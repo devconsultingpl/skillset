@@ -2,7 +2,7 @@
 name: architect
 version: "0.1.0"
 description: Plan posture for non-trivial work — orient in the project, frame the problem, generate design options scaled to the stakes, recommend one with risks named, and write the plan to docs/plans. Hands off to confidence to drive the question loop to a "go". Skips trivial edits.
-slug: architect
+slug: sk-architect
 ---
 # architect
 

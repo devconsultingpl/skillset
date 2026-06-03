@@ -53,15 +53,15 @@ skillset init convention
 - **`convention`** — points the agent at `docs/goals.md` and `docs/conventions.md` for project context. Use `skillset init convention` to scaffold the tree.
 - **`builder`** — senior-engineer build posture for *writing* code: search before abstracting, minimal diffs, small functions, verify before done. Defers planning to `confidence`/`architect`. Lean toward `auto`/`slash` mode — the body loads cheaply on demand rather than every session.
 - **`code-review`** — read-only review of the changes on this branch (local vs `origin`'s default branch, or a path/range you name): flags correctness, readability, convention breaks, newly-introduced bloat, and obvious security/perf at `file:line` with a blocker/important/nit severity. Reports; never edits. Lean toward `auto`/`slash`.
-- **`declutter`** — whole-codebase anti-bloat survey: hunts *pre-existing* dead code, duplication, and collapsible abstractions, ranks the biggest maintenance wins, and applies the fixes you approve. `/declutter` or `/declutter <area>`. Slash-only — a whole-repo survey that then edits shouldn't fire on a weak match.
+- **`declutter`** — whole-codebase anti-bloat survey: hunts *pre-existing* dead code, duplication, and collapsible abstractions, ranks the biggest maintenance wins, and applies the fixes you approve. `/sk-declutter` or `/sk-declutter <area>`. Slash-only — a whole-repo survey that then edits shouldn't fire on a weak match.
 - **`appsec-review`** — deep, read-only application-security audit of the changes (or a path you name): conservative — flags a vulnerability only with a concrete exploit path, ranked Critical→Info with an OWASP/CWE category. Distinct from Claude Code's built-in `/security-review` — this is the cross-agent, exploit-path-disciplined version. Reports; never edits. Lean toward `auto`/`slash`.
-- **`commit-suggestion`** — suggests a ready-to-paste `git commit` command for the current changes, matching your repo's log style. Emits a concise one-liner and a heredoc multi-line form every run; flags multi-concern diffs and secret-file touches. Read-only — never runs git. `/commit-suggest`. Lean toward `auto`/`slash`.
-- **`caveman`** — compresses your communication to terse, telegraphic style for fast iteration loops. `/caveman on` (default) or `/caveman off`. Slash-only — `auto`/`always` make no sense for a manual mode switch.
-- **`skillset-status`** — shows which **slash-installed** skills are currently active (toggled on) in this session. `/skillset-status`. Installing it also wires per-agent tracking so `/<skill>` and `/<skill> off` flip a skill on and off (see **Active-skill status** below). Slash-only.
+- **`commit-suggestion`** — suggests a ready-to-paste `git commit` command for the current changes, matching your repo's log style. Emits a concise one-liner and a heredoc multi-line form every run; flags multi-concern diffs and secret-file touches. Read-only — never runs git. `/sk-commit-suggest`. Lean toward `auto`/`slash`.
+- **`caveman`** — compresses your communication to terse, telegraphic style for fast iteration loops. `/sk-caveman on` (default) or `/sk-caveman off`. Slash-only — `auto`/`always` make no sense for a manual mode switch.
+- **`skillset-status`** — shows which **slash-installed** skills are currently active (toggled on) in this session. `/sk-status`. Installing it also wires per-agent tracking so `/<skill>` and `/<skill> off` flip a skill on and off (see **Active-skill status** below). Slash-only.
 
 ## Active-skill status
 
-Slash skills are treated as session-scoped, toggleable **modes**: invoking `/builder` marks it active, `/builder off` clears it, and `/skillset-status` reports the set. (auto- and always-mode skills are never tracked — they have no on/off moment.) Install the feature with:
+Slash skills are treated as session-scoped, toggleable **modes**: invoking `/sk-builder` marks it active, `/sk-builder off` clears it, and `/sk-status` reports the set. (auto- and always-mode skills are never tracked — they have no on/off moment.) Install the feature with:
 
 ```sh
 skillset install skillset-status --agent all --mode slash --local   # or --global
@@ -71,11 +71,11 @@ State lives in `~/.skillset/active/<session>.json`. How each agent records and s
 
 | agent | tracking (write) | status command | live indicator |
 |---|---|---|---|
-| **Claude Code** | `` !`skillset track` `` trailer in each slash command (session-scoped) | `/skillset-status` (inline) | `statusLine` in `settings.json` |
-| **opencode** | `.opencode/plugins/skillset.js` via `command.execute.before` (project-scoped) | `/skillset-status` (inline) | — (no statusline API) |
-| **pi** | `.pi/extensions/skillset.ts` via the `input` event (session-scoped) | `/skillset-status` (model-driven) | footer via `ctx.ui.setStatus` |
+| **Claude Code** | `` !`skillset track` `` trailer in each slash command (session-scoped) | `/sk-status` (inline) | `statusLine` in `settings.json` |
+| **opencode** | `.opencode/plugins/skillset.js` via `command.execute.before` (project-scoped) | `/sk-status` (inline) | — (no statusline API) |
+| **pi** | `.pi/extensions/skillset.ts` via the `input` event (session-scoped) | `/sk-status` (model-driven) | footer via `ctx.ui.setStatus` |
 | **Copilot CLI** | `~/.copilot/hooks/skillset.json` parses `/skill` in the prompt (on-only) | — (no custom commands) | `statusLine` in `~/.copilot/settings.json` |
-| **VS Code Copilot** | — (no hooks) | `/skillset-status` (model-driven) | — |
+| **VS Code Copilot** | — (no hooks) | `/sk-status` (model-driven) | — |
 
 The Copilot CLI hook + statusline install on `--global` only (CLI config is user-global). A user's existing `statusLine` is never overwritten — skillset fills only an empty slot and removes only what it wrote.
 
@@ -165,7 +165,7 @@ For marker-block installs (`always` mode), only the bytes inside the `skillset:b
 name: confidence
 version: "0.1.0"
 description: Short one-liner. Drives auto-trigger.
-slug: confidence          # optional — slash command name (default: name)
+slug: sk-confidence       # slash command name; bundled skills use `sk-` to avoid built-in collisions
 config:                   # optional — values substituted into body
   start: 98
   resume: 95

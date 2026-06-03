@@ -84,6 +84,7 @@ export const opencodeTarget: AgentTarget = {
 
     return {
       skill: name,
+      slug,
       version: skill.frontmatter.version,
       agent: "opencode",
       scope,

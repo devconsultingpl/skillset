@@ -4,10 +4,17 @@ import { readState } from "../core/state.js";
 /** Names + slugs of every skill skillset has installed (any agent/scope). The
  * indiscriminate writer surfaces (opencode plugin, pi extension, Copilot hook)
  * fire on *any* command/prompt, so they pass `--known-only` to drop anything
- * that isn't a skillset skill. */
+ * that isn't a skillset skill. We include both name and slug because trackers
+ * receive the slash-command name typed by the user (the slug), while older
+ * state records may only carry the skill name. */
 async function installedSkills(): Promise<Set<string>> {
   const state = await readState();
-  return new Set(state.installs.map((i) => i.skill));
+  const keys = new Set<string>();
+  for (const i of state.installs) {
+    keys.add(i.skill);
+    if (i.slug) keys.add(i.slug);
+  }
+  return keys;
 }
 
 /**

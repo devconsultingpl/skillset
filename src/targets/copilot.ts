@@ -95,6 +95,7 @@ export const copilotTarget: AgentTarget = {
 
     return {
       skill: name,
+      slug,
       version: skill.frontmatter.version,
       agent: "copilot",
       scope,

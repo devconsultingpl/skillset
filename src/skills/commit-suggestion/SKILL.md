@@ -2,11 +2,11 @@
 name: commit-suggestion
 version: "0.1.0"
 description: Suggest a ready-to-paste git commit command for the current changes, matching the repo's existing log style. Emits a concise one-liner and a heredoc multi-line form every run; you pick and paste. Auto-activates on "suggest a commit message / commit this / what should I commit this as". Read-only — never runs git commit.
-slug: commit-suggest
+slug: sk-commit-suggest
 ---
 # commit-suggestion
 
-Suggest a commit message for the current changes as a ready-to-paste command. Activates on "suggest a commit message / commit this / what should I commit this as", or `/commit-suggest`. Read-only: only inspects the repo (`git status` / `diff` / `log` / `diff --staged`) — never runs `git commit`, never pushes.
+Suggest a commit message for the current changes as a ready-to-paste command. Activates on "suggest a commit message / commit this / what should I commit this as", or `/sk-commit-suggest`. Read-only: only inspects the repo (`git status` / `diff` / `log` / `diff --staged`) — never runs `git commit`, never pushes.
 
 ## Read the change
 - If anything is staged, describe the **staged** diff. Otherwise describe **all uncommitted** changes and note the user must `git add` first. A clean tree → say there's nothing to commit.

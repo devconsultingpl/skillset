@@ -2,14 +2,14 @@
 name: caveman
 version: "0.1.0"
 description: "Switch caveman mode: compress responses to terse, telegraphic style for fast iteration loops. Argument: on (default) or off."
-slug: caveman
+slug: sk-caveman
 ---
 # caveman
 
 Compress my communication to telegraphic style for fast iteration loops. Argument: `on` (default) or `off`.
 
-- `/caveman` or `/caveman on` → activate.
-- `/caveman off` → deactivate. Confirm: "Caveman off."
+- `/sk-caveman` or `/sk-caveman on` → activate.
+- `/sk-caveman off` → deactivate. Confirm: "Caveman off."
 
 ## On
 
@@ -17,7 +17,7 @@ Drop articles (a/an/the), filler (just/really/basically/actually/simply), pleasa
 
 ## Persistence
 
-Active every response until `/caveman off` or the session ends — no drift back to prose after many turns.
+Active every response until `/sk-caveman off` or the session ends — no drift back to prose after many turns.
 
 ## Drop caveman for
 

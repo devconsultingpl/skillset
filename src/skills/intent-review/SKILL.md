@@ -2,7 +2,7 @@
 name: intent-review
 version: "0.1.0"
 description: Read-only check of pending changes against the plan that motivated them. Flags drift from the plan, scope creep, missing pieces, and overengineering. Auto-activates when there are uncommitted changes and an open plan in docs/plans. Reports; never edits.
-slug: intent-review
+slug: sk-intent-review
 ---
 # intent-review
 

@@ -39,12 +39,17 @@ function renderSkillFile(ctx: InstallContext): string {
  * permission gate rejects any `!`-command with expansion, so it would never
  * match `allowed-tools: Bash(skillset *)` and the command would be blocked.
  * `skillset` reads `CLAUDE_CODE_SESSION_ID` from the env in-process instead
- * (see `resolveSessionKey`, plan 0018). */
+ * (see `resolveSessionKey`, plan 0018).
+ *
+ * We deliberately do NOT forward `$ARGUMENTS`. Claude Code substitutes
+ * `$ARGUMENTS` as raw text into this backticked command — any backtick or
+ * newline in the user's slash args closes the outer backticks and breaks the
+ * permission-gate parser before the command runs. Dropping the placeholder
+ * costs the `/skill off` toggle (a bare invocation defaults to "on"); off is
+ * still reachable via `/clear`, `/compact`, or `skillset reset`. */
 function slashTrailer(ctx: InstallContext, slug: string): string | null {
   if (ctx.mode !== "slash") return null;
-  const cmd = ctx.skill.frontmatter.statusReader
-    ? "skillset status"
-    : `skillset track ${slug} $ARGUMENTS`;
+  const cmd = ctx.skill.frontmatter.statusReader ? "skillset status" : `skillset track ${slug}`;
   return `!\`${cmd}\``;
 }
 
@@ -191,6 +196,7 @@ export const claudeCodeTarget: AgentTarget = {
 
     return {
       skill: name,
+      slug,
       version: skill.frontmatter.version,
       agent: "claude-code",
       scope,

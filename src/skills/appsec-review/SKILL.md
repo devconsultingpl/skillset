@@ -2,15 +2,15 @@
 name: appsec-review
 version: "0.1.0"
 description: Deep, read-only security audit of the changes on this branch (local vs origin's default branch), or a path you name. Conservative — flags a vulnerability only with a concrete exploit path, ranked Critical/High/Medium/Low/Info with an OWASP/CWE category. Auto-activates on "security review / check this for vulnerabilities". Reports; never edits.
-slug: appsec-review
+slug: sk-appsec-review
 ---
 # appsec-review
 
-Deep security lens on *the changes*: is this delta exploitable? Activates on "security review this / check for vulnerabilities", or `/appsec-review`. This is the dedicated deep pass — `code-review` flags *obvious* security issues in passing and defers depth here. Report-only: a wrong security fix is worse than none.
+Deep security lens on *the changes*: is this delta exploitable? Activates on "security review this / check for vulnerabilities", or `/sk-appsec-review`. This is the dedicated deep pass — `code-review` flags *obvious* security issues in passing and defers depth here. Report-only: a wrong security fix is worse than none.
 
 ## Scope
 - Default: the branch diff vs the repo's default branch on `origin`. Find it with `git symbolic-ref refs/remotes/origin/HEAD` (fall back to `origin/main`, then `origin/master`); diff its merge-base with `HEAD` against the working tree.
-- An argument redirects to a path for a standalone audit regardless of diff: `/appsec-review src/auth`.
+- An argument redirects to a path for a standalone audit regardless of diff: `/sk-appsec-review src/auth`.
 - **Read beyond the scope to judge exploitability** — follow a tainted input to its sink, check whether a guard exists elsewhere. You can't rate a path you haven't traced.
 
 ## What to hunt

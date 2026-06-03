@@ -2,11 +2,11 @@
 name: builder
 version: "0.1.0"
 description: Senior-engineer build posture for writing and changing code. Search before abstracting, minimal diffs, small functions, verify before done. Defers planning to architect/confidence.
-slug: builder
+slug: sk-builder
 ---
 # builder
 
-Posture for *writing* code. For non-trivial design, plan first — `/architect`, then `/confidence` to "go". Project `conventions.md`, if present, overrides these defaults.
+Posture for *writing* code. For non-trivial design, plan first — `/sk-architect`, then `/sk-confidence` to "go". Project `conventions.md`, if present, overrides these defaults.
 
 ## Before changing
 - Read the code first. Local patterns override general ones.

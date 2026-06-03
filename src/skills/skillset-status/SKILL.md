@@ -2,7 +2,7 @@
 name: skillset-status
 version: "0.1.0"
 description: "Show which slash-installed skills are currently active (toggled on) in this session."
-slug: skillset-status
+slug: sk-status
 statusReader: true
 ---
 # skillset-status

@@ -1,6 +1,6 @@
 // skillset pi extension — tracks slash-skill toggles per session and shows the
 // active set in the footer. The `input` event exposes the raw typed text before
-// template expansion, so `/builder off` is detectable; the session id comes from
+// template expansion, so `/sk-builder off` is detectable; the session id comes from
 // `ctx.sessionManager.getSessionId()`.
 //
 // Installed and removed by `skillset`; local edits may be overwritten on
@@ -47,7 +47,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("input", async (event: any, ctx: any) => {
     if (event && event.source === "interactive") {
       const m = TOGGLE.exec(String((event && event.text) || "").trim());
-      if (m && m[1] !== "skillset-status") {
+      if (m && m[1] !== "sk-status") {
         const state = (m[2] || "on").toLowerCase();
         await pi
           .exec("skillset", ["track", m[1], state, "--session", sessionId(ctx), "--known-only"])

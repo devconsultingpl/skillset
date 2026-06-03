@@ -2,15 +2,15 @@
 name: code-review
 version: "0.1.0"
 description: Read-only review of the changes on this branch — local state vs origin's default branch, or a path/range you name. Flags correctness, readability, convention, and obvious security/perf issues at file:line with a severity tag. Auto-activates on "review my changes / this diff". Reports; never edits.
-slug: code-review
+slug: sk-code-review
 ---
 # code-review
 
-Read-only review of *the changes*: is this delta correct, clear, and consistent with the codebase? Activates on "review my changes / this PR / this diff", or `/code-review`. Reviews the change — not the whole codebase. Pre-existing bloat is `declutter`'s, plan-alignment is `intent-review`'s, security depth is `appsec-review`'s.
+Read-only review of *the changes*: is this delta correct, clear, and consistent with the codebase? Activates on "review my changes / this PR / this diff", or `/sk-code-review`. Reviews the change — not the whole codebase. Pre-existing bloat is `declutter`'s, plan-alignment is `intent-review`'s, security depth is `appsec-review`'s.
 
 ## Scope the diff
 - Default: everything that diverges from the repo's default branch on `origin`. Find it with `git symbolic-ref refs/remotes/origin/HEAD` (fall back to `origin/main`, then `origin/master`); diff its merge-base with `HEAD` against the working tree, so committed and uncommitted changes both show. Uncommitted work gets the hardest look.
-- An argument narrows or redirects scope: `/code-review in the payments module` (a path), or a commit range. Review that instead.
+- An argument narrows or redirects scope: `/sk-code-review in the payments module` (a path), or a commit range. Review that instead.
 - Read outside the diff only to check "does this reinvent or duplicate something that already exists" — not to review unrelated code.
 
 ## What to flag
@@ -26,4 +26,4 @@ Read-only review of *the changes*: is this delta correct, clear, and consistent 
 ## Report
 - Group by severity: **blocker** (fix before merge) / **important** (should fix) / **nit** (optional).
 - Each: `file:line`, what's wrong, why it matters, a suggested fix where obvious.
-- Read-only — write nothing into files. May point ("run `/declutter` for codebase-wide bloat") but never invoke another skill. End with a one-line verdict: ship / ship-with-fixes / needs-work.
+- Read-only — write nothing into files. May point ("run `/sk-declutter` for codebase-wide bloat") but never invoke another skill. End with a one-line verdict: ship / ship-with-fixes / needs-work.

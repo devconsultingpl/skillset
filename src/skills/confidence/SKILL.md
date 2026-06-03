@@ -2,7 +2,7 @@
 name: confidence
 version: "0.1.0"
 description: Drive a question-led planning loop before any non-trivial work. Reach confidence ≥{{start}}% before writing code; write a plan to docs/plans and wait for explicit "go". If confidence drops below {{resume}}% mid-task, stop and re-question.
-slug: confidence
+slug: sk-confidence
 config:
   start: 98
   resume: 95

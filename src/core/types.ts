@@ -35,6 +35,10 @@ export interface TargetArtifact {
 
 export interface InstallRecord {
   skill: string;
+  /** Slug used as the slash-command filename. May differ from `skill` (e.g. the
+   * `sk-` prefix convention). Optional for backward compatibility with state
+   * written before this field existed. */
+  slug?: string;
   version: string;
   agent: AgentName;
   scope: Scope;

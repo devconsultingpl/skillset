@@ -14,6 +14,16 @@ Executable artifacts under `src/skills/<skill>/assets/` (opencode plugin, pi ext
 - Tests: colocated `*.test.ts` next to source under `src/core` and `src/targets`; end-to-end tests under `test/`.
 - Branches: short topical name (e.g. `step-8-agent-integration-tests`).
 
+## Skill slugs — `sk-` prefix is mandatory
+
+Every bundled skill's `slug:` **must** start with `sk-`. The slug becomes the slash command on every target (Claude Code, pi, opencode, Copilot), so a bare `code-review` or `verify` would collide with built-ins on at least one of them. The `sk-` prefix makes invocations unambiguously skillset's and survives any future built-in Anthropic / opencode / pi might ship.
+
+- `name:` stays the canonical short name (used for `skillset install <name>`, state records, logs).
+- `slug:` is the user-facing slash command. Default is `name` — override to `sk-<name>` for every skill we ship.
+- Drop redundancy where it reads cleaner: `skillset-status` → slug `sk-status` (not `sk-skillset-status`).
+
+When creating a new skill, set the slug explicitly in frontmatter even if it equals `sk-<name>` — making the convention visible at the top of every SKILL.md.
+
 ## Tests
 
 Vitest. Unit tests live next to source (`src/**/*.test.ts`). CLI end-to-end tests live under `test/`. Cover happy path + uninstall via markers for every target.
