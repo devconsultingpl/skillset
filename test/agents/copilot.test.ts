@@ -54,7 +54,13 @@ describe("copilot target", () => {
         sb.env,
       );
       expect(out.status).toBe(0);
-      const promptPath = join(sb.home, ".skillset", "copilot", "prompts", "sk-confidence.prompt.md");
+      const promptPath = join(
+        sb.home,
+        ".skillset",
+        "copilot",
+        "prompts",
+        "sk-confidence.prompt.md",
+      );
       expect(await exists(promptPath)).toBe(true);
 
       expect(run(["uninstall", "confidence", "--global"], sb.projectRoot, sb.env).status).toBe(0);

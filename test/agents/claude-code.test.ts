@@ -57,7 +57,9 @@ describe("claude-code", () => {
       sb.projectRoot,
       sb.env,
     );
-    expect(await exists(join(sb.projectRoot, ".claude", "commands", "sk-confidence.md"))).toBe(true);
+    expect(await exists(join(sb.projectRoot, ".claude", "commands", "sk-confidence.md"))).toBe(
+      true,
+    );
 
     const swap = run(
       ["set-mode", "confidence", "always", "--agent", "claude-code", "--local"],
@@ -65,7 +67,9 @@ describe("claude-code", () => {
       sb.env,
     );
     expect(swap.status).toBe(0);
-    expect(await exists(join(sb.projectRoot, ".claude", "commands", "sk-confidence.md"))).toBe(false);
+    expect(await exists(join(sb.projectRoot, ".claude", "commands", "sk-confidence.md"))).toBe(
+      false,
+    );
     expect(await exists(join(sb.projectRoot, ".claude", "settings.json"))).toBe(true);
   });
 });

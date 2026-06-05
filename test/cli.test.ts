@@ -72,7 +72,9 @@ describe("cli — cross-mode reinstall guard", () => {
     expect(out.stderr).toContain("--force");
     expect(out.stderr).toContain("set-mode");
     // Prior artifact must still exist; nothing changed.
-    expect(await exists(join(sb.projectRoot, ".claude", "commands", "sk-confidence.md"))).toBe(true);
+    expect(await exists(join(sb.projectRoot, ".claude", "commands", "sk-confidence.md"))).toBe(
+      true,
+    );
     expect(await exists(join(sb.projectRoot, ".claude", "settings.json"))).toBe(false);
     const installs = await readStateInstalls();
     expect(installs).toHaveLength(1);
@@ -82,7 +84,9 @@ describe("cli — cross-mode reinstall guard", () => {
   it("conflicting mode with --force cleans up prior artifact and replaces the record", async () => {
     expect(run(installArgs("slash"), sb.projectRoot, sb.env).status).toBe(0);
     expect(run(installArgs("always", ["--force"]), sb.projectRoot, sb.env).status).toBe(0);
-    expect(await exists(join(sb.projectRoot, ".claude", "commands", "sk-confidence.md"))).toBe(false);
+    expect(await exists(join(sb.projectRoot, ".claude", "commands", "sk-confidence.md"))).toBe(
+      false,
+    );
     expect(await exists(join(sb.projectRoot, ".claude", "settings.json"))).toBe(true);
     const installs = await readStateInstalls();
     expect(installs).toHaveLength(1);
