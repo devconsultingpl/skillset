@@ -33,7 +33,7 @@ describe("copilot target", () => {
         sb.env,
       );
       expect(out.status).toBe(0);
-      const promptPath = join(sb.projectRoot, ".github", "prompts", "confidence.prompt.md");
+      const promptPath = join(sb.projectRoot, ".github", "prompts", "sk-confidence.prompt.md");
       expect(await exists(promptPath)).toBe(true);
 
       const body = await readFile(promptPath, "utf8");
@@ -54,7 +54,7 @@ describe("copilot target", () => {
         sb.env,
       );
       expect(out.status).toBe(0);
-      const promptPath = join(sb.home, ".skillset", "copilot", "prompts", "confidence.prompt.md");
+      const promptPath = join(sb.home, ".skillset", "copilot", "prompts", "sk-confidence.prompt.md");
       expect(await exists(promptPath)).toBe(true);
 
       expect(run(["uninstall", "confidence", "--global"], sb.projectRoot, sb.env).status).toBe(0);

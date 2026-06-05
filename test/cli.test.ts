@@ -72,7 +72,7 @@ describe("cli — cross-mode reinstall guard", () => {
     expect(out.stderr).toContain("--force");
     expect(out.stderr).toContain("set-mode");
     // Prior artifact must still exist; nothing changed.
-    expect(await exists(join(sb.projectRoot, ".claude", "commands", "confidence.md"))).toBe(true);
+    expect(await exists(join(sb.projectRoot, ".claude", "commands", "sk-confidence.md"))).toBe(true);
     expect(await exists(join(sb.projectRoot, ".claude", "settings.json"))).toBe(false);
     const installs = await readStateInstalls();
     expect(installs).toHaveLength(1);
@@ -82,7 +82,7 @@ describe("cli — cross-mode reinstall guard", () => {
   it("conflicting mode with --force cleans up prior artifact and replaces the record", async () => {
     expect(run(installArgs("slash"), sb.projectRoot, sb.env).status).toBe(0);
     expect(run(installArgs("always", ["--force"]), sb.projectRoot, sb.env).status).toBe(0);
-    expect(await exists(join(sb.projectRoot, ".claude", "commands", "confidence.md"))).toBe(false);
+    expect(await exists(join(sb.projectRoot, ".claude", "commands", "sk-confidence.md"))).toBe(false);
     expect(await exists(join(sb.projectRoot, ".claude", "settings.json"))).toBe(true);
     const installs = await readStateInstalls();
     expect(installs).toHaveLength(1);
@@ -126,7 +126,7 @@ describe("cli — update protects local edits", () => {
       sb.projectRoot,
       sb.env,
     );
-  const cmdPath = () => join(sb.projectRoot, ".claude", "commands", "confidence.md");
+  const cmdPath = () => join(sb.projectRoot, ".claude", "commands", "sk-confidence.md");
 
   it("non-interactively skips a diverged install and warns", async () => {
     expect(installSlash().status).toBe(0);
@@ -217,7 +217,7 @@ describe("cli — update protects local edits", () => {
         sb.env,
       ).status,
     ).toBe(0);
-    const conventionPath = join(sb.projectRoot, ".claude", "commands", "convention.md");
+    const conventionPath = join(sb.projectRoot, ".claude", "commands", "sk-convention.md");
     const conventionOriginal = await readFile(conventionPath, "utf8");
     await writeFile(cmdPath(), "TAMPERED\n", "utf8");
 
@@ -288,17 +288,17 @@ describe("cli — set-mode round-trips on every agent", () => {
   }> = [
     {
       agent: "pi",
-      slashPath: (s) => join(s.projectRoot, ".pi", "prompts", "confidence.md"),
+      slashPath: (s) => join(s.projectRoot, ".pi", "prompts", "sk-confidence.md"),
       alwaysPath: (s) => join(s.projectRoot, ".pi", "APPEND_SYSTEM.md"),
     },
     {
       agent: "opencode",
-      slashPath: (s) => join(s.projectRoot, ".opencode", "commands", "confidence.md"),
+      slashPath: (s) => join(s.projectRoot, ".opencode", "commands", "sk-confidence.md"),
       alwaysPath: (s) => join(s.projectRoot, "AGENTS.md"),
     },
     {
       agent: "copilot",
-      slashPath: (s) => join(s.projectRoot, ".github", "prompts", "confidence.prompt.md"),
+      slashPath: (s) => join(s.projectRoot, ".github", "prompts", "sk-confidence.prompt.md"),
       alwaysPath: (s) => join(s.projectRoot, ".github", "copilot-instructions.md"),
     },
   ];
@@ -339,10 +339,10 @@ describe("cli — set-mode round-trips on every agent", () => {
 
 describe("cli — caveman bundled skill", () => {
   const slashPaths: Array<[string, (sb: Sandbox) => string]> = [
-    ["claude-code", (s) => join(s.projectRoot, ".claude", "commands", "caveman.md")],
-    ["pi", (s) => join(s.projectRoot, ".pi", "prompts", "caveman.md")],
-    ["opencode", (s) => join(s.projectRoot, ".opencode", "commands", "caveman.md")],
-    ["copilot", (s) => join(s.projectRoot, ".github", "prompts", "caveman.prompt.md")],
+    ["claude-code", (s) => join(s.projectRoot, ".claude", "commands", "sk-caveman.md")],
+    ["pi", (s) => join(s.projectRoot, ".pi", "prompts", "sk-caveman.md")],
+    ["opencode", (s) => join(s.projectRoot, ".opencode", "commands", "sk-caveman.md")],
+    ["copilot", (s) => join(s.projectRoot, ".github", "prompts", "sk-caveman.prompt.md")],
   ];
 
   it("is listed among bundled skills", () => {
@@ -362,7 +362,7 @@ describe("cli — caveman bundled skill", () => {
     const body = await readFile(slashPaths[0][1](sb), "utf8");
     expect(body).toContain("description:");
     expect(body).toContain("telegraphic");
-    expect(body).toContain("/caveman off");
+    expect(body).toContain("/sk-caveman off");
   });
 
   it("installs slash on every agent", async () => {
@@ -388,9 +388,9 @@ describe("cli — uninstall fan-out", () => {
       (r) => r.skill === skill,
     );
   };
-  const ccLocal = () => join(sb.projectRoot, ".claude", "commands", "confidence.md");
-  const ccGlobal = () => join(sb.home, ".claude", "commands", "confidence.md");
-  const piLocal = () => join(sb.projectRoot, ".pi", "prompts", "confidence.md");
+  const ccLocal = () => join(sb.projectRoot, ".claude", "commands", "sk-confidence.md");
+  const ccGlobal = () => join(sb.home, ".claude", "commands", "sk-confidence.md");
+  const piLocal = () => join(sb.projectRoot, ".pi", "prompts", "sk-confidence.md");
 
   it("bare uninstall removes installs across every agent", async () => {
     expect(

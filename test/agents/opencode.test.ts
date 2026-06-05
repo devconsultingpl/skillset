@@ -22,7 +22,7 @@ describe("opencode target", () => {
         sb.env,
       );
       expect(out.status).toBe(0);
-      const cmdPath = join(sb.projectRoot, ".opencode", "commands", "confidence.md");
+      const cmdPath = join(sb.projectRoot, ".opencode", "commands", "sk-confidence.md");
       expect(await exists(cmdPath)).toBe(true);
 
       const body = await readFile(cmdPath, "utf8");
@@ -44,7 +44,7 @@ describe("opencode target", () => {
         sb.env,
       );
       expect(out.status).toBe(0);
-      const cmdPath = join(sb.home, ".config", "opencode", "commands", "confidence.md");
+      const cmdPath = join(sb.home, ".config", "opencode", "commands", "sk-confidence.md");
       expect(await exists(cmdPath)).toBe(true);
 
       expect(run(["uninstall", "confidence", "--global"], sb.projectRoot, sb.env).status).toBe(0);
@@ -68,7 +68,7 @@ describe("opencode target", () => {
       // Resets the active set when a session is compacted.
       expect(pluginBody).toContain("session.compacted");
       // The status command reads project-scoped state.
-      const cmd = join(sb.projectRoot, ".opencode", "commands", "skillset-status.md");
+      const cmd = join(sb.projectRoot, ".opencode", "commands", "sk-status.md");
       expect(await readFile(cmd, "utf8")).toContain("!`skillset status`");
 
       expect(run(["uninstall", "skillset-status", "--local"], sb.projectRoot, sb.env).status).toBe(

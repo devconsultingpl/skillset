@@ -22,7 +22,7 @@ describe("pi target", () => {
         sb.env,
       );
       expect(out.status).toBe(0);
-      const promptPath = join(sb.projectRoot, ".pi", "prompts", "confidence.md");
+      const promptPath = join(sb.projectRoot, ".pi", "prompts", "sk-confidence.md");
       expect(await exists(promptPath)).toBe(true);
 
       const body = await readFile(promptPath, "utf8");
@@ -43,7 +43,7 @@ describe("pi target", () => {
         sb.env,
       );
       expect(out.status).toBe(0);
-      const promptPath = join(sb.home, ".pi", "agent", "prompts", "confidence.md");
+      const promptPath = join(sb.home, ".pi", "agent", "prompts", "sk-confidence.md");
       expect(await exists(promptPath)).toBe(true);
 
       expect(run(["uninstall", "confidence", "--global"], sb.projectRoot, sb.env).status).toBe(0);
