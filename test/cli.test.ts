@@ -383,6 +383,49 @@ describe("cli — caveman bundled skill", () => {
   });
 });
 
+describe("cli — ponytail bundled skill", () => {
+  const slashPaths: Array<[string, (sb: Sandbox) => string]> = [
+    ["claude-code", (s) => join(s.projectRoot, ".claude", "commands", "sk-ponytail.md")],
+    ["pi", (s) => join(s.projectRoot, ".pi", "prompts", "sk-ponytail.md")],
+    ["opencode", (s) => join(s.projectRoot, ".opencode", "commands", "sk-ponytail.md")],
+    ["copilot", (s) => join(s.projectRoot, ".github", "prompts", "sk-ponytail.prompt.md")],
+  ];
+
+  it("is listed among bundled skills", () => {
+    const out = run(["list"], sb.projectRoot, sb.env);
+    expect(out.status).toBe(0);
+    expect(out.stdout).toContain("ponytail");
+  });
+
+  it("installs slash on claude-code with description and body", async () => {
+    expect(
+      run(
+        ["install", "ponytail", "--agent", "claude-code", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    const body = await readFile(slashPaths[0][1](sb), "utf8");
+    expect(body).toContain("description:");
+    expect(body).toContain("YAGNI");
+    expect(body).toContain("/sk-ponytail off");
+    expect(body).toContain("shortens code, not requested reports");
+  });
+
+  it("installs slash on every agent", async () => {
+    expect(
+      run(
+        ["install", "ponytail", "--agent", "all", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    for (const [, path] of slashPaths) {
+      expect(await exists(path(sb))).toBe(true);
+    }
+  });
+});
+
 describe("cli — uninstall fan-out", () => {
   const installsOf = async (skill: string) => {
     const statePath = join(sb.home, ".skillset", "state.json");

@@ -11,6 +11,7 @@ Posture for *writing* code. For non-trivial design, plan first — `/sk-architec
 ## Before changing
 - Read the code first. Local patterns override general ones.
 - Search the codebase for an existing solution before adding any abstraction or utility — grep likely names, types, modules. Reuse beats reinvent.
+- Prefer stdlib and native platform features (CSS over JS, DB constraint over app code) over custom code. Never add a dependency for what a few lines can do.
 - Match existing style, naming, error handling, tests.
 
 ## While building

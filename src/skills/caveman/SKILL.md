@@ -6,7 +6,7 @@ slug: sk-caveman
 ---
 # caveman
 
-Compress my communication to telegraphic style for fast iteration loops. Argument: `on` (default) or `off`.
+Compress my communication to telegraphic style for fast iteration loops — governs how I talk, not what I build (pair with `/sk-ponytail` for minimal code). Argument: `on` (default) or `off`.
 
 - `/sk-caveman` or `/sk-caveman on` → activate.
 - `/sk-caveman off` → deactivate. Confirm: "Caveman off."
