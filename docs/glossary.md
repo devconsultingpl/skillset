@@ -2,7 +2,7 @@
 
 - **skill** — a unit of reusable agent instruction: one `SKILL.md` (YAML frontmatter + Markdown body).
 - **canonical format** — the single source `SKILL.md`; skillset projects it into each agent's native shape rather than storing per-agent copies.
-- **bundled skill** — a skill shipped in `src/skills/` (today: `appsec-review`, `architect`, `builder`, `caveman`, `code-review`, `commit-suggestion`, `confidence`, `convention`, `declutter`, `intent-review`, `skillset-status`). See README's *Bundled skills* for descriptions.
+- **bundled skill** — a skill shipped in `src/skills/` (today: `appsec-review`, `architect`, `builder`, `caveman`, `code-review`, `commit-suggestion`, `confidence`, `convention`, `declutter`, `ponytail`, `remediate`, `retro`, `skillset-status`). See README's *Bundled skills* for descriptions.
 - **target** — an agent integration implementing the `AgentTarget` interface (`install` / `uninstall` / `preview`). One per supported agent.
 - **mode** — how a skill is invoked: `slash` (explicit `/name`), `auto` (model auto-loads by description match), `always` (injected every session).
 - **scope** — install reach: `local` (current project) or `global` (user-level home dir).

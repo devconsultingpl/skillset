@@ -6,14 +6,17 @@ slug: sk-commit-suggest
 ---
 # commit-suggestion
 
-Suggest a commit message for the current changes as a ready-to-paste command. Activates on "suggest a commit message / commit this / what should I commit this as", or `/sk-commit-suggest`. Read-only: only inspects the repo (`git status` / `diff` / `log` / `diff --staged`) — never runs `git commit`, never pushes.
+Suggest a commit message for the current changes as a ready-to-paste command. Activates on "suggest a commit message / commit this / what should I commit this as", or `/sk-commit-suggest`. Read-only: only inspects the repo (`git status` / `git diff HEAD` / `log` / `diff --staged`) — never runs `git commit`, never pushes.
+
+## Optional subject
+If the user typed a subject (e.g. `/sk-commit-suggest fix auth`), make it the message's focus. In pi it arrives as `$@`; other harnesses append it themselves. No subject → derive it from the diff.
 
 ## Read the change
-- If anything is staged, describe the **staged** diff. Otherwise describe **all uncommitted** changes and note the user must `git add` first. A clean tree → say there's nothing to commit.
+- By default describe the **full working-tree change** (`git diff HEAD`) — staged and unstaged together — and note the user must `git add` them before committing. A clean tree → say there's nothing to commit. If the user scoped the request (staged only, or specific paths), follow that scope instead.
 - Sample `git log -20` (or `--oneline`) and match the repo's dominant style: prefix convention (none / type-scope / ticket), length, capitalization, imperative vs descriptive. If the log is sparse or inconsistent, fall back to imperative, concise, no forced prefix. Don't impose Conventional Commits unless the repo already uses them.
 
 ## Emit both forms
-Always give two ready-to-paste commands, one-liner first (the favored default):
+Always give two ready-to-paste commands, one-liner first — and **the one-liner is the answer** unless the change genuinely can't be explained in one line (a migration with an ordering constraint, a non-obvious *why* a reader will need, a breaking change). Say which you'd use, and lead with the one-liner.
 
 1. **One-liner** — `git commit -m "subject"`. Captures the *why* in one imperative line.
 2. **Multi-line** (heredoc, body scales to the change — may be just the subject for a small diff):
@@ -32,4 +35,6 @@ Always give two ready-to-paste commands, one-liner first (the favored default):
 - **Secrets:** if the diff touches `.env`, `*.key`, `*.pem`, or `secrets/`, add a one-line heads-up before the suggestion — the moment of commit is when it matters. Depth is `appsec-review`'s job.
 
 ## Don't
-Execute the commit, push, amend, or add a `Co-Authored-By` line. This skill only *suggests* — the user runs git.
+Execute the commit, push, or amend. This skill only *suggests* — the user runs git.
+
+Don't volunteer a `Co-Authored-By` or other trailer on your own — but if the harness or the repo mandates one, include it. A standing instruction wins over this default.

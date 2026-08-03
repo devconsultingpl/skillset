@@ -29,12 +29,19 @@ Confidence is ≥ {{start}}% only if constraints are written down, edge cases ha
    # NNNN — <title>
 
    ## Goal
+   ## Acceptance criteria
+   ## Budget
    ## Decisions
    ## Approach
    ## Steps
    ## Open questions
    ## Confidence
+   ## Review log
    ```
+
+   **Acceptance criteria** — ≤10 binary must / must-not lines, each answerable yes/no by reading the diff. This is the spec `code-review` reviews against; without it review has no oracle and never terminates.
+   **Budget** — files expected to change, new dependencies (default: none), rough line ceiling.
+   **Review log** — left empty; `remediate` appends one line per round.
 
 3. Print a 2–4 sentence summary plus the plan path.
 4. **Stop. Wait for explicit "go" before any code change.**

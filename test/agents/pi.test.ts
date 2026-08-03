@@ -65,9 +65,10 @@ describe("pi target", () => {
       const body = await readFile(ext, "utf8");
       expect(body).toContain('pi.on("input"');
       expect(body).toContain("setStatus");
-      // Resets the active set on compaction and session end.
+      // Resets the active set on compaction (transcript gone) but not on
+      // shutdown — reload/resume keep the bodies, so the set stays valid.
       expect(body).toContain('pi.on("session_compact"');
-      expect(body).toContain('pi.on("session_shutdown"');
+      expect(body).not.toContain('pi.on("session_shutdown"');
 
       expect(run(["uninstall", "skillset-status", "--local"], sb.projectRoot, sb.env).status).toBe(
         0,

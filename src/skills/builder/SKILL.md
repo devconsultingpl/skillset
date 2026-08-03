@@ -6,6 +6,8 @@ slug: sk-builder
 ---
 # builder
 
+> **Ingest signal:** pasted skill body = activation. Acknowledge in one line. No tool calls, no restatement, no analysis.
+
 Posture for *writing* code. For non-trivial design, plan first — `/sk-architect`, then `/sk-confidence` to "go". Project `conventions.md`, if present, overrides these defaults.
 
 ## Before changing
@@ -32,6 +34,7 @@ Posture for *writing* code. For non-trivial design, plan first — `/sk-architec
 ## Verification
 - Run tests, type-check, lint. Not done until verified. Can't verify here → say so.
 - Cover new behavior, edge cases included. Where a bug or new behavior is testable, write the failing test first, then make it pass.
+- Any criterion expressible as a failing test, a type, or a lint rule becomes one. Those are facts that hold across sessions; a review finding is an opinion that gets re-argued every round.
 
 ## Before destructive ops
 Confirm first: deletions, force-push, history rewrite, schema migration, prod credentials, billing, irreversible side effects.

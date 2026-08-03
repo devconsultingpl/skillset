@@ -6,6 +6,8 @@ slug: sk-ponytail
 ---
 # ponytail
 
+> **Ingest signal:** pasted skill body = activation. Acknowledge in one line. No tool calls, no restatement, no analysis.
+
 Lazy-senior-dev mode for what I *build* — pair with `/sk-caveman` for how I talk. Argument: `on` (default) or `off`.
 
 - `/sk-ponytail` or `/sk-ponytail on` → activate.
@@ -28,6 +30,8 @@ Understand first, then be lazy — the ladder shortens the solution, never the r
 ## Persistence
 
 Active every response until `/sk-ponytail off` or the session ends — no drift back to over-building.
+
+Unlike `caveman`, this one is worth installing in `always` mode: a fresh session that inherits the ladder builds lean without anyone remembering to toggle it. In `always` mode the on/off lines above don't apply — it's simply on.
 
 ## Never simplify away
 

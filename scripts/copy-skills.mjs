@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { access, cp, mkdir } from "node:fs/promises";
+import { access, cp, mkdir, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,6 +14,9 @@ try {
   process.exit(0);
 }
 
+// Wipe first — a plain copy leaves deleted skills behind, and a stale skill in
+// dist is a skill the CLI still lists and installs.
+await rm(dst, { recursive: true, force: true });
 await mkdir(dst, { recursive: true });
 await cp(src, dst, { recursive: true });
 console.log(`copied skills → ${dst}`);

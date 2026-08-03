@@ -20,6 +20,7 @@ Plan posture for *non-trivial* work — multi-file design, ambiguous scope, arch
 
 ## Write the plan, then hand off
 - You own the artifact: write `docs/plans/NNNN-<slug>.md` (next number = highest in `docs/plans/` incl. `completed/`, +1). Capture goal, the options, the chosen direction, risks, open questions.
+- **Acceptance criteria and a budget are mandatory** — a plan without them isn't done. Criteria: ≤10 binary must / must-not lines answerable yes/no from the diff. Budget: files expected to change, new dependencies (default: none), rough line ceiling. They are what `code-review` reviews against and what makes the review loop terminate.
 - Flag decisions that outlive this plan inline — "→ worth an ADR: X" — but don't draft ADRs or edit architecture/conventions docs.
 - Hand the floor to `confidence` to drive questions to ≥98% and wait for an explicit "go". `confidence` refines this same doc; you own it.
 

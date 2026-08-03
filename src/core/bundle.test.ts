@@ -12,7 +12,7 @@ describe("bundled skills", () => {
     expect(names).toContain("confidence");
     expect(names).toContain("convention");
     expect(names).toContain("declutter");
-    expect(names).toContain("intent-review");
+    expect(names).toContain("remediate");
   });
 
   // Generic validity gate — covers every bundled skill, current and future.
