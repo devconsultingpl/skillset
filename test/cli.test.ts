@@ -1,4 +1,4 @@
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type Sandbox, exists, makeSandbox, run } from "./helpers.js";
@@ -26,6 +26,52 @@ describe("cli — cross-cutting", () => {
     const second = run(["init", "convention"], sb.projectRoot, sb.env);
     expect(second.status).toBe(0);
     expect(await readFile(join(sb.projectRoot, "docs", "goals.md"), "utf8")).toBe("MY GOALS\n");
+  });
+
+  it("init convention scaffolds monorepo apps (non-TTY default: every app + root)", async () => {
+    await mkdir(join(sb.projectRoot, "apps", "web"), { recursive: true });
+    await mkdir(join(sb.projectRoot, "apps", "api"), { recursive: true });
+    await writeFile(join(sb.projectRoot, "package.json"), '{"workspaces": ["apps/*"]}');
+    await writeFile(join(sb.projectRoot, "apps", "web", "package.json"), "{}");
+    await writeFile(join(sb.projectRoot, "apps", "api", "package.json"), "{}");
+
+    const out = run(["init", "convention"], sb.projectRoot, sb.env);
+    expect(out.status).toBe(0);
+    expect(await exists(join(sb.projectRoot, "docs", "goals.md"))).toBe(true);
+    expect(await exists(join(sb.projectRoot, "apps", "web", "docs", "goals.md"))).toBe(true);
+    expect(await exists(join(sb.projectRoot, "apps", "api", "docs", "goals.md"))).toBe(true);
+  });
+
+  it("init convention --no-apps scaffolds root only", async () => {
+    await mkdir(join(sb.projectRoot, "apps", "web"), { recursive: true });
+    await writeFile(join(sb.projectRoot, "package.json"), '{"workspaces": ["apps/*"]}');
+    await writeFile(join(sb.projectRoot, "apps", "web", "package.json"), "{}");
+
+    const out = run(["init", "convention", "--no-apps"], sb.projectRoot, sb.env);
+    expect(out.status).toBe(0);
+    expect(await exists(join(sb.projectRoot, "docs", "goals.md"))).toBe(true);
+    expect(await exists(join(sb.projectRoot, "apps", "web", "docs", "goals.md"))).toBe(false);
+  });
+
+  it("init convention --yes accepts the flag (agent-safe) and scaffolds", async () => {
+    await mkdir(join(sb.projectRoot, "apps", "web"), { recursive: true });
+    await writeFile(join(sb.projectRoot, "package.json"), '{"workspaces": ["apps/*"]}');
+    await writeFile(join(sb.projectRoot, "apps", "web", "package.json"), "{}");
+
+    const out = run(["init", "convention", "--yes"], sb.projectRoot, sb.env);
+    expect(out.status).toBe(0);
+    expect(await exists(join(sb.projectRoot, "docs", "goals.md"))).toBe(true);
+    expect(await exists(join(sb.projectRoot, "apps", "web", "docs", "goals.md"))).toBe(true);
+  });
+
+  it("init convention reports created vs nothing-to-create", async () => {
+    const first = run(["init", "convention"], sb.projectRoot, sb.env);
+    expect(first.status).toBe(0);
+    expect(first.stdout).toContain("created");
+
+    const second = run(["init", "convention"], sb.projectRoot, sb.env);
+    expect(second.status).toBe(0);
+    expect(second.stdout).toContain("nothing to create");
   });
 
   it("emit confidence prints additionalContext JSON", () => {

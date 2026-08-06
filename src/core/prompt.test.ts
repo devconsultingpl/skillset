@@ -1,36 +1,31 @@
-import { describe, expect, it, vi } from "vitest";
-import { type Asker, resolveDivergence } from "./prompt.js";
+import { describe, expect, it } from "vitest";
+import { askChoice, type Asker } from "./prompt.js";
 
-/** Build an asker that returns the queued answers in order. */
-function scriptedAsker(answers: string[]): Asker {
+const makeAsker = (answers: string[]): Asker => {
   let i = 0;
-  return async () => answers[i++] ?? "";
-}
+  return async () => answers[Math.min(i++, answers.length - 1)] ?? "";
+};
 
-describe("resolveDivergence", () => {
-  it("empty input defaults to skip", async () => {
-    expect(await resolveDivergence(scriptedAsker([""]), () => {})).toBe("skip");
+describe("askChoice", () => {
+  const options = [
+    { key: "a", label: "every app + root" },
+    { key: "r", label: "root only" },
+    { key: "o", label: "apps only" },
+  ];
+
+  it("returns the default on empty input", async () => {
+    expect(await askChoice(makeAsker([""]), "Q?", options, "a")).toBe("a");
   });
 
-  it("'s' skips, 'o' overwrites, 'a' aborts", async () => {
-    expect(await resolveDivergence(scriptedAsker(["s"]), () => {})).toBe("skip");
-    expect(await resolveDivergence(scriptedAsker(["o"]), () => {})).toBe("overwrite");
-    expect(await resolveDivergence(scriptedAsker(["a"]), () => {})).toBe("abort");
+  it("returns the chosen key", async () => {
+    expect(await askChoice(makeAsker(["r"]), "Q?", options, "a")).toBe("r");
   });
 
-  it("is case- and whitespace-insensitive", async () => {
-    expect(await resolveDivergence(scriptedAsker(["  O  "]), () => {})).toBe("overwrite");
+  it("case-insensitive match", async () => {
+    expect(await askChoice(makeAsker(["O"]), "Q?", options, "a")).toBe("o");
   });
 
-  it("'d' shows the diff then re-prompts", async () => {
-    const onDiff = vi.fn();
-    const decision = await resolveDivergence(scriptedAsker(["d", "s"]), onDiff);
-    expect(onDiff).toHaveBeenCalledOnce();
-    expect(decision).toBe("skip");
-  });
-
-  it("unrecognized input re-prompts", async () => {
-    const decision = await resolveDivergence(scriptedAsker(["huh?", "o"]), () => {});
-    expect(decision).toBe("overwrite");
+  it("re-prompts on unrecognized input", async () => {
+    expect(await askChoice(makeAsker(["x", "r"]), "Q?", options, "a")).toBe("r");
   });
 });

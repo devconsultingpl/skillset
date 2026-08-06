@@ -23,6 +23,21 @@ Root `AGENTS.md` / `CLAUDE.md` are already injected by the harness — don't rel
 - `docs/plans/NNNN-*.md` — designs for in-flight work.
 - `docs/decisions/NNNN-*.md` — recorded decisions (ADRs).
 
+## Ensure conventions exist
+
+If conventions are missing or you're asked to make sure they're in place, run
+`skillset init convention` (idempotent — creates only what's missing, never
+overwrites):
+
+```sh
+skillset init convention            # default: monorepo = every app + root
+skillset init convention --no-apps  # monorepo: root only, no per-app docs
+skillset init convention --yes      # never prompt — agent/CI-safe
+```
+
+It never creates or edits `.flow/`, `AGENTS.md`, or `CLAUDE.md`. Never invent
+conventions — run the command or read what's already there.
+
 ## Numbering
 
 Files under `docs/plans/` and `docs/decisions/` are zero-padded `NNNN-slug.md`. Next number = highest existing + 1.

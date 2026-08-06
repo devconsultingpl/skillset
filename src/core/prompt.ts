@@ -22,6 +22,29 @@ export const readlineAsker: Asker = (question) =>
 
 const PROMPT = "  [s]kip  [o]verwrite  [d]iff  [a]bort  (default: s): ";
 
+/** A single-choice question's options. */
+export interface ChoiceOption {
+  key: string;
+  label: string;
+}
+
+/** Pose a single-choice question. Empty input → `defaultKey`; unrecognized
+ * input re-prompts. Injectable asker keeps the loop unit-testable. */
+export async function askChoice(
+  ask: Asker,
+  question: string,
+  options: ChoiceOption[],
+  defaultKey: string,
+): Promise<string> {
+  const prompt = `${question} [${options.map((o) => o.key).join("/")}] (default: ${defaultKey}): `;
+  for (;;) {
+    const ans = (await ask(prompt)).trim().toLowerCase();
+    if (ans === "") return defaultKey;
+    const hit = options.find((o) => o.key === ans);
+    if (hit) return hit.key;
+  }
+}
+
 /**
  * Drive the per-install divergence prompt: skip / overwrite / diff / abort.
  * `d` calls `onDiff` and re-prompts; empty input defaults to skip; anything

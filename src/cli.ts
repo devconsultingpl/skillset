@@ -110,8 +110,11 @@ program
   .command("init")
   .description("Scaffold a skill's templates into the current project (idempotent).")
   .argument("<skill>", "skill name with bundled templates (e.g. convention)")
-  .action(async (skill: string) => {
-    await init({ skill });
+  .option("--no-apps", "skip per-app scaffolding in monorepos (root only)")
+  .option("--yes", "never prompt — apply the default choice (every app + root)")
+  .action(async (skill: string, opts: { apps?: boolean; yes?: boolean }) => {
+    // commander maps --no-apps to `opts.apps === false` (attribute drops the prefix)
+    await init({ skill, noApps: opts.apps === false, yes: Boolean(opts.yes) });
   });
 
 program
