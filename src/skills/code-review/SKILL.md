@@ -6,7 +6,10 @@ slug: sk-code-review
 ---
 # code-review
 
-Read-only review of *the changes*: does this delta meet its spec, and is it correct and consistent with the codebase? Activates on "review my changes / this PR / this diff", or `/sk-code-review`. Reviews the change — not the whole codebase. Pre-existing bloat is `declutter`'s, security depth is `appsec-review`'s, applying fixes is `remediate`'s.
+Read-only review of *the changes*: does this delta meet its spec, and is it correct and consistent with the codebase? Reviews the change — not the whole codebase. Pre-existing bloat is `declutter`'s, security depth is `appsec-review`'s, applying fixes is `remediate`'s.
+
+## Project conventions
+If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flow/guidance/**/architecture.md` — read them first; they override these defaults.
 
 ## Scope the diff
 - Default: everything that diverges from the repo's default branch on `origin`. Find it with `git symbolic-ref refs/remotes/origin/HEAD` (fall back to `origin/main`, then `origin/master`); diff its merge-base with `HEAD` against the working tree, so committed and uncommitted changes both show. Uncommitted work gets the hardest look.

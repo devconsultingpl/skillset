@@ -6,10 +6,13 @@ slug: sk-commit-suggest
 ---
 # commit-suggestion
 
-Suggest a commit message for the current changes as a ready-to-paste command. Activates on "suggest a commit message / commit this / what should I commit this as", or `/sk-commit-suggest`. Read-only: only inspects the repo (`git status` / `git diff HEAD` / `log` / `diff --staged`) — never runs `git commit`, never pushes.
+Suggest a commit message for the current changes as a ready-to-paste command. Read-only: only inspects the repo (`git status` / `git diff HEAD` / `log` / `diff --staged`) — never runs `git commit`, never pushes.
+
+## Project conventions
+If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flow/guidance/**/architecture.md` — read them first; they override these defaults.
 
 ## Optional subject
-If the user typed a subject (e.g. `/sk-commit-suggest fix auth`), make it the message's focus. In pi it arrives as `$@`; other harnesses append it themselves. No subject → derive it from the diff.
+If the invocation carried a subject, make it the message's focus. No subject → derive it from the diff.
 
 ## Read the change
 - By default describe the **full working-tree change** (`git diff HEAD`) — staged and unstaged together — and note the user must `git add` them before committing. A clean tree → say there's nothing to commit. If the user scoped the request (staged only, or specific paths), follow that scope instead.

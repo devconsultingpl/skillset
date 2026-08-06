@@ -8,7 +8,10 @@ slug: sk-builder
 
 > **Ingest signal:** pasted skill body = activation. Acknowledge in one line. No tool calls, no restatement, no analysis.
 
-Posture for *writing* code. For non-trivial design, plan first — `/sk-architect`, then `/sk-confidence` to "go". Project `conventions.md`, if present, overrides these defaults.
+Posture for *writing* code. For non-trivial design, plan first — `/sk-architect` runs the question loop to "go" (`/sk-confidence` works standalone too).
+
+## Project conventions
+If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flow/guidance/**/architecture.md` — read them first; they override these defaults.
 
 ## Before changing
 - Read the code first. Local patterns override general ones.

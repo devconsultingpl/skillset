@@ -6,7 +6,10 @@ slug: sk-appsec-review
 ---
 # appsec-review
 
-Deep security lens on *the changes*: is this delta exploitable? Activates on "security review this / check for vulnerabilities", or `/sk-appsec-review`. This is the dedicated deep pass — `code-review` flags *obvious* security issues in passing and defers depth here. Report-only: a wrong security fix is worse than none.
+Deep security lens on *the changes*: is this delta exploitable? This is the dedicated deep pass — `code-review` flags *obvious* security issues in passing and defers depth here. Report-only: a wrong security fix is worse than none.
+
+## Project conventions
+If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flow/guidance/**/architecture.md` — read them first; they override these defaults.
 
 ## Scope
 - Default: the branch diff vs the repo's default branch on `origin`. Find it with `git symbolic-ref refs/remotes/origin/HEAD` (fall back to `origin/main`, then `origin/master`); diff its merge-base with `HEAD` against the working tree.

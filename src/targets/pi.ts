@@ -32,7 +32,11 @@ function renderPromptFile(ctx: InstallContext): string {
   // if present so the filename governs the slash command name.
   const { name: _omit, ...rest } = overrides as { name?: unknown };
   void _omit;
-  return compose({ description, ...rest }, ctx.skill.body);
+  // pi substitutes `$@` (all invocation args) — without a placeholder, args are
+  // dropped entirely, so every slash prompt gets a labeled argument slot. Empty
+  // when invoked bare; carries e.g. `/sk-caveman off`, `/sk-commit-suggest fix auth`.
+  const body = `${ctx.skill.body.trimEnd()}\n\nArguments: $@\n`;
+  return compose({ description, ...rest }, body);
 }
 
 export const piTarget: AgentTarget = {

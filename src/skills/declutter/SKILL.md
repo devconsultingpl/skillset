@@ -8,6 +8,9 @@ slug: sk-declutter
 
 Whole-codebase anti-bloat survey: where has the project accreted dead code, duplication, and abstractions that cost more to maintain than they earn? Run `/sk-declutter`, or `/sk-declutter <area>` to scope to a module. "Simpler" means *less to maintain* — not stripping every abstraction. Run this on a quiet tree; policing a fresh diff is `code-review`'s job.
 
+## Project conventions
+If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flow/guidance/**/architecture.md` — read them first; they override these defaults.
+
 ## What counts as bloat
 - **Dead code** — unreachable branches, unused exports/functions/files, commented-out blocks, obsolete flags.
 - **Duplication** — the same logic copied across call sites, near-identical functions, boilerplate a present library or existing helper already covers.

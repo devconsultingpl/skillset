@@ -8,6 +8,9 @@ slug: sk-remediate
 
 The session that *fixes* what a review found. Run `/sk-remediate` with a review report pasted in, or after `/sk-code-review` in the same session. A fresh session has no idea why the code looks the way it does, so left unconstrained it fixes defensively — a new layer, a new file, a guard for an impossible state. That is where bloat comes from. This body is the constraint.
 
+## Project conventions
+If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flow/guidance/**/architecture.md` — read them first; they override these defaults.
+
 ## Act on
 Bugs and spec violations only. Read the governing plan in `docs/plans/` first — its **Acceptance criteria** are what "fixed" means, its **Review log** is the round count.
 

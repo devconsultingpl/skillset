@@ -12,6 +12,9 @@ Project goals, conventions, and decisions live under `docs/`.
 
 - `docs/goals.md` — what we're building and why.
 - `docs/conventions.md` — code style, naming, testing, commits.
+- `.flow/guidance/**/architecture.md` — flow-generated guidance shadow tree (pi-extensions flow), when the project uses it.
+
+Root `AGENTS.md` / `CLAUDE.md` are already injected by the harness — don't reload them.
 
 ## On demand, when relevant
 
