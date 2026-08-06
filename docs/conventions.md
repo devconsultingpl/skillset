@@ -41,4 +41,4 @@ Vitest. Unit tests live next to source (`src/**/*.test.ts`). CLI end-to-end test
 
 ## Plans
 
-Active plans live in `docs/plans/`. As soon as a plan is fully done, move it to `docs/plans/completed/` — it stops crowding the context of active work but stays in the dev log. Never delete completed plans.
+Active plans live in `docs/plans/`. When a plan's work is fully done, **ask the developer to sign it off first**; only on explicit sign-off move it to `docs/plans/completed/` — it stops crowding the context of active work but stays in the dev log. Never delete completed plans.

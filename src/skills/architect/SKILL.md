@@ -25,6 +25,7 @@ If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flo
 - You own the artifact: write `docs/plans/NNNN-<slug>.md` (next number = highest in `docs/plans/` incl. `completed/`, +1). Capture goal, the options, the chosen direction, risks, open questions.
 - **Acceptance criteria and a budget are mandatory** — a plan without them isn't done. Criteria: ≤10 binary must / must-not lines answerable yes/no from the diff. Budget: files expected to change, new dependencies (default: none), rough line ceiling. They are what `code-review` reviews against and what makes the review loop terminate.
 - Flag decisions that outlive this plan inline — "→ worth an ADR: X" — but don't draft ADRs or edit architecture/conventions docs.
+- Plan lifecycle: once the work is implemented, reviewed clean, and the developer **signs the plan off**, move it to `docs/plans/completed/` (the dev log — never delete). Ask for the sign-off; don't move it on your own.
 - Then run the confidence loop inline (below) to ≥98% and wait for an explicit "go". `/sk-confidence` remains available standalone; if invoked, it refines this same doc — you own it.
 
 ## The confidence loop (inline)

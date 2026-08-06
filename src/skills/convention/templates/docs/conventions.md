@@ -24,4 +24,4 @@
 
 ## Plans
 
-<!-- Active plans live in `docs/plans/`. As soon as a plan is fully done, move it to `docs/plans/completed/` so it stops crowding the context of active work. The completed/ tree is the development log — never delete. -->
+<!-- Active plans live in `docs/plans/`. When a plan's work is fully done, ask the developer to **sign it off** first; only on explicit sign-off move it to `docs/plans/completed/` so it stops crowding the context of active work. The completed/ tree is the development log — never delete. -->
