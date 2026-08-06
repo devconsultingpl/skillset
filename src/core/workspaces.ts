@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import { fileExists } from "./fs.js";
@@ -97,7 +98,10 @@ async function readPnpmWorkspaces(projectRoot: string): Promise<string[]> {
     }
     if (trimmed === "" || trimmed.startsWith("#")) continue;
     if (!trimmed.startsWith("-")) break; // next top-level key
-    const value = trimmed.slice(1).trim().replace(/^['"]|['"]$/g, "");
+    const value = trimmed
+      .slice(1)
+      .trim()
+      .replace(/^['"]|['"]$/g, "");
     if (value && !value.startsWith("!")) out.push(value);
   }
   return out;
@@ -109,9 +113,7 @@ async function readLernaWorkspaces(projectRoot: string): Promise<string[]> {
   try {
     const json = JSON.parse(await readFile(file, "utf8")) as { packages?: unknown };
     if (Array.isArray(json.packages)) {
-      return json.packages.filter(
-        (p): p is string => typeof p === "string" && !p.startsWith("!"),
-      );
+      return json.packages.filter((p): p is string => typeof p === "string" && !p.startsWith("!"));
     }
   } catch {
     // unparseable lerna.json — treat as no declaration
@@ -167,7 +169,7 @@ export async function detectWorkspaceApps(projectRoot: string): Promise<string[]
   const apps = new Map<string, string[]>();
 
   async function visit(dir: string): Promise<void> {
-    let entries;
+    let entries: Dirent[];
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {

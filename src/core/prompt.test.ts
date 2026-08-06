@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { askChoice, type Asker } from "./prompt.js";
+import { type Asker, askChoice } from "./prompt.js";
 
 const makeAsker = (answers: string[]): Asker => {
   let i = 0;

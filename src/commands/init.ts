@@ -3,7 +3,13 @@ import { join } from "node:path";
 import pc from "picocolors";
 import { templatesRoot } from "../core/bundle.js";
 import { fileExists } from "../core/fs.js";
-import { askChoice, isInteractive, readlineAsker, type Asker, type ChoiceOption } from "../core/prompt.js";
+import {
+  type Asker,
+  type ChoiceOption,
+  askChoice,
+  isInteractive,
+  readlineAsker,
+} from "../core/prompt.js";
 import { detectWorkspaceApps } from "../core/workspaces.js";
 
 export interface InitOptions {
@@ -111,6 +117,8 @@ export async function init(opts: InitOptions): Promise<void> {
   }
 
   if (await fileExists(join(projectRoot, ".flow"))) {
-    console.log(pc.dim("flow: .flow/ present — left untouched; skills read its guidance when present."));
+    console.log(
+      pc.dim("flow: .flow/ present — left untouched; skills read its guidance when present."),
+    );
   }
 }
