@@ -1,7 +1,7 @@
 ---
 name: ponytail
 version: "0.1.0"
-description: "Switch lazy mode: minimal YAGNI code — stdlib before custom, one line before fifty. Argument: on (default) or off."
+description: "Lazy-senior-dev mode for what the agent builds — climb the reuse ladder, stop at the first rung that holds, never over-build (pair with /sk-caveman for how the agent talks). Argument: on (default) or off. Invoke /sk-ponytail or /sk-ponytail on to activate; /sk-ponytail off to deactivate. Suited for always mode."
 slug: sk-ponytail
 ---
 # ponytail

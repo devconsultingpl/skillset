@@ -1,7 +1,7 @@
 ---
 name: caveman
 version: "0.1.0"
-description: "Switch caveman mode: compress responses to terse, telegraphic style for fast iteration loops. Argument: on (default) or off."
+description: "Compress the agent's communication to telegraphic style for fast iteration loops — governs how the agent talks, not what it builds (pair with /sk-ponytail for minimal code). Argument: on (default) or off. Invoke /sk-caveman or /sk-caveman on to activate; /sk-caveman off to deactivate."
 slug: sk-caveman
 ---
 # caveman

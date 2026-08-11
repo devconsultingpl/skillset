@@ -1,7 +1,7 @@
 ---
 name: architect
 version: "0.1.0"
-description: Plan posture for non-trivial work — orient in the project, frame the problem, generate design options scaled to the stakes, recommend one with risks named, and write the plan to docs/plans. Hands off to confidence to drive the question loop to a "go". Skips trivial edits.
+description: "Plan posture for non-trivial work — multi-file design, ambiguous scope, architectural impact, or should-we-do-X. Reads project conventions first, orients on code/docs, writes docs/plans/NNNN-slug.md (or the project's plan location) with mandatory acceptance criteria + budget, runs a confidence loop to ≥98%, and never jumps to implementation without an explicit go. Skip trivial edits (rename, typo, single-file localized fix): say nothing and let building proceed."
 slug: sk-architect
 ---
 # architect
@@ -9,7 +9,7 @@ slug: sk-architect
 Plan posture for *non-trivial* work — multi-file design, ambiguous scope, architectural impact, or "should we do X". Skip trivial edits (rename, typo, single-file localized fix): say nothing and let building proceed. This body owns that threshold.
 
 ## Project conventions
-If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flow/guidance/**/architecture.md` — read them first; they override these defaults.
+If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flow/guidance/**/architecture.md` — read them first; they override these defaults. (The plan file location is a default: projects may override it, e.g. `.pi/plans/` gitignored per repo.)
 
 ## Orient first
 - Read the code and docs before proposing (the conventions step above first).
