@@ -453,7 +453,7 @@ describe("cli — ponytail bundled skill", () => {
     ).toBe(0);
     const body = await readFile(slashPaths[0][1](sb), "utf8");
     expect(body).toContain("description:");
-    expect(body).toContain("YAGNI");
+    expect(body).toContain("reuse ladder");
     expect(body).toContain("/sk-ponytail off");
     expect(body).toContain("shortens code, not requested reports");
   });

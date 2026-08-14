@@ -6,6 +6,12 @@
 // Also registers `/sk-start <skill> [skill...]` — a one-keystroke session-start
 // ritual: activates the named skills (tracked on) and injects their bodies as a
 // single user message, because pi expands only the *first* `/command` per submit.
+//
+// Re-checked against pi 0.84.2: `pi.sendUserMessage(..., { expandPromptTemplates: true })`
+// still expands only the leading command (`_expandSkillCommand` handles a single
+// `/skill:`; `expandPromptTemplate` matches one leading `/template`). Splitting into
+// N single-command messages would cost N model turns, and each expanded template
+// re-introduces its own ingest line — so emit-and-inject in one message stays.
 // Accepts skill names (`ponytail`) or `/sk-*` slugs (`sk-ponytail`); bodies come
 // from `skillset emit`, so installed-but-unbundled skills are reported as missing.
 //
