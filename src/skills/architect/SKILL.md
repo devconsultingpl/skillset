@@ -25,7 +25,7 @@ If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flo
 - You own the artifact: write `docs/plans/NNNN-<slug>.md` (next number = highest in `docs/plans/` incl. `completed/`, +1). Capture goal, the options, the chosen direction, risks, open questions.
 - **Acceptance criteria and a budget are mandatory** — a plan without them isn't done. Criteria: ≤10 binary must / must-not lines answerable yes/no from the diff. Budget: list every expected file (including config, docs, and `.gitignore` edits), new dependencies (default: none), estimated implementation-logic lines, and expected physical-line range including repository-standard docstrings and section banners. Unexplained growth beyond that range remains a spec violation; the documentation allowance is not a blanket exemption. They are what `code-review` reviews against and what makes the review loop terminate.
 - Flag decisions that outlive this plan inline — "→ worth an ADR: X" — but don't draft ADRs or edit architecture/conventions docs.
-- Plan lifecycle: once the work is implemented, reviewed clean, and the developer **signs the plan off**, move it to `docs/plans/completed/` (the dev log — never delete). Ask for the sign-off; don't move it on your own.
+- Plan lifecycle: once the work is implemented, reviewed clean, and the developer **signs the plan off**, move it to `docs/plans/completed/` (the dev log — never delete) with plain `mv` — the plan file is untracked until the work lands, so `git mv` will fail. Ask for the sign-off; don't move it on your own.
 - Then run the confidence loop inline (below) to ≥98% and wait for an explicit "go". `/sk-confidence` remains available standalone; if invoked, it refines this same doc — you own it.
 
 ## The confidence loop (inline)
@@ -34,7 +34,7 @@ The planning loop runs here — no separate `/sk-confidence` invocation needed.
 1. State current confidence 0–100 each turn.
 2. Ask **one** question. Recommend an answer first. Never batch.
 3. Read code, docs, commits before asking — don't ask what's already written.
-4. Continue until confidence ≥ 98% — constraints written down, edge cases have stated recipes, assumptions validated against code, fallback known if the next step fails.
+4. Continue until confidence ≥ 98% — constraints written down, edge cases have stated recipes, assumptions validated against code, fallback known if the next step fails. Validate by running a targeted check (test/render/grep) when a claim is load-bearing — executing beats re-reading.
 
 At threshold: write *or update* `docs/plans/NNNN-<slug>.md` (Goal / Acceptance criteria / Budget / Decisions / Approach / Steps / Open questions / Confidence / Review log), print a 2–4 sentence summary plus the plan path, then stop.
 
