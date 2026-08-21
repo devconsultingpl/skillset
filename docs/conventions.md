@@ -36,7 +36,7 @@ Vitest. Unit tests live next to source (`src/**/*.test.ts`). CLI end-to-end test
 ## What not to do
 
 - Don't publish to npm — distribution is local-clone only for now.
-- Don't write per-agent forks of a skill body — frontmatter projects to each target.
+- Don't write per-agent forks of a skill body — `targets:` frontmatter projects per-agent overrides (allowed-tools, activation) to each target. Keep the shared body tool-agnostic: tool names (`browser_*` on pi vs `mcp__playwright__*` on Claude Code), activation instructions, and allowed-tool metadata belong in `targets:`, never hard-coded in the body. A skill whose core is one harness's tool API may stay as separate per-agent copies — intent and safety rules synchronize, tool specifics don't.
 - Don't write outside marker blocks in shared files (`settings.json`, `AGENTS.md`, `copilot-instructions.md`).
 
 ## Plans

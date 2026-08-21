@@ -30,10 +30,12 @@ You may be running under any of the supported harnesses. Each keeps its standing
 |---|---|---|---|
 | **Claude Code** | `./CLAUDE.md`, `~/.claude/CLAUDE.md`, `SessionStart` hooks in `settings.json` | a `memory/` dir with `MEMORY.md` index if the project uses one, else `CLAUDE.md` itself | `.claude/skills/`, `.claude/commands/` |
 | **opencode** | `AGENTS.md`, `opencode.json` | `AGENTS.md` (no separate store) | `.opencode/skills/`, `.opencode/commands/`, plugins |
-| **pi** | `APPEND_SYSTEM.md`, `AGENTS.md` | `AGENTS.md` / `APPEND_SYSTEM.md` | `.pi/skills/`, `.pi/prompts/`, `.pi/extensions/` |
+| **pi** | `AGENTS.md` (or `CLAUDE.md`), `APPEND_SYSTEM.md` | `AGENTS.md` / `CLAUDE.md` / `APPEND_SYSTEM.md` | `.pi/skills/`, `.pi/prompts/`, `.pi/extensions/` |
 | **Copilot** | `.github/copilot-instructions.md`, `~/.copilot/settings.json` | `copilot-instructions.md` (no separate store) | `.github/prompts/*.prompt.md` |
 
 Also check both scopes: **project-local** files (travel with the repo) and **global/user** files (`~/...`) — a finding can belong to either. When in doubt about a path, look before you write.
+
+The table's paths are defaults, not guarantees. When the listed files are absent, find what the harness actually loads — pi and Claude Code read `CLAUDE.md` when `AGENTS.md` is missing, and a repo may carry `.cursorrules`, `.github/copilot-instructions.md`, or an override file instead. Treat the instruction file that's actually present as authoritative and report which one you found.
 
 ## Pass 1 — Mine the session for friction
 
@@ -58,7 +60,7 @@ Independently of this session's events, inspect what every future session will l
 
 Every finding must name the exact artifact and where it lands — not "consider documenting this":
 
-- **Recurring fact / preference / correction** → a memory entry (one fact each; corrections/preferences carry the *why* and how to apply). On harnesses with no separate store, a tight line in the instruction file instead. Update any index.
+- **Recurring fact / preference / correction** → a memory entry (one fact each; corrections/preferences carry the *why* and how to apply). On harnesses with no separate store, a tight line in the instruction file instead. Update any index. If no memory store exists, don't create one for one-off facts — durable rules belong in the project's existing instruction or conventions files.
 - **A rule the user clearly holds but isn't written** → add it to the conventions doc / instruction file.
 - **A recurring task pattern** → propose a new skill: name, one-line trigger, which modes/harnesses. Offer to scaffold the `SKILL.md` stub.
 - **An awkward or broken skill** → the specific edit to its body or frontmatter — and keep that edit lean, don't bloat the skill while fixing it.

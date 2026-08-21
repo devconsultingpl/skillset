@@ -16,6 +16,8 @@ Bugs and spec violations only. Read the governing plan in `docs/plans/` first �
 
 **Preferences are not work.** List them back as ignored, in one line, and move on. Acting on one requires the user asking for it by name.
 
+**Track findings individually.** Multiple bugs → each gets its own acceptance criterion (a failing test when expressible) and is verified per-finding; a finding that can't be verified is reported as unverified, never silently dropped. No governing plan → the pasted report is the checklist: findings tracked by `file:line` until fixed or explicitly deferred.
+
 ## Budget — hard
 - **No new files.**
 - **No new dependencies.**

@@ -13,12 +13,18 @@ If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flo
 
 ## Scope the diff
 - Default: everything that diverges from the repo's default branch on `origin`. Find it with `git symbolic-ref refs/remotes/origin/HEAD` (fall back to `origin/main`, then `origin/master`); diff its merge-base with `HEAD` against the working tree, so committed and uncommitted changes both show. Uncommitted work gets the hardest look.
-- An argument narrows or redirects scope: `/sk-code-review in the payments module` (a path), or a commit range. Review that instead.
+- An argument narrows or redirects scope: `/sk-code-review in the payments module` (a path), or a commit range. A commit range covers commits only — when the user also has uncommitted work (e.g. "the last two commits plus my edits"), union the range with staged and unstaged changes, state the resulting scope, and exclude unrelated files.
 - Read outside the diff only to check "does this reinvent or duplicate something that already exists" — not to review unrelated code.
 
 ## Establish the spec first
 - Find the governing plan in `docs/plans/` (the one matching the work) and read its **Acceptance criteria**, **Budget**, and **Review log**. That is the spec, and the round count.
 - No plan and no stated intent → say so, review for bugs only, and note that everything else can only be preference.
+
+## Run the review once
+One primary pass over the whole diff *is* the review. Additional agents only for independent, explicitly scoped questions (a subsystem, security depth) — never a second agent with the same whole-diff prompt; they overlap and burn tokens. Cap background agents' turns. Every finding carries `file:line` evidence; without evidence it's not a finding.
+
+## Verify, don't just read
+For the changed surface, run what the project offers — typecheck, lint, compile/check, and the tests covering the change — when locally available and safe; verification is observation, not editing. Report each check's result. A check or test set that wasn't run is reported as **not run** with the reason (unavailable, unsafe, too slow).
 
 ## Classify every finding — the class is the point
 - **bug** — provable wrong behavior: wrong edge case, swallowed error, hazard around concurrency/time/money/identity/untrusted input, visible injection or leaked secret, O(n²) in a hot path.
