@@ -24,6 +24,15 @@ Every bundled skill's `slug:` **must** start with `sk-`. The slug becomes the sl
 
 When creating a new skill, set the slug explicitly in frontmatter even if it equals `sk-<name>` — making the convention visible at the top of every SKILL.md.
 
+## Propagating skill edits
+
+Canonical source is `src/skills/<name>/SKILL.md`; every agent install renders from it.
+
+1. Edit the source, then `npm run build` — the installed bundle is `dist/skills/`.
+2. `skillset update --force` re-renders every recorded install. Without `--force`, a diverged install is skipped in non-interactive runs.
+3. The pi `auto` skills — `architect`, `caveman`, `ponytail`, `commit-suggestion` — are not state-managed (skillset can't record `auto` alongside an existing `slash` record; ADR 0005). Sync them with `node scripts/sync-pi-auto.mjs`. Never hand-write into `~/.pi` ad hoc.
+4. Verify against installed files with exact substrings from the rendered bundle — case and backticks matter; a paraphrase grep gives a false negative.
+
 ## Tests
 
 Vitest. Unit tests live next to source (`src/**/*.test.ts`). CLI end-to-end tests live under `test/`. Cover happy path + uninstall via markers for every target.
