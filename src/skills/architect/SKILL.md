@@ -13,6 +13,7 @@ If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flo
 
 ## Orient first
 - Read the code and docs before proposing (the conventions step above first).
+- Input that is a pasted third-party claim set (a card, a colleague's message) → the claims get verified first. If the project ships a triage or claim-verification skill, that pass is its job. Plan only after.
 - Frame the actual problem in one or two sentences. Name the constraints and the unknowns.
 - Fill gaps by reading and asking, not guessing. Web research is opt-in — only when prior art genuinely decides the call (library, protocol, algorithm), ≤3 searches unless asked for more.
 
@@ -24,7 +25,7 @@ If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flo
 ## Write the plan, then hand off
 - You own the artifact: write `docs/plans/NNNN-<slug>.md` (next number = highest in `docs/plans/` incl. `completed/`, +1). Capture goal, the options, the chosen direction, risks, open questions.
 - **Acceptance criteria and a budget are mandatory** — a plan without them isn't done. Criteria: ≤10 binary must / must-not lines answerable yes/no from the diff. Budget: list every expected file (including config, docs, and `.gitignore` edits), new dependencies (default: none), estimated implementation-logic lines, and expected physical-line range including repository-standard docstrings and section banners. Unexplained growth beyond that range remains a spec violation; the documentation allowance is not a blanket exemption. They are what `code-review` reviews against and what makes the review loop terminate.
-- Flag decisions that outlive this plan inline — "→ worth an ADR: X" — but don't draft ADRs or edit architecture/conventions docs.
+- Flag decisions that outlive this plan inline — "→ worth an ADR: X" — and draft the ADR (context, decision, consequences) as an appendix to the Decisions section so it can't orphan. The builder files it as `docs/decisions/NNNN-*.md` (or the project's decisions location) during implementation; only that file placement stays review-time. Don't edit architecture/conventions docs.
 - Plan lifecycle: once the work is implemented, reviewed clean, and the developer **signs the plan off**, move it to `docs/plans/completed/` (the dev log — never delete) with plain `mv` — the plan file is untracked until the work lands, so `git mv` will fail. Ask for the sign-off; don't move it on your own.
 - Then run the confidence loop inline (below) to ≥98% and wait for an explicit "go". `/sk-confidence` remains available standalone; if invoked, it refines this same doc — you own it.
 
@@ -36,7 +37,7 @@ The planning loop runs here — no separate `/sk-confidence` invocation needed.
 3. Read code, docs, commits before asking — don't ask what's already written.
 4. Continue until confidence ≥ 98% — constraints written down, edge cases have stated recipes, assumptions validated against code, fallback known if the next step fails. Validate by running a targeted check (test/render/grep) when a claim is load-bearing — executing beats re-reading.
 
-At threshold: write *or update* `docs/plans/NNNN-<slug>.md` (Goal / Acceptance criteria / Budget / Decisions / Approach / Steps / Open questions / Confidence / Review log), print a 2–4 sentence summary plus the plan path, then stop.
+At threshold: write *or update* `docs/plans/NNNN-<slug>.md` (Goal / Acceptance criteria / Budget / Decisions / ADR appendix (mandatory when flagged) / Approach / Steps / Open questions / Confidence / Review log), print a 2–4 sentence summary plus the plan path, then stop.
 
 ## Hard rule
 Never jump to implementation without an explicit "go". Plan mode ends at the written plan + handoff. Building is `builder`'s job, after "go".
