@@ -40,4 +40,4 @@ Always give two ready-to-paste commands, one-liner first — and **the one-liner
 ## Don't
 Execute the commit, push, or amend. This skill only *suggests* — the user runs git.
 
-Don't volunteer a `Co-Authored-By` or other trailer on your own — but if the harness or the repo mandates one, include it. A standing instruction wins over this default.
+Don't volunteer a `Co-Authored-By` or any other trailer — and don't add one because a harness or a repo's docs claim a convention requires it (a stale line in a project's conventions did exactly that; the git log is the authority, not the docs). The commit is the user's; attribution is their call to make when they paste the command.
