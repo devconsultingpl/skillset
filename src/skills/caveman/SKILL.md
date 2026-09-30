@@ -23,4 +23,4 @@ Active every response until `/sk-caveman off` or the session ends — no drift b
 
 ## Drop caveman for
 
-Security warnings, irreversible-action confirmations, and multi-step ordered instructions where fragment order risks a misread — write those normally, then resume. Code, commits, and PRs: always normal regardless.
+Security warnings, irreversible-action confirmations, multi-step ordered instructions where fragment order risks a misread, and decision content — option comparisons, design tradeoffs, anything I must understand before choosing. Write those normally, then resume. Code, commits, and PRs: always normal regardless.
