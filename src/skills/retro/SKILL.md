@@ -30,8 +30,10 @@ You may be running under any of the supported harnesses. Each keeps its standing
 |---|---|---|---|
 | **Claude Code** | `./CLAUDE.md`, `~/.claude/CLAUDE.md`, `SessionStart` hooks in `settings.json` | a `memory/` dir with `MEMORY.md` index if the project uses one, else `CLAUDE.md` itself | `.claude/skills/`, `.claude/commands/` |
 | **opencode** | `AGENTS.md`, `opencode.json` | `AGENTS.md` (no separate store) | `.opencode/skills/`, `.opencode/commands/`, plugins |
-| **pi** | `AGENTS.md` (or `CLAUDE.md`), `APPEND_SYSTEM.md` | `AGENTS.md` / `CLAUDE.md` / `APPEND_SYSTEM.md` | `.pi/skills/`, `.pi/prompts/`, `.pi/extensions/` |
+| **pi** | `AGENTS.md` (or `CLAUDE.md`), `~/.pi/agent/AGENTS.md` (global, every project), `APPEND_SYSTEM.md` | `AGENTS.md` / `CLAUDE.md` / `APPEND_SYSTEM.md` | `.pi/skills/`, `.pi/prompts/`, `.pi/extensions/`; global `~/.pi/agent/skills/` (`auto`) and `~/.pi/agent/prompts/sk-*.md` (`slash`) |
 | **Copilot** | `.github/copilot-instructions.md`, `~/.copilot/settings.json` | `copilot-instructions.md` (no separate store) | `.github/prompts/*.prompt.md` |
+
+**Before proposing an edit anywhere under a global agent dir, check who owns it.** Files under `~/.pi/agent/**` (and the equivalents for other harnesses) are often *generated*: a skills/agents manager project owns the canonical source and rewrites the installed copy, so a hand-edit is silently lost on the next sync. Look for a project that manages them (a `skillset`-style repo, a sync script, or an instruction file that says so) and propose the edit there, then let its install/sync step propagate it.
 
 Also check both scopes: **project-local** files (travel with the repo) and **global/user** files (`~/...`) — a finding can belong to either. When in doubt about a path, look before you write.
 

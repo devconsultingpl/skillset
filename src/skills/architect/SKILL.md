@@ -37,6 +37,7 @@ The planning loop runs here — no separate `/sk-confidence` invocation needed.
 2. Ask **one** question. Recommend an answer first. Never batch.
 3. Read code, docs, commits before asking — don't ask what's already written.
 4. Continue until confidence ≥ 98% — constraints written down, edge cases have stated recipes, assumptions validated against code, fallback known if the next step fails. Validate by running a targeted check (test/render/grep) when a claim is load-bearing — executing beats re-reading.
+5. **Every "currently true" statement in the draft gets its falsifying check, run now** — "all skills already conform", "that path deactivates the tools", "this is verified sound". Paste the command and its result into the plan. Seeing that a guard function *exists* is not evidence that it *runs on the path that matters*; a grep for a property is not evidence that the property holds.
 
 At threshold: write *or update* `docs/plans/NNNN-<slug>.md` (Goal / Acceptance criteria / Budget / Decisions / ADR appendix (mandatory when flagged) / Approach / Steps / Open questions / Confidence / Review log), print a 2–4 sentence summary plus the plan path, then stop.
 
