@@ -7,9 +7,122 @@ import {
   configPlaceholdersIn,
   declarationCoverage,
   declaredModes,
+  fieldSupport,
   parseDeclarations,
 } from "./declarations.js";
+import { parseSkill } from "./parse.js";
 import type { SiblingFile } from "./types.js";
+
+/** A skill carrying whatever harness frontmatter a case needs. */
+function skillWith(frontmatter: string) {
+  return parseSkill(
+    `---\nname: demo\nversion: "1.0.0"\ndescription: demo skill\n${frontmatter}\n---\nBody.\n`,
+  );
+}
+
+describe("parseDeclarations — requires", () => {
+  it("parses a per-harness field requirement", () => {
+    const { requires, problems } = parseDeclarations({
+      version: 1,
+      installs: { "code-review": [{ agent: "pi", mode: "auto" }] },
+      requires: { "code-review": { pi: ["contract"] } },
+    });
+
+    expect(problems).toEqual([]);
+    expect(requires["code-review"]?.pi).toEqual(["contract"]);
+  });
+
+  it("rejects an unknown agent, a non-array, and an empty field name", () => {
+    const { problems } = parseDeclarations({
+      version: 1,
+      installs: { "code-review": [{ agent: "pi", mode: "auto" }] },
+      requires: {
+        "code-review": { cursor: ["contract"], pi: "contract", opencode: [""] },
+      },
+    });
+
+    expect(problems).toHaveLength(3);
+    expect(problems[0]).toContain('unknown agent "cursor"');
+    expect(problems[1]).toContain("must be an array of frontmatter field names");
+    expect(problems[2]).toContain("must be an array of frontmatter field names");
+  });
+
+  it("rejects a requirement on skillset's own keys, or for an agent it never installs on", async () => {
+    const { declarations, requires } = parseDeclarations({
+      version: 1,
+      installs: { demo: [{ agent: "pi", mode: "auto" }] },
+      requires: { demo: { pi: ["config"], opencode: ["license"] } },
+    });
+
+    const problems = await declarationCoverage(declarations, {}, requires);
+    expect(problems.join("\n")).toContain("skillset's own frontmatter key");
+    expect(problems.join("\n")).toContain("does not install on opencode");
+  });
+});
+
+/**
+ * The capability half of slice 2c: what a target can carry is declared data, so
+ * these cases run against the real target records rather than a fixture copy.
+ */
+describe("fieldSupport", () => {
+  it("stays silent for a field the harness can carry", () => {
+    const report = fieldSupport(
+      skillWith("targets:\n  opencode:\n    license: MIT"),
+      "opencode",
+      "auto",
+    );
+    expect(report).toEqual({ warnings: [], errors: [] });
+  });
+
+  it("names the field and the consequence when the harness ignores it", () => {
+    const { warnings } = fieldSupport(
+      skillWith("targets:\n  opencode:\n    disable-model-invocation: true"),
+      "opencode",
+      "auto",
+    );
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("cannot express `disable-model-invocation`");
+    expect(warnings[0]).toContain("stays model-invocable");
+  });
+
+  it("reports a top-level harness field, which no renderer forwards", () => {
+    const { warnings } = fieldSupport(skillWith("disable-model-invocation: true"), "pi", "slash");
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("declared at the top level");
+    expect(warnings[0]).toContain("targets.pi");
+  });
+
+  it("reports a field the mode cannot carry even when another mode can", () => {
+    // `name` is stripped from prompt files on purpose — the filename governs —
+    // but it is a field of a skill file.
+    const { warnings } = fieldSupport(skillWith("targets:\n  pi:\n    name: demo"), "pi", "slash");
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("cannot express `name`");
+  });
+
+  it("errors on a required field with no renderer", () => {
+    const { warnings, errors } = fieldSupport(skillWith(""), "opencode", "slash", [
+      "disable-model-invocation",
+    ]);
+
+    expect(warnings).toEqual([]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("required field `disable-model-invocation` has no renderer");
+    expect(errors[0]).toContain("refusing a partial install");
+  });
+
+  it("warns when a required field is expressible but nothing writes a value", () => {
+    const { warnings, errors } = fieldSupport(skillWith(""), "pi", "auto", ["contract"]);
+
+    expect(errors).toEqual([]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("nothing declares a value for it");
+    expect(warnings[0]).toContain("targets.pi.contract");
+  });
+});
 
 describe("parseDeclarations", () => {
   it("defaults scope to global and keeps every declared entry", () => {

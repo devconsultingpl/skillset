@@ -43,6 +43,24 @@ export const copilotTarget: AgentTarget = {
   // Copilot has no model-driven auto-trigger concept — only slash + always.
   supportedModes: ["slash", "always"],
 
+  // What this target writes is a VS Code prompt file (.prompt.md), so its field
+  // set is VS Code's (code.visualstudio.com/docs/copilot/customization/prompt-files,
+  // fetched 2026-10-07): `description`, `name`, `argument-hint`, `agent`, `model`,
+  // `tools`. Note `agent`, not `mode`, and note that VS Code documents prompt
+  // files as deprecated for Agent Host sessions. `native` is the GitHub Copilot
+  // app's built-in skill ids (docs.github.com/en/copilot/reference/
+  // github-copilot-app-reference/built-in-skills); the Copilot **CLI**'s own
+  // slash-command list has not been read here, so it is not claimed.
+  frontmatter: {
+    expresses: {
+      slash: ["description", "name", "argument-hint", "agent", "model", "tools"],
+      always: [],
+    },
+    // The GitHub Copilot app's built-in skill ids; the Copilot **CLI**'s own
+    // slash-command list has not been read here, so it is not claimed.
+    native: "af,agent-merge,create-canvas,orchestrate,pr-stack,customize-cloud-agent".split(","),
+  },
+
   async install(ctx) {
     const { skill, scope, mode, projectRoot } = ctx;
     if (mode === "auto") {

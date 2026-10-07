@@ -66,6 +66,25 @@ each path in `skillset.config.json` under `siblings.<skill>`, relative to the sk
 - `assets/` keeps its distinct meaning: foreign-runtime artifacts read at install time by
   `assetPath` and landing *outside* the skill directory (a plugin, an extension, a hook).
 
+## Harness fields — one declaration, honest reporting
+
+A harness-specific frontmatter field goes under `targets.<agent>` in the skill, never at the top
+level: the renderers compose a fixed shape and forward only `targets.<agent>`, so a top-level field
+is dropped by all four targets.
+
+Each target declares what it can carry (`frontmatter.expresses`, per mode — a command and a skill
+have different vocabularies on the same harness) plus its native command names. `fieldSupport`
+compares a skill's declared fields against that record, and `install` / `sync` report the gap:
+warning for a field the harness ignores, error and no write at all for a field the skill **requires**
+(`requires.<skill>.<agent>` in `skillset.config.json`). Never work around a missing renderer by
+writing a field anyway and hoping.
+
+Every bundled skill's `slug:` starts with `sk-`. That prefix is the whole reason our installs cannot
+shadow a harness's own commands, and a test pins it against each target's recorded built-in list.
+
+`SKILLSET_CONFIG=<path>` points a run at a different declarations file — the seam end-to-end tests
+use to exercise a declaration shape without editing the repository's own.
+
 ## Tests
 
 Vitest. Unit tests live next to source (`src/**/*.test.ts`). CLI end-to-end tests live under `test/`. Cover happy path + uninstall via markers for every target.

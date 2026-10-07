@@ -139,9 +139,57 @@ const addResetHook = (settings: ClaudeSettings) =>
   );
 const dropResetHook = (settings: ClaudeSettings) => removeSessionStart(settings, RESET_TAG);
 
+/** The skill frontmatter Claude Code 2.1.286 reads, in the order its reference
+ * documents. The Agent Skills spec fields are the subset other tools accept. */
+const CLAUDE_SKILL_FIELDS = [
+  "name",
+  "description",
+  "when_to_use",
+  "argument-hint",
+  "arguments",
+  "disable-model-invocation",
+  "user-invocable",
+  "allowed-tools",
+  "disallowed-tools",
+  "model",
+  "effort",
+  "context",
+  "agent",
+  "background",
+  "hooks",
+  "paths",
+  "shell",
+  "metadata",
+  "license",
+  "compatibility",
+];
+
+/** A file in `.claude/commands/` accepts the same fields except `name` — the
+ * filename is the command name — and `paths`, which is skill-only. */
+const CLAUDE_COMMAND_FIELDS = CLAUDE_SKILL_FIELDS.filter((f) => f !== "name" && f !== "paths");
+
 export const claudeCodeTarget: AgentTarget = {
   name: "claude-code",
   supportedModes: ["slash", "auto", "always"],
+
+  // From Claude Code 2.1.286's own frontmatter reference
+  // (docs.claude.com/en/docs/claude-code/skills, fetched 2026-10-07). `always`
+  // writes a SessionStart hook into settings.json, so it carries no frontmatter.
+  frontmatter: {
+    expresses: {
+      slash: CLAUDE_COMMAND_FIELDS,
+      auto: CLAUDE_SKILL_FIELDS,
+      always: [],
+    },
+    // The bundled skills, plus `review` — a same-named user skill replaces a
+    // bundled skill but *not* its alias, so the alias is what an install can
+    // still shadow. From the same page; the `sk-` slug rule is what keeps ours
+    // clear of all of them.
+    native:
+      "code-review,review,verify,simplify,debug,doctor,run,run-skill-generator,batch,loop,claude-api,workflow-authoring".split(
+        ",",
+      ),
+  },
 
   async install(ctx) {
     const { skill, scope, mode, projectRoot } = ctx;

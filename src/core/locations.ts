@@ -155,5 +155,10 @@ export function stateFilePath(): string {
  * and `dist/` (installed).
  */
 export function declarationsFilePath(): string {
+  // A test or CI run can point at a scratch declarations file instead; the same
+  // seam `SKILLSET_ALWAYS_WARN_LINES` uses for the same reason. Without it the
+  // path is fixed next to the bundle, in both `src/` and `dist/`.
+  const override = process.env.SKILLSET_CONFIG?.trim();
+  if (override) return resolve(override);
   return resolve(here, "..", "..", "skillset.config.json");
 }

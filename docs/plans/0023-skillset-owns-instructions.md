@@ -21,7 +21,7 @@ This is a program, not one change. Each slice gets an explicit go; slice budgets
 
 - **Slice 1 — skillset becomes the trustworthy owner.** Declare each skill's `mode` and `scope` in the repo; give installs an ownership manifest with hashes; refuse or report foreign edits; replace the hardcoded sync list with a real `sync` that reconciles every target and every consumer. Skillset-only.
 - **Slice 2 — pi-extensions depends on skillset, by installation.** The review family (`code-review`, `remediate`) moves into this repository, keeps its name, and FLOW's package ships no copy of either; the one FLOW-side coupling — a `contract:` block whose `blockers_count` gates a stage — is satisfied because FLOW's contract harvester reads **user-installed** skills too. What FLOW keeps is its workflow declaration. Budgeted 2026-10-07 as **2a** (a skill ships its tools), **2b** (the review family moves) and **2c** (harness field support + the missing-renderer report). See *Slice 2* below; the context-economy half of the same directive is planned in `pi-extensions/docs/plans/0017-context-economy-load-on-demand.md`.
-- **Slice 3 — agents, guidance channel and project scaffolds.** skillset gains a subagent definition concept; the global guidance channel is rendered from skillset rather than hand-written; project scaffolds (`.pi/`, project `AGENTS.md`) render with a documented local-override escape hatch.
+- **Slice 3 — agents, guidance channel and project scaffolds.** skillset gains a subagent definition concept; the global guidance channel is rendered from skillset rather than hand-written; project scaffolds (`.pi/`, project `AGENTS.md`) render with a documented local-override escape hatch. Inventory, placement rule and move order: *Slice 3 — one place for instructions, one place per harness for extensions* below.
 
 ## Acceptance criteria (slice 1)
 
@@ -245,6 +245,8 @@ An install is honest per harness: every declared frontmatter field is either exp
 - Verification per harness: claude-code and opencode are installed locally, so an install into a temp dir followed by that CLI's own discovery is checkable; Copilot CLI needs its `custom agents configuration` and `built-in skills` reference pages read before anything is declared for it.
 - New dependencies: **none**. Estimated implementation logic: **90-130 added lines**. Physical: skillset **400-600**.
 
+**Superseded 2026-10-07 by the build** — the estimate treated the per-target capability record as if the field sets were small; four harnesses' actual vocabularies are data, and Claude Code's skill reference alone is 20 fields. Measured: **240 added / 10 removed, 230 net** runtime logic. The per-file breakdown, the two mechanical reductions made before measuring, and what is counted as overrun are under *Measured against 2c* below.
+
 ### Decisions (slice 2)
 
 1. **No projection mechanism — superseded, and dropped.** The earlier 2a (`skillset project` + manifest + two-sided drift checks) rested on a premise the executed check destroyed: that a skill must have a source here *and* a copy in FLOW's package. pi resolves an installed skill at run time and FLOW harvests contracts from installed skills, so nothing needs to exist twice. Dropping it removes a command, a manifest, a second writer and a class of drift; what replaces it is smaller and more general — a skill ships its tools.
@@ -270,6 +272,143 @@ An install is honest per harness: every declared frontmatter field is either exp
 - The roster's `isolated: true` (14 files) and `extensions:` (one) are provably read by nothing, so "fresh context" needs no new flag.
 
 What remains unretired, in risk order: **(a) retired 2026-10-07 by execution** — the runner builds a literal `/skill:<name>` prompt (`run-stage.ts:116`) over a pure name derivation (`stage-identity.ts:60`) and never consults the bundle, and `BUNDLED_SKILL_NAMES` has no production consumer. **(b)** That claude-code and opencode accept the review's rendered frontmatter once `contract:` moves under `targets.pi`: claude-code's full field set and opencode's five-field set are now documented, but the end-to-end check is 2c's first task, since both CLIs are installed here. **(c)** The size of the portability rewrite — judgment work, and the plan's largest single estimate.
+
+## Slice 3 — one place for instructions, one place per harness for extensions
+
+Planned 2026-10-07 at the developer's direction: *"we should probably add to the plan how we are going to move other things to skillset — like other agents, so we have one place where we define agents skills prompts etc etc and one place with genuine extensions — right now we are actively developing only pi extensions as the other harnesses that we're using have most of our extensions build in."* **No go**: this section is the inventory, the rule and the order. Budget is written when the slice starts, as the program shape says.
+
+### The test that decides where something lives
+
+The slice-2 placement rule, extended from skills to every artifact kind:
+
+1. **Does it implement a harness API?** — an extension entry point, tool registration, a hook, a TUI overlay, a prompt rewrite, a permission gate. Then it is *harness surface*: it stays in that harness's package, because no other harness has that API.
+2. **Does it shape how work is done?** — a skill body, an agent definition, a prompt or command template, a workflow declaration. Then it is *instruction content*: it lives here and is rendered per target in the dialect that target reads.
+3. **Is it instruction content that documents one harness's extension?** — then it stays beside that extension. Verified example: `pi-permission-system` ships `permission-policy-change`, which means nothing where that extension is not installed.
+
+Roads not taken: importing a harness extension here as an "asset" (foreign code with no owner and no test); leaving content in the harness's package because it is convenient there (that is the drift this program exists to remove).
+
+### Inventory — measured 2026-10-07, `pi-extensions` @ `c488419`
+
+Per-package counts of `skills/`, `agents/`, `extensions/`, `prompts/` (`ls -d` per directory), against the 16 packages in the workspace:
+
+| package | kind | what it holds (measured) |
+|---|---|---|
+| `flow` | **content**, plus one runtime | `skills/` 32 directories (31 skills + `_shared/`), `agents/` 15 definitions, `extensions/flow-core` (contract harvester, pipeline pointer, agent manifest) |
+| `flow-workflow` | runtime | the workflow engine: chained stages, audited JSONL state, predicate routing. Its stage lists are the *declaration* half of the same package (3e) |
+| `flow-advisor`, `flow-ask-user-question`, `flow-todo`, `flow-web-tools`, `flow-args`, `flow-i18n` | runtime | one pi tool or prompt layer each |
+| `pi-subagents`, `pi-playwright`, `pi-permission-system`, `pi-permission-system-slr`, `pi-slr-service` | runtime | agent core, browser tools, permission enforcement, SLR adapter |
+| `pi-permission-system` | runtime, plus one skill | `permission-policy-change` — content for its own surface (rule 3) |
+| `flow-config`, `flow-test-utils` | no extension | shared config utils, test fixtures |
+| `pi-llm-switch` | **planned, not built** | `README.md`, `docs/` (a plan, a RAM/model analysis, a fine-tuning guide) and an empty `src/` — no `package.json`, no extension entry point. The developer's purpose for it, stated 2026-10-07: run subagents on **different models**, and use **local models** (Ollama / MLX) alongside cloud ones, releasing RAM when switching. Runtime and pi-side; nothing here for this repository to own |
+
+Exactly **one** package is mostly instruction content, and it is the one this program already started on: `flow`, whose review family is 2b. The other fifteen are what the developer called genuine extensions.
+
+### Do the other harnesses miss anything pi has?
+
+Verified 2026-10-07 by fetching docs, not by recall: claude-code 2.1.286 honours a full skill frontmatter set, runs a skill in a subagent (`context: fork` + `agent:`), and ships slash commands, subagents, hooks, plugins, permissions, statusline and MCP; opencode 1.1.40 has skills, commands, agents/subagents, plugins, permissions, MCP; Copilot CLI documents agent skills, custom agents, subagents, hooks, plugins, dynamic workflows and MCP, plus its own code review. Those capabilities are what `flow-todo`, `flow-web-tools`, `pi-subagents`, `pi-permission-system`, `pi-playwright`, `flow-ask-user-question` exist to give pi — so in the main the developer's reading holds: the pi side is where parity work lives, and there is nothing to port into a harness that already ships it.
+
+**Not verified, and therefore work rather than assumption:** parity *per capability*. Nobody has checked whether opencode ships a todo tool, a web-fetch tool or a permission gate shaped like `pi-permission-system`'s, nor what Copilot CLI's hooks and plugin model would do with `flow-workflow`'s needs. The check is per capability and cheap — the harness's docs plus a temp-dir install followed by its own discovery, the method 2c already uses — and it sorts each runtime package into one of three outcomes: **parity shim** (pi catching up; nothing to move, nothing for this repository to own), **harness-unique** (no peer concept exists, so there is nothing to port), or **portable capability** (the engine is harness-specific but a peer concept exists — GitHub's *dynamic workflows* is the nearest thing to `flow-workflow`, in a different shape).
+
+**SLR — settled 2026-10-07 by the developer, and not by the classification.** `pi-slr-service` and `pi-permission-system-slr` exist to make SLR a first-class tool *in pi*. SLR itself is a tool under development, and the other harnesses will be reached a different way later; **nothing about SLR is to be ported now**. It is harness-unique by decision as well as by evidence, and the same holds for `flow-i18n` (a locale layer for pi-side skills).
+
+### The order, and what this repository gains before each move
+
+- **3a — an agent-definition concept.** Today this repository installs skills and prompts and has no concept of a *subagent definition* at all, so FLOW's 15 agents cannot move however portable they are. The roster's dialect is pi's: `packages/pi-subagents/src/config/custom-agents.ts:56-68` parses exactly `display_name`, `description`, `tools`, `model`, `thinking`, `max_turns`, `prompt_mode`, `inherit_context`, `run_in_background`, `enabled`, while 14 of FLOW's files add `isolated: true` and one adds `extensions:` — keys nothing parses. Rendering agents per harness therefore needs the same thing 2c is building for skills: a per-target declaration of the fields a target can express. Until then the roster stays FLOW's (slice-2 decision 7, unchanged). `model` is one of the ten fields pi does parse, which is where the developer's multi-model intent for `pi-llm-switch` meets this step: an agent that names a model is a declaration, and only the harness can honour it.
+- **3b — the guidance channel** (already scoped in this plan): the ownership rule rendered here instead of hand-written.
+- **3c — project scaffolds**: project `.pi/`, project `AGENTS.md`, with a documented local-override escape hatch.
+- **3d — the FLOW skill triage** (31 skills). Per skill, one question: does the body name a pi-only tool, or call a `_shared/` script? Portable method moves here — 2b's review is the first case, already in flight — and a body that only means something against pi's tool surface stays with FLOW, under a name this repository does not own.
+- **3e — workflow declarations.** FLOW's stage graph (`built-in-workflows.ts`) is a declaration over skill names: content by the rule above. Moving it needs a workflow concept here *and* a per-harness story for the harnesses with no workflow engine — pi has `flow-workflow`, GitHub now advertises dynamic and agentic workflows, the other two have nothing comparable.
+- **3f — prompts and commands.** `pi-extensions` ships no `prompts/` directory; this repository's `slash` mode already covers that shape for all four targets, so the remaining gap is only that FLOW's stage skills install as skills rather than prompts.
+
+### Implementation session — slice 2c — 2026-10-07
+
+The developer said **go** on 2c (2c first, then 2b) and settled the one open design question: the capability report has **two sources** — a field present in the skill's own frontmatter *warns*, and a `requires` entry in `skillset.config.json` *errors*. Implemented tests-first, in the four steps the handoff named.
+
+**What landed.** `TargetFrontmatter` on every target (`expresses` per mode, `consequence`, `native`) with the four sets declared in `src/targets/*.ts`; `requires` parsing, coverage checks and `fieldSupport` in `src/core/declarations.ts`; the capability check wired into `install` (warn, or refuse and write nothing) and `sync` (warn, or exit 2 before the first artifact — sync stays all or nothing); the `sk-` slug rule pinned by a test against each target's recorded built-ins; and `SKILLSET_CONFIG=<path>`, a declarations-path seam so an end-to-end test can exercise a declaration shape without editing this repository's own config.
+
+Evidence:
+
+```sh
+npm run build              # tsc + copy-skills
+npm test                   # 25 files / 241 tests (2a: 226 → +15)
+npx biome check src test   # clean
+```
+
+**AC-5 proved by execution, not assertion — and one half failed for a reason outside this repository.** An install into a temp project, then Claude Code 2.1.286's own loader (`claude --debug-file … -p …`; authentication failed, so **no model call happened** and the log is the loader's, not a model's claim):
+
+```
+[DEBUG] Loading skills from: … project=[/private/tmp/cc-disc-vjxt/.claude/skills]
+[DEBUG] Loaded 16 unique skills (16 unconditional, …, project: 1, …, legacy commands: 12)
+[DEBUG] getSkills returning: 16 skill dir commands, 0 plugin skills, 39 bundled skills, 1 builtin plugin skills
+# artifact removed with `rm …/architect/SKILL.md`:
+[DEBUG] Loaded 15 unique skills (… project: 0, …)
+[DEBUG] getSkills returning: 15 skill dir commands, …
+```
+
+`project: 1` with our artifact and `project: 0` without it: the count is ours. The negative run is the check, because a positive count alone would not distinguish our skill from one already on the machine.
+
+**opencode could not be checked, and the cause is a broken install rather than a design problem.** Its arm64 binary dies with `Killed: 9` on every invocation (direct, through a pty, and with `HOME` unset), and `codesign --verify --strict` names why:
+
+```
+opencode-darwin-arm64/bin/opencode: invalid signature (code or signature have been modified)
+```
+
+So opencode 1.1.40 cannot launch on this machine at all, and *its own* discovery is unrunnable here — a reinstall would fix it. What stands in for it is weaker and is named as such: opencode's field sets come from its fetched docs, and the install paths this repository writes (`~/.config/opencode/skills/<name>/SKILL.md`, `~/.config/opencode/commands/<slug>.md`) are the paths those docs list. Copilot CLI is installed nowhere here, so its row is doc-level throughout, and there is no `native` list for it beyond the Copilot **app**'s built-in skill ids — the CLI's own list was not read and is not claimed.
+
+### Measured against 2c — 2026-10-07
+
+| area | budget | measured | verdict |
+|---|---|---|---|
+| runtime logic | 90-130 added | **240 added / 10 removed, 230 net** | **overrun: +100 net (77%), +110 gross (122%)** |
+| runtime physical | — | 10 files in `src/` (beyond tests), +654/−13 overall with tests and docs | see below |
+| new runtime modules | 0 | 0 | met |
+| new dependencies | 0 | 0 | met |
+| tests | ~25 × 4 targets + ~50 CLI = ~150 | **+249** (unit 120, matrix 32, end-to-end 91, +6 amended) | overrun +99 |
+| docs | README +35, conventions +15, architecture +6 = 56 | **+115** (README 52, conventions 27, architecture 33 incl. amendments) | +59 |
+
+**Per-file runtime logic, and where the overrun went:**
+
+| file | added / removed / net |
+|---|---|
+| `src/core/declarations.ts` | 104 / 5 / **99** |
+| `src/targets/claude-code.ts` | 34 / 0 / **34** |
+| `src/targets/pi.ts` | 23 / 0 / **23** |
+| `src/commands/sync.ts` | 20 / 2 / **18** |
+| `src/core/types.ts` | 15 / 0 / **15** |
+| `src/commands/install.ts` | 14 / 2 / **12** |
+| `src/targets/opencode.ts`, `copilot.ts` | 19 / 0 / **19** |
+| `src/core/target.ts`, `locations.ts` | 11 / 1 / **10** |
+
+1. **The field vocabularies are data the budget did not model.** It budgeted "a per-target capability record (~25 lines in `types.ts`)" as if the sets were small. Claude Code's skill frontmatter reference alone is 20 fields, and pi's command namespace 26 names; enumerating what four harnesses actually read is most of the difference. Two mechanical reductions were made before measuring — Claude's command set is derived (`CLAUDE_SKILL_FIELDS.filter(…)`, exactly the doc's "same fields except `name` and `paths`") instead of transcribed twice, and the `native` lists are compacted one-liners with their source named — which removed ~75 lines. What remains is the substance of the matrix.
+2. **Per-mode sets were necessary, not speculative**: the same harness reads different vocabularies for a command and a skill (claude-code: minus `name`/`paths`; opencode: five fields versus four; pi: `argument-hint` versus the Agent Skills set). A single set per target would have made the report wrong in both directions.
+3. **The behavioural half is close to plan**: `fieldSupport` (45) + `requires` parsing (28) + coverage (14) + report wiring in `install` (12) and `sync` (18) = 117 against a budgeted 30 + 25 + 20 + 10 = 85.
+4. One file beyond the budgeted list: **`src/core/locations.ts`** (2 logic lines) — the `SKILLSET_CONFIG` seam, added because the declarations path is fixed next to the bundle, so the error path could otherwise only be unit-tested, never proven end-to-end as this plan's criteria require for "never a partial install".
+
+**Falsification, because a green test proves nothing on its own.** The load-bearing test (criterion 3) was run against a deliberately broken implementation:
+
+```
+$ sed -i '' 's/if (support.errors.length > 0) {/if (false \&\& …) {/' src/commands/install.ts && npm run build
+$ npx vitest run test/cli.test.ts -t "refuses a required field"
+AssertionError: expected 0 to be 1        # exit status: the install proceeded
+```
+
+The file was restored and rebuilt. Without that run, "the refusal works" would have been an assertion.
+
+**Criteria as built.**
+
+1. Holds — `TargetFrontmatter` is declared once per target, four records, no scattered conditionals; `expresses` is per mode and `native` per harness.
+2. Holds, with the two-source split the developer chose: a top-level harness field warns that no renderer forwards it; a `targets.<agent>` field the harness ignores warns with the field and the consequence (opencode's `disable-model-invocation` entry is written from its own docs).
+3. Holds, and is falsified above: `requires` with no renderer is an error, `install` writes nothing and records nothing, and `sync` exits 2 before its first write.
+4. Holds: the `sk-` rule is now *checked* rather than assumed — every bundled slug must match `^sk-`, and each shipped slug is compared against its target's recorded built-in list, which for Claude Code includes the `/review` alias alongside the bundled skills.
+5. Documented where it changes behaviour: opencode reads `.claude/skills/`, so a global claude-code install is visible to opencode and a skill should be declared for one of them, not both (README).
+
+**Behaviour change the developer sees today:** none. No shipped skill declares a harness field a target cannot express, so a healthy `sync` reports nothing new — pinned by an end-to-end test ("reports no unsupported field for the repository's own declarations") so the silence is a checked claim rather than an accident. The first live subject is 2b's review declaration.
+
+**Findings recorded, not fixed.** This target writes `mode: agent` into Copilot prompt files, while VS Code's current reference documents the field as `agent` (and documents prompt files as deprecated for Agent Host sessions). Changing rendered output for copilot installs is a behaviour change outside 2c's criteria, so it is named here rather than slipped into the diff.
+
+### Slice-2c status — 2026-10-07
+
+Implemented, tested, and measured; **not committed** — the commit message is drafted and the developer runs it. 2b remains unauthorised, and its prerequisite is now closer to solved: the matrix states exactly which fields the review can carry per harness, so the skill-versus-command decision (claude-code `auto`, which has a directory for `review-range.mjs`, versus `slash`, which has none) can be made from data rather than from a reading.
 
 ## Decisions
 
@@ -534,17 +673,25 @@ The developer committed slice 2a (`7e65d1a`), pushed it, and signed it off. As w
 
 Two consequences recorded for the next session: the sibling declaration for `code-review` has **no install that can carry it** (its declared modes are `slash` only), which is a decision 2c makes rather than a defect; and the `review-range.mjs` **two-copy window stays open** until 2b deletes FLOW's copy and its test.
 
+### Planning session — slice 3 inventory — 2026-10-07
+
+The developer asked whether the plan says how the remaining instruction content moves here, and whether the other harnesses are missing anything pi has. Both answered in a new *Slice 3 — one place for instructions, one place per harness for extensions* section: the placement rule extended to every artifact kind, the measured per-package inventory of `pi-extensions` (`flow` is the only content-bearing package: 31 skills, 15 agents; the other fifteen are runtime), the verified-versus-unverified split on harness parity, and a six-step order (3a agents → 3f prompts) with what this repository must gain before each. Nothing was moved, nothing was authorized, and no file outside this plan was touched. The parity check is named as work rather than asserted: today's fetches cover the *capabilities* the peer harnesses ship, not whether each `pi-*` package is a parity shim or a unique capability.
+
+### Implementation session — slice 2c — 2026-10-07 (Review log)
+
+The developer said go on 2c after the slice-3 inventory session, and answered the one design question 2c carried: the capability report reads **two** declarations — a field present in the skill's own frontmatter warns, a `requires` entry in `skillset.config.json` errors. Built tests-first; criteria as built, the measured overrun, and the falsification run are recorded in the *Implementation session — slice 2c*, *Measured against 2c* and *Slice-2c status — 2026-10-07* entries above, so this entry is the pointer rather than a second copy. Gates: `npm run build`, `npm test` (25 files / 241 tests), `npx biome check src test` — all clean. Nothing committed; the message is drafted for the developer to run. Two findings were recorded rather than fixed: the copilot target writes `mode:` where VS Code now documents `agent:`, and opencode's installed binary cannot launch on this machine (`invalid signature`), which is why its half of AC-5 rests on its docs plus path agreement rather than on its own discovery.
+
 ## Handoff — prompt for the next session
 
 Paste this into a skillset session to continue. It assumes nothing that is not written above.
 
 > Continue the skillset instruction-ownership program. Read `docs/plans/0023-skillset-owns-instructions.md` in full first — it is the spec, and its slice-2 sections carry the decisions, budgets and evidence you need. Do not re-derive anything marked verified; it was checked by execution and the transcripts are in the plan. Read *Slice-2a sign-off*, *Implementation session — slice 2a* and *Measured against 2a* before touching anything: they carry the criteria as built, the measured overrun, and the three mistakes that session made first.
 >
-> **State.** Slice 1 (`880fdfe`) and slice 2a (`7e65d1a`) are implemented, committed, pushed and signed off. The plan stays in `docs/plans/` until the program finishes. 2a landed: declared `siblings.<skill>` payload files, copied verbatim beside `SKILL.md`, recorded per relative path, classified through the six existing statuses, removed on uninstall — plus `src/skills/code-review/_helpers/review-range.mjs` (443 lines incl. the normalised docstring) proven to run from the installed location. FLOW still keeps its copy **and its 227-line test**, so a two-copy window is open until 2b. Slice 3 stays parked.
+> **State.** Slice 1 (`880fdfe`) and slice 2a (`7e65d1a`) are implemented, committed, pushed and signed off. The plan stays in `docs/plans/` until the program finishes. 2a landed: declared `siblings.<skill>` payload files, copied verbatim beside `SKILL.md`, recorded per relative path, classified through the six existing statuses, removed on uninstall — plus `src/skills/code-review/_helpers/review-range.mjs` (443 lines incl. the normalised docstring) proven to run from the installed location. FLOW still keeps its copy **and its 227-line test**, so a two-copy window is open until 2b. **Slice 2c is implemented and measured but not committed** (see *Implementation session — slice 2c*, *Measured against 2c*, *Slice-2c status*): every target declares the frontmatter it can carry (`TargetFrontmatter`, per mode) and the native commands it must not shadow; `install` and `sync` report every declared field a target cannot express, naming the field and the consequence; a `requires` entry with no renderer is an error that writes nothing (sync exits 2 before its first write); the `sk-` slug rule is now checked against each target's recorded built-ins; and `SKILLSET_CONFIG=<path>` is the seam the end-to-end tests use. Gates were clean — 25 files / 241 tests, biome clean. Slice 3 has an inventory section but stays parked.
 >
-> **Go state.** 2b and 2c have **no go** — ask before building either. Recommendation: **2c first, then 2b**, because 2c decides which frontmatter fields the review must carry per harness, including whether claude-code takes the review as a skill (`auto`, which has a directory for the helper) or a command (`slash`, which has none). That is 2b's prerequisite gap: `code-review` declares only `slash` installs today, so its declared helper has nowhere to travel and every `sync` run reports it on stderr — a CLI test pins that note.
+> **Go state.** 2b has **no go** — ask before building it. 2c is built; if the developer wants it committed, the message is drafted and they run it. 2b's prerequisite gap is smaller now but not closed: the matrix says which fields the review can carry per harness, so the remaining decision is whether claude-code takes the review as a **skill** (`auto`, which has a directory for `_helpers/review-range.mjs`) or a **command** (`slash`, which has none) — and `code-review` still declares only `slash` installs on pi and claude-code, so every `sync` run reports its declared helper on stderr (a CLI test pins that note).
 >
-> **First unit for 2c** (tests first, in this order): each target declares, in one reviewable place, the frontmatter fields it can express and the native commands it must not shadow (`src/core/types.ts`, `src/core/target.ts`, the four targets); then `install` and `sync` report every declared field a target cannot express, naming the field and the consequence; then a declared *required* field with no renderer is a reported error, never a partial install; then the `sk-` slug rule checked against Claude Code's built-in list. Budget: 90-130 logic lines, 0 new modules, 0 new dependencies — report measured lines against it and name any overrun. Verify against the installed CLIs rather than by reading: claude-code and opencode are installed locally, so an install into a temp dir followed by that CLI's own discovery is checkable; Copilot CLI is installed nowhere here, and its `custom agents configuration` and `built-in skills` reference pages must be fetched before anything is declared for it.
+> **Verification lesson for 2b.** AC-5 was proved by execution on the claude-code side (its own loader logged `project: 1` with our artifact and `project: 0` without it; authentication failed, so no model call happened and the log is the loader's). The opencode side **could not be** proved: its installed arm64 binary is `invalid signature` and is SIGKILLed on every invocation, so reinstall it before trusting anything about opencode's discovery. Copilot CLI is installed nowhere on this machine and stays doc-level; this target writes `mode: agent` into `.github/prompts/*.prompt.md` where VS Code's current reference documents `agent:`.
 >
 > **Rules that are not negotiable.** Gates: `npm run build` *before* `npm test` (tests spawn `dist/cli.js`), then `npx biome check src test`. Commit messages are drafted, never run, and carry no trailers of any kind. Never hand-write into `~/.pi/agent/**`, `~/.claude/**`, `~/.config/opencode/**` or an installed copy — change the source and run `skillset sync`. Never re-introduce a raw-bundle render: every write and comparison path renders through `applyConfigToSkill`. A copied sibling is foreign-runtime code like `assets/`: excluded from `biome` and `tsc` (`src/skills/**/_helpers/**`) and never reformatted — the 2a session lost a round to `biome check --write` rewriting the payload. Keep the plan's acceptance criteria and budget current as you go, and report honestly, including failures.
 >

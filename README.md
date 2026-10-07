@@ -210,6 +210,40 @@ A declared path that is not a file in `src/skills/<skill>/` is a reported error 
 sibling is classified through the same six statuses as the skill file: edited → `drifted` (rewritten
 from source, prior content reported), present, unrecorded and different → `foreign` (refused).
 
+## What each harness can carry
+
+Every target declares, in one place, the frontmatter it can actually deliver — the renderer
+forwards it *and* the harness reads it — plus the native commands an install must not shadow:
+
+| target | frontmatter it can carry |
+|---|---|
+| pi | prompt template: `description`, `argument-hint`. Skill: `name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`, `disable-model-invocation`, `contract` (the last read by FLOW's contract harvester from the installed file, not by pi) |
+| claude-code | skill: Claude Code's full skill vocabulary — `name`, `description`, `when_to_use`, `argument-hint`, `arguments`, `disable-model-invocation`, `user-invocable`, `allowed-tools`, `disallowed-tools`, `model`, `effort`, `context`, `agent`, `background`, `hooks`, `paths`, `shell`, `metadata`, `license`, `compatibility`. Command: the same set minus `name` and `paths` |
+| opencode | command: `description`, `agent`, `model`, `subtask`. Skill: `name`, `description`, `license`, `compatibility`, `metadata` — every other field, `disable-model-invocation` included, is ignored |
+| copilot | VS Code prompt file: `description`, `name`, `argument-hint`, `agent`, `model`, `tools` (not `mode` — see the target's own note) |
+
+A harness field travels under `targets.<agent>`: every renderer composes a fixed shape
+(`{name, description, …targets.<agent>}`), so a field written at the top level reaches no harness.
+That silence is now a report, on `install` and on `sync`:
+
+- **declared at the top level** → warned by name, with the place it belongs (`targets.<agent>`);
+- **declared under `targets.<agent>` and ignored by that harness** → warned with the consequence
+  (opencode ignores `disable-model-invocation`, so the skill stays model-invocable there);
+- **listed in `requires` and unrenderable** → an **error**, and nothing is written. `requires`
+  states a capability the skill needs per harness, never a preference:
+
+```json
+{ "requires": { "code-review": { "pi": ["contract"] } } }
+```
+
+The `sk-` slug rule is what keeps our commands clear of the harnesses' own: every bundled skill's
+slug must start with `sk-`, and a test checks each shipped slug against each target's recorded
+built-in list (Claude Code's bundled skills and the `/review` alias, opencode's `/init`, `/undo`,
+`/redo`, `/share`, `/help`, the Copilot app's built-in skill ids, pi's slash commands).
+
+One install can serve two harnesses: opencode also reads `.claude/skills/`. Declare such a skill for
+one of them, not both.
+
 ## Reinstall guard
 
 A different mode is a different install: `--mode auto` beside an existing `slash` install records

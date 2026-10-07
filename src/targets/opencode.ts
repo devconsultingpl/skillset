@@ -44,6 +44,25 @@ export const opencodeTarget: AgentTarget = {
   name: "opencode",
   supportedModes: ["slash", "auto", "always"],
 
+  // From opencode's own docs (opencode.ai/docs/skills and /docs/commands,
+  // fetched 2026-10-07). Skills recognise only `name`, `description`, `license`,
+  // `compatibility` and `metadata` — every other field, `disable-model-invocation`
+  // included, is ignored — while commands read `description`, `agent`, `model`
+  // and `subtask`. `always` appends a marker block to AGENTS.md: no frontmatter.
+  frontmatter: {
+    expresses: {
+      slash: ["description", "agent", "model", "subtask"],
+      auto: ["name", "description", "license", "compatibility", "metadata"],
+      always: [],
+    },
+    consequence: {
+      "disable-model-invocation":
+        "opencode ignores it, so this skill stays model-invocable there — the only control is a `permission.skill` rule in opencode.json",
+    },
+    // opencode's built-in commands; custom commands override same-named built-ins.
+    native: "init undo redo share help".split(" "),
+  },
+
   async install(ctx) {
     const { skill, scope, mode, projectRoot } = ctx;
     const layout = layoutFor("opencode");

@@ -31,11 +31,12 @@ import type {
   InstallRecord,
   Mode,
   ParsedSkill,
+  RequiredFields,
   Scope,
   SiblingFile,
   SkillsetState,
 } from "./types.js";
-import { AGENTS, MODES } from "./types.js";
+import { AGENTS, MODES, SKILLSET_FIELDS } from "./types.js";
 
 export type InstallStatus =
   /** Recorded, and the on-disk bytes match what we would write. */
@@ -97,6 +98,8 @@ export interface DeclarationParseResult {
   declarations: InstallDeclaration[];
   /** Declared sibling files per skill, with absolute bundle source paths. */
   siblings: Record<string, SiblingFile[]>;
+  /** Per skill and harness, the fields that harness must be able to carry. */
+  requires: RequiredFields;
   problems: string[];
 }
 
@@ -155,11 +158,47 @@ function parseSiblings(raw: unknown, problems: string[]): Record<string, Sibling
   return siblings;
 }
 
+/**
+ * Parse the optional `requires` block: per skill and harness, the frontmatter
+ * fields that harness must be able to carry. Shape rules only — whether a target
+ * can actually express a field is `fieldSupport`'s job, and whether the skill
+ * installs there at all is coverage's.
+ */
+function parseRequires(raw: unknown, problems: string[]): RequiredFields {
+  const requires: RequiredFields = {};
+  if (raw === undefined) return requires;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    problems.push("`requires` must be an object keyed by skill name");
+    return requires;
+  }
+
+  for (const [skill, perAgent] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof perAgent !== "object" || perAgent === null || Array.isArray(perAgent)) {
+      problems.push(`${skill}: \`requires\` must be an object keyed by agent`);
+      continue;
+    }
+    for (const [agent, fields] of Object.entries(perAgent as Record<string, unknown>)) {
+      if (!isKnown(AGENTS, agent)) {
+        problems.push(`${skill}: \`requires\` names unknown agent ${JSON.stringify(agent)}`);
+        continue;
+      }
+      if (!Array.isArray(fields) || fields.some((f) => typeof f !== "string" || f.length === 0)) {
+        problems.push(
+          `${skill}: \`requires.${agent}\` must be an array of frontmatter field names`,
+        );
+        continue;
+      }
+      requires[skill] = { ...requires[skill], [agent]: fields as string[] };
+    }
+  }
+  return requires;
+}
+
 /** Parse the declarations file. Pure, so the shape rules are unit-testable. */
 export function parseDeclarations(raw: unknown): DeclarationParseResult {
   const problems: string[] = [];
   const declarations: InstallDeclaration[] = [];
-  const empty: DeclarationParseResult = { declarations, siblings: {}, problems };
+  const empty: DeclarationParseResult = { declarations, siblings: {}, requires: {}, problems };
 
   if (typeof raw !== "object" || raw === null) {
     return { ...empty, problems: ["declarations file must contain a JSON object"] };
@@ -168,18 +207,21 @@ export function parseDeclarations(raw: unknown): DeclarationParseResult {
     version,
     installs,
     siblings: siblingBlock,
+    requires: requiresBlock,
   } = raw as {
     version?: unknown;
     installs?: unknown;
     siblings?: unknown;
+    requires?: unknown;
   };
   const siblings = parseSiblings(siblingBlock, problems);
+  const requires = parseRequires(requiresBlock, problems);
   if (version !== 1) {
     problems.push(`unsupported declarations version: ${String(version)}`);
   }
   if (typeof installs !== "object" || installs === null || Array.isArray(installs)) {
     problems.push("`installs` must be an object keyed by skill name");
-    return { declarations, siblings, problems };
+    return { declarations, siblings, requires, problems };
   }
 
   for (const [skill, entries] of Object.entries(installs as Record<string, unknown>)) {
@@ -220,14 +262,19 @@ export function parseDeclarations(raw: unknown): DeclarationParseResult {
     }
   }
 
-  return { declarations, siblings, problems };
+  return { declarations, siblings, requires, problems };
 }
 
 /** Read and parse `skillset.config.json`. */
 export async function loadDeclarations(
   path = declarationsFilePath(),
 ): Promise<DeclarationParseResult> {
-  const none: DeclarationParseResult = { declarations: [], siblings: {}, problems: [] };
+  const none: DeclarationParseResult = {
+    declarations: [],
+    siblings: {},
+    requires: {},
+    problems: [],
+  };
   let raw: string;
   try {
     raw = await readFile(path, "utf8");
@@ -254,6 +301,7 @@ export async function loadDeclarations(
 export async function declarationCoverage(
   declarations: readonly InstallDeclaration[],
   siblings: Record<string, SiblingFile[]> = {},
+  requires: RequiredFields = {},
 ): Promise<string[]> {
   const problems: string[] = [];
   const bundled = new Set(await listBundledSkills());
@@ -290,7 +338,85 @@ export async function declarationCoverage(
       }
     }
   }
+  for (const [skill, perAgent] of Object.entries(requires)) {
+    if (!declared.has(skill)) {
+      problems.push(`${skill}: declares required fields but no install`);
+      continue;
+    }
+    for (const [agent, fields] of Object.entries(perAgent)) {
+      if (!declarations.some((d) => d.skill === skill && d.agent === agent)) {
+        problems.push(`${skill}: requires fields for ${agent} but does not install on ${agent}`);
+      }
+      for (const field of fields ?? []) {
+        if (SKILLSET_FIELDS.includes(field)) {
+          problems.push(
+            `${skill}: \`${field}\` is skillset's own frontmatter key, not a harness field`,
+          );
+        }
+      }
+    }
+  }
   return problems;
+}
+
+/**
+ * Compare a skill's declared harness frontmatter with what one target can
+ * actually carry on one mode (slice 2c). Three findings, in the developer's
+ * terms — "if there is no renderer for that then we should let the user know":
+ *
+ * - a field declared at the top level reaches no renderer at all, because every
+ *   renderer composes a fixed shape and forwards only `targets.<agent>`;
+ * - a field declared under `targets.<agent>` reaches the artifact, but the
+ *   harness may ignore it — the warning names the field and the consequence;
+ * - a field listed in `requires` is not a preference: with no renderer for it,
+ *   installing anyway would ship a skill whose stated requirement is unmet, so
+ *   it is an error and the caller writes nothing.
+ */
+export function fieldSupport(
+  skill: ParsedSkill,
+  agent: AgentName,
+  mode: Mode,
+  required: readonly string[] = [],
+): { warnings: string[]; errors: string[] } {
+  const target = targetFor(agent);
+  const expresses = target.frontmatter.expresses[mode] ?? [];
+  const overrides = (skill.frontmatter.targets?.[agent] ?? {}) as Record<string, unknown>;
+  const name = skill.frontmatter.name;
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  for (const field of Object.keys(skill.frontmatter)) {
+    if (SKILLSET_FIELDS.includes(field) || field in overrides) continue;
+    warnings.push(
+      `${name} → ${agent} (${mode}): \`${field}\` is declared at the top level, where no renderer forwards it for any target — put it under \`targets.${agent}\``,
+    );
+  }
+
+  for (const field of Object.keys(overrides)) {
+    if (expresses.includes(field)) continue;
+    warnings.push(
+      `${name} → ${agent} (${mode}): \`${agent}\` cannot express \`${field}\` — ${
+        target.frontmatter.consequence?.[field] ??
+        `the field is written to the artifact and ignored by ${agent}`
+      }`,
+    );
+  }
+
+  for (const field of required) {
+    if (!expresses.includes(field)) {
+      errors.push(
+        `${name} → ${agent} (${mode}): required field \`${field}\` has no renderer for ${agent} — refusing a partial install`,
+      );
+      continue;
+    }
+    if (!(field in overrides)) {
+      warnings.push(
+        `${name} → ${agent} (${mode}): required field \`${field}\` is expressible but nothing declares a value for it — add \`targets.${agent}.${field}\``,
+      );
+    }
+  }
+
+  return { warnings, errors };
 }
 
 async function isFile(path: string): Promise<boolean> {

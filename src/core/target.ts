@@ -1,4 +1,11 @@
-import type { InstallRecord, Mode, ParsedSkill, Scope, SiblingFile } from "./types.js";
+import type {
+  InstallRecord,
+  Mode,
+  ParsedSkill,
+  Scope,
+  SiblingFile,
+  TargetFrontmatter,
+} from "./types.js";
 
 export interface InstallContext {
   skill: ParsedSkill;
@@ -32,6 +39,9 @@ export interface AgentTarget {
   readonly name: InstallRecord["agent"];
   /** Modes this agent supports. Installer rejects unsupported requests. */
   readonly supportedModes: readonly Mode[];
+  /** The harness frontmatter this target can carry, and the native commands it
+   * must not shadow (slice 2c). Declared data, checked by `fieldSupport`. */
+  readonly frontmatter: TargetFrontmatter;
   install(ctx: InstallContext): Promise<InstallRecord>;
   uninstall(record: InstallRecord): Promise<void>;
   /** Comparable on-disk vs would-write bytes for a recorded install. */

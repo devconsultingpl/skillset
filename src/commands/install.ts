@@ -1,7 +1,12 @@
 import pc from "picocolors";
 import { alwaysWarnLines, bodyLineCount } from "../core/body-size.js";
 import { loadBundledSkill } from "../core/bundle.js";
-import { classifyInstall, declaredModes, loadDeclarations } from "../core/declarations.js";
+import {
+  classifyInstall,
+  declaredModes,
+  fieldSupport,
+  loadDeclarations,
+} from "../core/declarations.js";
 import { matchInstall, readState, upsertInstall, writeState } from "../core/state.js";
 import { applyConfigToSkill } from "../core/template.js";
 import type { AgentName, InstallDeclaration, Mode, ParsedSkill, Scope } from "../core/types.js";
@@ -96,7 +101,7 @@ export async function install(opts: InstallOptions): Promise<number> {
   let failures = 0;
 
   let state = await readState();
-  const { declarations, siblings } = await loadDeclarations();
+  const { declarations, siblings, requires } = await loadDeclarations();
   for (const skillName of opts.skills) {
     const raw = await loadBundledSkill(skillName);
     const skill = applyConfigToSkill(raw, opts.configOverrides);
@@ -116,6 +121,16 @@ export async function install(opts: InstallOptions): Promise<number> {
       }
 
       const key = { skill: skillName, agent, scope: opts.scope, mode, projectPath };
+      // Honesty check before anything is written (slice 2c): a declared field
+      // this harness cannot express is reported, and a *required* one is not a
+      // degraded install but a missing renderer — nothing is written at all.
+      const support = fieldSupport(skill, agent, mode, requires[skillName]?.[agent] ?? []);
+      for (const warning of support.warnings) console.error(pc.yellow("warning"), warning);
+      if (support.errors.length > 0) {
+        for (const error of support.errors) console.error(pc.red("error"), error);
+        failures += 1;
+        continue;
+      }
       const prior = state.installs.find((r) => matchInstall(r, key));
       if (!opts.force) {
         // The identity now includes the mode, so an unrecorded destination is

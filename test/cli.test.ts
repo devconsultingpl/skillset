@@ -1,7 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type Sandbox, exists, makeSandbox, run } from "./helpers.js";
+import { type Sandbox, exists, makeSandbox, repoRoot, run } from "./helpers.js";
 
 let sb: Sandbox;
 
@@ -11,6 +11,95 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await sb.cleanup();
+});
+
+describe("cli — harness field support (0023 slice 2c)", () => {
+  type ScratchConfig = {
+    installs: Record<string, Array<{ agent: string; mode: string }>>;
+    requires?: Record<string, Record<string, string[]>>;
+  };
+
+  /** The repository's own declarations, one edit applied, in a scratch file. */
+  async function scratchConfig(
+    mutate: (config: ScratchConfig) => void,
+  ): Promise<NodeJS.ProcessEnv> {
+    const config = JSON.parse(await readFile(join(repoRoot, "skillset.config.json"), "utf8"));
+    mutate(config);
+    const path = join(sb.projectRoot, "scratch-skillset.config.json");
+    await writeFile(path, JSON.stringify(config, null, 2));
+    return { SKILLSET_CONFIG: path };
+  }
+
+  /** Records this sandbox wrote, if any — `writeState` always leaves a file. */
+  async function recordedSkills(): Promise<string[]> {
+    const path = join(sb.home, ".skillset", "state.json");
+    if (!(await exists(path))) return [];
+    const state = JSON.parse(await readFile(path, "utf8"));
+    return (state.installs ?? []).map((record: { skill: string }) => record.skill);
+  }
+
+  const opencodeCommand = () =>
+    join(sb.home, ".config", "opencode", "commands", "sk-code-review.md");
+
+  it("refuses a required field no renderer can express, and installs nothing", async () => {
+    const env = await scratchConfig((config) => {
+      config.installs["code-review"].push({ agent: "opencode", mode: "slash" });
+      config.requires = { "code-review": { opencode: ["disable-model-invocation"] } };
+    });
+
+    const out = run(
+      ["install", "code-review", "--agent", "opencode", "--mode", "slash", "--global"],
+      sb.projectRoot,
+      { ...sb.env, ...env },
+    );
+
+    expect(out.status).toBe(1);
+    expect(out.stderr).toContain(
+      "required field `disable-model-invocation` has no renderer for opencode",
+    );
+    expect(out.stderr).toContain("refusing a partial install");
+    expect(await exists(opencodeCommand())).toBe(false);
+    expect(await recordedSkills()).toEqual([]);
+  });
+
+  it("installs the same skill when nothing requires the unsupported field", async () => {
+    const out = run(
+      ["install", "code-review", "--agent", "opencode", "--mode", "slash", "--global"],
+      sb.projectRoot,
+      sb.env,
+    );
+
+    expect(out.status).toBe(0);
+    expect(await exists(opencodeCommand())).toBe(true);
+    expect(await recordedSkills()).toEqual(["code-review"]);
+  });
+
+  it("sync refuses the whole run when a requirement has no renderer", async () => {
+    const env = await scratchConfig((config) => {
+      config.installs["code-review"].push({ agent: "opencode", mode: "slash" });
+      config.requires = { "code-review": { opencode: ["disable-model-invocation"] } };
+    });
+
+    const out = run(["sync"], sb.projectRoot, { ...sb.env, ...env });
+
+    expect(out.status).toBe(2);
+    expect(out.stderr).toContain("required field `disable-model-invocation` has no renderer");
+    expect(await exists(opencodeCommand())).toBe(false);
+    expect(await recordedSkills()).toEqual([]);
+    // Not even the installs that are perfectly fine: sync writes all or nothing.
+    expect(await exists(join(sb.home, ".pi", "agent", "prompts", "sk-architect.md"))).toBe(false);
+  });
+
+  it("reports no unsupported field for the repository's own declarations", async () => {
+    // The honest current state: no shipped skill declares a harness field its
+    // target cannot express, so a healthy sync is silent about the matrix. The
+    // first live subject is 2b's review declaration.
+    const out = run(["sync", "--dry-run"], sb.projectRoot, sb.env);
+
+    expect(out.status).toBe(0);
+    expect(out.stderr).not.toContain("cannot express");
+    expect(out.stderr).toContain("declared sibling file(s)");
+  });
 });
 
 describe("cli — cross-cutting", () => {

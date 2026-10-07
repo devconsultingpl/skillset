@@ -43,6 +43,40 @@ export const piTarget: AgentTarget = {
   name: "pi",
   supportedModes: ["slash", "auto", "always"],
 
+  // What pi can carry, from the installed package's own docs (docs/skills.md,
+  // docs/prompt-templates.md) and from what its loader returns. `contract` is
+  // read from the installed file by FLOW's contract harvester rather than by pi
+  // itself — declared here because that is where the review's gate has to travel
+  // (0023 slice 2b). A prompt template reads `description` and `argument-hint`
+  // only, and `name` is stripped on purpose: the filename is the command name.
+  frontmatter: {
+    expresses: {
+      slash: ["description", "argument-hint"],
+      auto: [
+        "name",
+        "description",
+        "license",
+        "compatibility",
+        "metadata",
+        "allowed-tools",
+        "disable-model-invocation",
+        "contract",
+      ],
+      // `always` writes a marker block into APPEND_SYSTEM.md: no frontmatter.
+      always: [],
+    },
+    native: [
+      // pi's built-in slash commands (docs/slash-commands.md in the installed
+      // package). Compacted: the `sk-` slug rule is what actually prevents a
+      // collision, this is the namespace inventory behind it.
+      ..."settings model thinking scoped-models login logout llama new resume name session".split(
+        " ",
+      ),
+      ..."tree fork clone compact import copy export share bug trust".split(" "),
+      ..."reload hotkeys changelog quit".split(" "),
+    ],
+  },
+
   async install(ctx) {
     const { skill, scope, mode, projectRoot } = ctx;
     const layout = layoutFor("pi");

@@ -2,9 +2,11 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { listBundledSkills, loadBundledSkill } from "../core/bundle.js";
+import { loadDeclarations } from "../core/declarations.js";
 import { fileExists } from "../core/fs.js";
 import { parseSkill } from "../core/parse.js";
-import { copilotTarget, opencodeTarget, piTarget } from "./index.js";
+import { claudeCodeTarget, copilotTarget, opencodeTarget, piTarget } from "./index.js";
 
 const SKILL_SRC = `---
 name: confidence
@@ -180,3 +182,45 @@ describe("copilot target", () => {
 
 // Local helper to avoid an extra import line at the top.
 import { dirname } from "node:path";
+
+/**
+ * The capability matrix (0023 slice 2c): each target declares, in one place,
+ * which harness frontmatter it can carry per mode and which native commands it
+ * must not shadow. These tests are what keep the declarations honest data — a
+ * mode without a declared set, a slug that no longer carries the `sk-` prefix,
+ * or one that shadows a harness built-in all fail here.
+ */
+describe("frontmatter capability matrix", () => {
+  const targets = [claudeCodeTarget, piTarget, opencodeTarget, copilotTarget];
+
+  it("declares a field set for every mode the target supports", () => {
+    for (const target of targets) {
+      for (const mode of target.supportedModes) {
+        expect(target.frontmatter.expresses[mode], `${target.name} ${mode}`).toBeDefined();
+      }
+    }
+  });
+
+  it("ships only sk- slugs, and none that shadows a native command", async () => {
+    const { declarations, problems } = await loadDeclarations();
+    expect(problems).toEqual([]);
+
+    const slugs = new Map<string, string>();
+    for (const skill of await listBundledSkills()) {
+      const { frontmatter } = await loadBundledSkill(skill);
+      expect(frontmatter.slug, `${skill} must declare an sk- slug`).toMatch(/^sk-/);
+      slugs.set(skill, frontmatter.slug ?? skill);
+    }
+
+    for (const target of targets) {
+      for (const native of target.frontmatter.native ?? []) {
+        for (const declaration of declarations.filter((d) => d.agent === target.name)) {
+          expect(
+            slugs.get(declaration.skill),
+            `${declaration.skill} → ${target.name} would shadow the built-in /${native}`,
+          ).not.toBe(native);
+        }
+      }
+    }
+  });
+});

@@ -17,6 +17,7 @@ import {
   STATUS_ORDER,
   classifyAll,
   declarationCoverage,
+  fieldSupport,
   loadDeclarations,
 } from "../core/declarations.js";
 import { lineDiff } from "../core/diff.js";
@@ -95,13 +96,36 @@ function reportPriorContent(current: string, next: string, maxLines = 60): strin
 
 export async function sync(opts: SyncOptions = {}): Promise<number> {
   const projectRoot = opts.projectRoot ?? process.cwd();
-  const { declarations, siblings, problems } = await loadDeclarations();
-  const coverage = declarations.length > 0 ? await declarationCoverage(declarations, siblings) : [];
+  const { declarations, siblings, requires, problems } = await loadDeclarations();
+  const coverage =
+    declarations.length > 0 ? await declarationCoverage(declarations, siblings, requires) : [];
   const allProblems = [...problems, ...coverage];
   if (allProblems.length > 0) {
     for (const problem of allProblems) {
       console.error(pc.red("problem"), problem);
     }
+    return 2;
+  }
+
+  // Capability check before any write (slice 2c): every declared field a target
+  // cannot express is reported by name and consequence, and a *required* field
+  // with no renderer makes the declaration set invalid — sync never writes half
+  // a run, so the errors are collected first and the run stops before the first
+  // artifact.
+  const supportErrors: string[] = [];
+  for (const declaration of declarations) {
+    const declared = applyConfigToSkill(await loadBundledSkill(declaration.skill));
+    const support = fieldSupport(
+      declared,
+      declaration.agent,
+      declaration.mode,
+      requires[declaration.skill]?.[declaration.agent] ?? [],
+    );
+    for (const warning of support.warnings) console.error(pc.yellow("warning"), warning);
+    supportErrors.push(...support.errors);
+  }
+  if (supportErrors.length > 0) {
+    for (const error of supportErrors) console.error(pc.red("error"), error);
     return 2;
   }
 
