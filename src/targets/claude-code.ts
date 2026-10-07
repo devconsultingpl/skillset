@@ -53,17 +53,42 @@ function slashTrailer(ctx: InstallContext, slug: string): string | null {
   return `!\`${cmd}\``;
 }
 
+/** The pattern that pre-approves every `!`skillset …` trailer this target
+ * appends. It is the target's own claim on `allowed-tools`, not a default: with
+ * no pattern matching it, Claude Code's permission gate rejects the trailer. */
+const SKILLSET_PATTERN = "Bash(skillset *)";
+
+/** Merge, never replace: one field has two owners, and a plain spread let the
+ * skill's value delete the pattern above — the trailer's own pre-approval, gone
+ * silently (0023 open question (b)). Target pattern first; unknown shapes are
+ * handed on for the frontmatter renderer to accept or refuse. */
+function mergeAllowedTools(declared: unknown): unknown {
+  if (declared === undefined || declared === null) return SKILLSET_PATTERN;
+  if (typeof declared === "string") {
+    return declared.includes(SKILLSET_PATTERN) ? declared : `${SKILLSET_PATTERN} ${declared}`;
+  }
+  if (Array.isArray(declared)) {
+    return declared.includes(SKILLSET_PATTERN) ? declared : [SKILLSET_PATTERN, ...declared];
+  }
+  return declared;
+}
+
 function renderCommandFile(ctx: InstallContext): string {
   const { description } = ctx.skill.frontmatter;
   const overrides = targetOverrides(ctx.skill);
-  // Commands use `description` only; allowed-tools etc. travel along if user added them.
-  const { name: _omit, ...rest } = overrides as { name?: unknown };
+  // Commands use `description` only; other fields travel along if user added
+  // them — except `allowed-tools`, which is overwritten by the merged value.
+  const { name: _omit, ...rest } = overrides as { name?: unknown; [key: string]: unknown };
   void _omit;
   const slug = ctx.skill.frontmatter.slug ?? ctx.skill.frontmatter.name;
   const trailer = slashTrailer(ctx, slug);
   if (!trailer) return compose({ description, ...rest }, ctx.skill.body);
   // Pre-approve the skillset call so invoking the command never prompts for Bash.
-  const frontmatter = { description, "allowed-tools": "Bash(skillset *)", ...rest };
+  const frontmatter = {
+    description,
+    ...rest,
+    "allowed-tools": mergeAllowedTools(rest["allowed-tools"]),
+  };
   return compose(frontmatter, `${ctx.skill.body.trimEnd()}\n\n${trailer}`);
 }
 

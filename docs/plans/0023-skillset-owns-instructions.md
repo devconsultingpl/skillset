@@ -902,13 +902,132 @@ node dist/cli.js sync --dry-run # checked undeclared 8 · in-sync 32
 
 **Not yet done.** Nothing is committed. Both changed files are in this repository only.
 
+### Open question (b) — scoped and awaiting go: the target keeps its own `allowed-tools` pattern — 2026-10-07
+
+#### Goal
+
+Close open question (b). The developer's criterion, stated 2026-10-07, decides the shape of the answer: **skillset does not choose a permission level — it only guarantees the field is available in each target.** Permission content is the developer's to set in each harness. So (b) is not "should we widen permissions" and it is not "should we port something": it is exactly two questions, and only the second has work in it.
+
+1. **Is `allowed-tools` expressible on claude-code?** Yes — already. Nothing to declare, nothing to port.
+2. **Does a skill's declared value survive to the artifact?** No. The slash renderer writes its own value for the same field and lets the skill overwrite it, so the one pattern the target's own trailer depends on is silently dropped the moment any skill declares the field.
+
+#### What is true today — measured, not read
+
+- **No content to port.** `grep -rn "allowed-tools" src/skills/` returns nothing. Only `code-review` has a `targets:` block at all, and it is `targets.pi`. The developer's read ("we have nothing to port") is correct.
+- **The field is expressible for claude-code in both modes that could carry it**: `src/targets/claude-code.ts:145-176` lists it in `CLAUDE_SKILL_FIELDS` and therefore in `CLAUDE_COMMAND_FIELDS`. `fieldSupport()` (`src/core/declarations.ts:390-412`) warns for neither, so a skill declaring it gets no diagnostic at install or sync time — including no diagnostic for the breakage below.
+- **The clobber, shown by the target's own `preview`** (`node` probe against `dist/targets/claude-code.js`, synthetic skill, `mode: slash`):
+
+```
+### targets.pi only                allowed-tools: "Bash(skillset *)"          trailer: true | skillset pattern: true
+### + allowed-tools: Bash(git *) … allowed-tools: "Bash(git *) Bash(date *)"  trailer: true | skillset pattern: false
+### + allowed-tools: [Bash(git *)]  allowed-tools: ["Bash(git *)", Read]      trailer: true | skillset pattern: false
+```
+
+The trailer is appended regardless, so the artifact asks Claude Code to pre-approve nothing for its own `!`skillset track sk-code-review`` line — and per the comment at `claude-code.ts:38-44` the permission gate **blocks** a `!`-command that matches no allowed pattern, which is the failure that comment records. One field, two owners (the target's trailer, the skill's own needs), single-valued, skill wins. Nothing declares the field today, so the breakage is latent.
+- **The undeclared case must not move.** The as-shipped render of `code-review` is **byte-identical** to `~/.claude/commands/sk-code-review.md` (which carries `allowed-tools: "Bash(skillset *)"`), and that install is part of the `in-sync 32`. Any rule that changes the undeclared render marks every claude-code slash artifact on this machine `drifted`.
+
+#### Acceptance criteria
+
+1. A skill declaring **no** `targets.claude-code.allowed-tools` renders byte-identical to today: `allowed-tools: "Bash(skillset *)"`, target pattern first. Checked against `~/.claude/commands/sk-code-review.md`.
+2. A skill declaring it as a **string** renders the target's pattern plus its own, both present, target's first: `"Bash(skillset *) Bash(git *) Bash(date *)"`.
+3. A skill declaring it as a **flat array of strings** keeps the array shape and gains the pattern as a first element: `["Bash(skillset *)", "Bash(git *)", Read]`.
+4. A declaration that **already contains** `Bash(skillset *)` is not duplicated.
+5. `renderSkillFile` (auto / always) is **unchanged** — auto mode still writes no `allowed-tools` of its own, and the existing `does not append a trailer for auto mode` assertion stays green.
+6. Each new test **fails first** against the current renderer and passes after; the two assertions in the AC-2/AC-3 rows are the red evidence, pasted into this plan.
+7. No change to any skill body, `skillset.config.json`, sibling, template, or dependency.
+8. Gates green: `npm run build` → `npm test` → `npx biome check .`, then `node dist/cli.js sync --dry-run` reports **`checked undeclared 8 · in-sync 32`** with nothing newly drifted — the installed artifacts' bytes are unchanged, so propagation writes nothing.
+
+#### Budget
+
+- `src/targets/claude-code.ts`: **+8 / −1 logic lines** (one pattern constant, one merge helper for the two renderable shapes, the frontmatter object) plus a 3-5 line comment recording why the target's own pattern is non-negotiable. Physical ≈ +13 / −1.
+- `src/targets/claude-code.test.ts`: **2 tests**, ≈ 30 physical lines, one for AC-2 (string merge) and one for AC-3 (array merge) — AC-1 and AC-4 are covered by extending the existing slash test's second assertion (~3 lines).
+- `docs/plans/0023-…md`: this section, ~35 lines.
+- **No new file, no dependency, no config, no skill content, no sibling, no template.** Expected implementation-logic total **≤ 10 lines**; physical range across the two code files **40-50**.
+
+#### Decisions
+
+1. **Merge, not clobber, and the target's pattern goes first.** First keeps the undeclared render and every existing artifact's bytes stable (AC-1) and keeps diffs readable.
+2. **Slash only.** `renderSkillFile` is not touched: the trailer — the only reason the target has an opinion — exists only in slash mode (`slashTrailer` returns null otherwise), and the `auto` test pins that no field appears there.
+3. **Two shapes are handled, because two shapes are renderable.** A string is merged textually; a flat array gains an element. Any other type is left alone for the existing renderer to accept or throw on — no third normalisation path.
+4. **`disallowed-tools` is not defended.** A skill that adds our pattern to `disallowed-tools` blocks its own trailer. That is self-sabotage, no skill does it, and code for it would be speculation.
+5. **No ADR.** The invariant is target-internal — *a target's own appended command must remain permitted by the artifact it writes* — not a cross-cutting rule, and it changes nothing about ownership or dependency direction.
+
+**Road not taken.** Dropping the trailer so the field needs no merging — trades a live feature (on/off tracking in pi and claude-code alike) for a latent bug. Warning instead of merging — reportable, but it leaves the trailer breakable and is more machinery than a five-line fix. Declaring `Bash(git *)` ourselves for the review — that is permission policy, which the developer explicitly does not want skillset to hold.
+
+#### Confidence
+
+**~95%.** The clobber and the byte-stability of the undeclared case are both **measured** (the `preview` probe and the byte-identical comparison above), which is what AC-1 and AC-2 rest on, and the whole change is one function in one target. Residual: Claude Code's actual gate behaviour — that a `!`-command matching no allowed pattern is blocked — rests on `claude-code.ts:38-44`'s comment and the 2c doc fetch, not on execution here (no authenticated claude-code session in this repository). It is not load-bearing for the fix: even if the gate merely prompted instead of blocking, a skill silently deleting the target's declared value is still the wrong composition, and AC-1-AC-4 hold either way.
+
+Nothing is authorised. ~~The go is a separate step.~~ **Go given 2026-10-07; implemented below.**
+
+### Implemented — (b), the target keeps its own `allowed-tools` pattern — 2026-10-07 (Review log)
+
+The developer gave **go** on the scope above. Two files changed in this repository: `src/targets/claude-code.ts` (one constant, one merge helper, the frontmatter composition) and `src/targets/claude-code.test.ts` (three cases plus a shared helper). No config, no skill body, no sibling, no template, no dependency.
+
+**What landed.** `mergeAllowedTools` merges instead of replacing, target pattern first: an undeclared field returns `Bash(skillset *)` exactly as before, a string gains the pattern as a prefix, a flat array gains it as a first element, and either shape is left alone if it already names the pattern. `renderCommandFile` composes the merged value over the declared one, so the spread can no longer delete it. `renderSkillFile` — auto and always modes, which append no trailer — is untouched. One thing the scoping did not predict: `rest["allowed-tools"]` needed an index signature on the destructured cast, because `tsc` refuses the implicit `any`; the build gate surfaced it, one line, no net growth.
+
+**AC-6 red evidence, first — the tests failed against the old renderer**, which is what makes them the criterion rather than an assertion of the new behaviour:
+
+```
+ × keeps the target's pattern alongside a declared string
+   → expected 'allowed-tools: "Bash(git *) Bash(date *)' to be 'allowed-tools: "Bash(skillset *) Bash…'
+ × keeps the target's pattern alongside a declared array, as an element
+   → expected 'allowed-tools: ["Bash(git *)", Read]' to be 'allowed-tools: ["Bash(skillset *)", "…'
+ Test Files  1 failed (1) | Tests  2 failed | 14 passed (16)
+```
+
+**AC-6 red evidence, second — AC-1 caught a real defect in my own first implementation.** The initial `mergeAllowedTools` handled only the string and array shapes, so the undeclared case returned `undefined` and `compose` dropped the key: the artifact was written with **no `allowed-tools` at all**, i.e. the merge rule itself deleted the target's pattern in the one case every installed artifact uses. The AC-1 assertion I had just tightened caught it:
+
+```
+ FAIL … claude-code target — write-on-invoke trailer > appends a track line + allowed-tools for a slash skill
+ AssertionError: expected '…' to contain 'allowed-tools: "Bash(skillset *)"\n'
+ Test Files  1 failed (1) | Tests  1 failed | 15 passed (16)
+```
+
+Fixed by making `undefined`/`null` return the pattern. Both red transcripts are the reason AC-1 and AC-6 were written as they were: a rule that preserves a field is worthless if it silently omits it when nothing declares one.
+
+**Criteria as built.**
+
+1. Holds — every claude-code slash artifact on this machine still carries exactly `allowed-tools: "Bash(skillset *)"` (one unique value across all 10 files, `grep -h "^allowed-tools:" ~/.claude/commands/sk-*.md | sort -u`), and the tightened test asserts the line including its newline, so a merged value cannot pass it.
+2. Holds — pinned by exact bytes: `allowed-tools: "Bash(skillset *) Bash(git *) Bash(date *)"`.
+3. Holds — pinned by exact bytes: `allowed-tools: ["Bash(skillset *)", "Bash(git *)", Read]`; the array shape is preserved, the pattern is an element.
+4. Holds — a declaration already naming the pattern renders unchanged, because the whole value ships verbatim when it already contains it.
+5. Holds — `renderSkillFile` is unmodified and the existing `does not append a trailer for auto mode` assertion (`not.toContain("allowed-tools")`) stays green.
+6. Holds — both red transcripts above; the first run was red on the two merge cases, the second on the undeclared case.
+7. Holds — `git diff --numstat` shows two source files and this plan; no skill body, config, sibling, template, or dependency changed.
+8. Holds, by execution, in this order:
+
+```sh
+npm run build                   # tsc + copy-skills, clean
+npx biome check .               # 68 files clean
+npm test                        # 26 files / 262 tests passed
+node dist/cli.js sync --dry-run # checked undeclared 8 · in-sync 32
+```
+
+**A pre-existing drift was found while checking AC-8, and it contradicts the handoff.** The first dry-run of this slice reported **`drifted 3 · undeclared 8 · in-sync 29`**, not 32. The three were exactly 2d's installs — `code-review` on claude-code slash, pi auto and pi slash — and their diff was the run-order index line added in **2d's second pass** (299 → 301), absent from every installed copy: `git show HEAD:src/skills/code-review/SKILL.md | grep -n "The run, in order"` → present at line 37; `grep -n "The run, in order" ~/.pi/agent/skills/code-review/SKILL.md` → absent. So `sync`'s "3 written" and the handoff's `in-sync 32` were true *before* that second pass, and the second pass was never re-propagated. Nothing about this slice caused it (two of the three drifted artifacts are pi, which this change does not touch, and the diff is body text, not frontmatter). Running `sync` reconciled all three — `reconciled drifted 3 · undeclared 8 · in-sync 29 · 3 written` — and the follow-up dry-run is `checked undeclared 8 · in-sync 32` with nothing drifted. The lesson this plan already wrote down held again: **verify the installed copy, not the committed one, and re-run the dry-run after every write** — a transcript from the first pass is not evidence about the second.
+
+**Measured against its budget — over, with the reasons, not smoothed.**
+
+| area | budget | measured | verdict |
+|---|---|---|---|
+| `claude-code.ts` logic | +8 / −1 | **+15 logic lines** (+9 comment, +4 brace-only = +28 / −3) | **over by 7** |
+| `claude-code.ts` comment | 3-5 lines | 9 | over by 4 |
+| `claude-code.test.ts` | 2 tests, ≈30 lines | **+53 / −1**, 3 cases + helper (8 comment, 45 code) | over by ~20 |
+| physical, both code files | 40-50 | **81 added / 4 removed** | over by ~30 |
+| config / skill body / sibling / template / dependency | none | none | met |
+| `docs/plans/0023-…md` | ~35 lines | +61 / −3 | over — this section reports the drift finding too |
+
+Why the estimate was low, stated rather than rounded away: the merge is four branches, not two — each shape needs a presence check *and* a merge expression — and the `undefined` guard is a fifth line that the red test forced (without it the rule deletes the pattern it exists to protect; that is a line the estimate had no way to anticipate). The comment count assumed 3-5 lines where this file's convention is to carry the *why* at the point of decision; both new blocks have a why a reader would otherwise re-derive wrong, and I chose that over brevity because the alternative is a future session "simplifying" the merge back into a spread. The tests are over because each of the three cases asserts exact rendered bytes rather than `toContain` — the loose form would have passed against the broken renderer, which is the entire point of AC-1 and AC-4. No criterion fails and nothing speculative was built; if the overage is not acceptable, the trims are the 9 comment lines and one of the three test cases, and I would take them on request rather than assume them.
+
+**Not yet done.** Nothing is committed. Three files are dirty in this repository: the two source files and this plan. The installed copies are propagated and verified (`in-sync 32`, nothing drifted).
+
 ## Handoff — prompt for the next session
 
 Paste this into a skillset session to continue. It assumes nothing that is not written above.
 
-> Continue the skillset instruction-ownership program. Read `docs/plans/0023-skillset-owns-instructions.md` in full first — it is the spec. Do not re-derive anything marked verified: it was checked by execution and the transcripts are in the plan. Before touching anything, read *Sign-off — slices 2c and 2b*, *Implemented — 2d*, *Measured against 2b*, *Measured against 2c* and *Slice 3 — one place for instructions, one place per harness for extensions*: they carry the criteria as built, the measured budgets, the deviations, and the open questions.
+> Continue the skillset instruction-ownership program. Read `docs/plans/0023-skillset-owns-instructions.md` in full first — it is the spec. Do not re-derive anything marked verified: it was checked by execution and the transcripts are in the plan. Before touching anything, read *Sign-off — slices 2c and 2b*, *Implemented — 2d*, *Implemented — (b)*, *Measured against 2b*, *Measured against 2c* and *Slice 3 — one place for instructions, one place per harness for extensions*: they carry the criteria as built, the measured budgets, the deviations, and the open questions.
 >
-> **State.** Slices 1 (`880fdfe`), 2a (`7e65d1a`), 2c (`c8cc22d`), 2b (`7eb7f75` here, `4b66b55` in `pi-extensions`) and 2d (`cea2963`) are **all committed** — verified by `git log`, not by this file's prose, which twice claimed "not committed" after the fact. Nothing is being rebuilt. **Propagation has run**: `skillset sync` re-rendered both stale slash prompts and installed `~/.pi/agent/skills/code-review/` with its two declared siblings, and the follow-up `--dry-run` reports `in-sync 32 · undeclared 8` with nothing drifted, missing or foreign. Verified after the write: FLOW's harvester returns `code-review` with `required: ["blockers_count"]`, and the installed helper runs from its installed location. See *Sign-off — slices 2c and 2b*. **2d (the body-fidelity restore) is committed — `cea2963`** — and its two files are `src/skills/code-review/SKILL.md` (211 → 301) and this plan. Only this plan file is dirty after it (the handoff edits you are reading); nothing is rebuilt or re-propagated. Read *Implemented — 2d* for the criteria as built, the budget table and the residue classification. Open question (a) is **closed**.
+> **State.** Slices 1 (`880fdfe`), 2a (`7e65d1a`), 2c (`c8cc22d`), 2b (`7eb7f75` here, `4b66b55` in `pi-extensions`) and 2d (`cea2963`) are **all committed** — verified by `git log`, not by this file's prose, which twice claimed "not committed" after the fact. Nothing is being rebuilt. **Propagation has run** — and one correction to what this paragraph used to claim. `skillset sync` re-rendered both stale slash prompts and installed `~/.pi/agent/skills/code-review/` with its two declared siblings; that `in-sync 32` was true **before 2d's second pass** (299 → 301), which was never re-propagated. Re-verified 2026-10-07 during (b): `sync` reported `reconciled drifted 3 … · 3 written`, and the dry-run now genuinely reports `in-sync 32 · undeclared 8` with nothing drifted, missing or foreign. Verified after the write: FLOW's harvester returns `code-review` with `required: ["blockers_count"]`, and the installed helper runs from its installed location. See *Sign-off — slices 2c and 2b* and the drift note under *Implemented — (b)*. **2d (the body-fidelity restore) is committed — `cea2963`** — and its two files are `src/skills/code-review/SKILL.md` (211 → 301) and this plan. Read *Implemented — 2d* for the criteria as built, the budget table and the residue classification. Open question (a) is **closed**; **(b) is built, uncommitted** — three files dirty in this repository, propagated and verified.
 >
 > **What 2c landed.** Every target declares in one place the frontmatter it can express (per mode) and the native commands it must not shadow; `install` and `sync` report every declared field a target cannot express, naming field and consequence; a `requires` entry with no renderer is an error that writes nothing (`sync` exits 2 before its first write); the `sk-` slug rule is checked against each target's recorded built-ins; `SKILLSET_CONFIG=<path>` points a run at a scratch declarations file. Two things it needed beyond its budget: a nested-mapping frontmatter renderer (`src/core/frontmatter.ts` — a pi `contract:` block is an object), and its capability check fixed to judge expressibility across the modes an agent is installed in, not per artifact. **Do not regress either**: a per-mode check refuses a required field outright, and the renderer refuses objects without the recursion.
 >
@@ -916,9 +1035,9 @@ Paste this into a skillset session to continue. It assumes nothing that is not w
 >
 > **What 2d landed.** The portable body regained the specification half it lost in the 2b port: the Discovery Map format (header block, clustering rule, first-match-wins role-tag table, symbols-touched hint) with role-tag *classification* now separate from *processing order*; per-pass output contracts (the five orientation passes, both lenses, the predicate trace, the gap finder, the verifier's `FINDING <id> | <tag> | <justification>` row, the summary block, the follow-up rules); the derived flags `LockstepSelfReview`, `ReviewType`, `TreeInputMode`, the `PeerPairs` heuristics and intra-folder peers; artifact frontmatter derived with plain `git` and `date` instead of the deleted `_shared` scripts; read-economy and file-orientation invariants; the isolation enforcement list; and a **parameterised** adjudication rule that names no harness tool. Two dangling references are closed — the four clarifying options at Step 1, and `LockstepSelfReview`, which Step 5 read and nothing derived. 211 → **301 lines**, +108/−18, one file, no config/sibling/template/dependency change. **Do not regress**: the body must stay harness-neutral (`grep -nE "\badvisor\b|\bask_user_question\b|\btodo\b|\bflow-[a-z]|Write\("` must return nothing) and free of wave vocabulary.
 >
-> **Go state — nothing is authorised.** Open question (a), the body-fidelity call, is **closed and built** (2d). Two remain, in the order I would take them:
+> **Go state — nothing is authorised.** Open question (a), the body-fidelity call, is **closed and built** (2d). (b) is **closed and built** — uncommitted, three files dirty, gates green, installed copies propagated and verified. One question remains fully open:
 >
-> **(b) `allowed-tools` on claude-code was left undeclared deliberately**, so a review run prompts for Bash permissions it could pre-approve. It is a permission-widening choice; it should be answered, not defaulted.
+> **(b) `allowed-tools` on claude-code — done, uncommitted — see *Implemented — (b)*.** The developer's criterion (2026-10-07): skillset guarantees the *availability* of the permission field in each target, never a permission level — content is the developer's. By that test the field was already expressible (`claude-code.ts:145-176`, slash + auto) and there was **nothing to port** (`grep -rn "allowed-tools" src/skills/` → nothing). What was built is the composition fix the question was hiding: `renderCommandFile` spread `targets.claude-code` over its own hardcoded `Bash(skillset *)`, so the first skill declaring `allowed-tools` would have silently dropped the pattern its own `!`skillset track`` trailer needs. Now merged, target pattern first; the undeclared render is byte-stable — one unique value across all 10 installed claude-code slash artifacts. **Over its budget** (15 logic lines vs 8, 81 physical vs 40-50, tests 53 vs 30) with the reasons in the measured table, and the estimate's low end was real: AC-1 caught a first implementation that omitted the pattern entirely when nothing declared one. Also found and repaired: 2d's second pass had never been propagated — see the drift note in that section.
 >
 > **(c) Slice 3 is parked but inventoried** (*Slice 3 — one place for instructions, one place per harness for extensions*). Its first step, **3a**, is the agent-definition concept: skillset gains the ability to render a subagent definition per harness, which needs the same per-target dialect work 2c built for skills — pi parses `display_name`, `description`, `tools`, `model`, `thinking`, `max_turns`, `prompt_mode`, `inherit_context`, `run_in_background`, `enabled`, and 14 of FLOW's files also declare `isolated: true`, which nothing parses. The roster stays FLOW's until that exists.
 >

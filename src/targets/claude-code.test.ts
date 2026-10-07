@@ -70,7 +70,10 @@ Report active skills.
       join(projectRoot, ".claude", "commands", "confidence.md"),
       "utf8",
     );
-    expect(contents).toContain('allowed-tools: "Bash(skillset *)"');
+    // Byte-stable undeclared case (0023 (b), AC-1): the target's own pattern is
+    // the whole value, exactly as it was before the merge rule. Anchored on the
+    // newline so a merged value (`… Bash(skillset *) Bash(git *)`) cannot pass.
+    expect(contents).toContain('allowed-tools: "Bash(skillset *)"\n');
     expect(contents).toContain("!`skillset track confidence`");
     // Trailer must not embed `${…}`: Claude Code's permission gate rejects any
     // `!`-command with shell expansion (plan 0018). `skillset` reads the env
@@ -111,6 +114,55 @@ Report active skills.
     );
     expect(contents).not.toContain("skillset track");
     expect(contents).not.toContain("allowed-tools");
+  });
+});
+
+describe("claude-code target — a skill's own allowed-tools (0023 (b))", () => {
+  // The target pre-approves the `!`skillset track` trailer it appends, and the
+  // trailer is what the pattern is for. A skill declaring its own set must not
+  // be able to delete it: the field is one value with two owners, and before
+  // the merge rule the skill's spread won outright (`claude-code.ts:66`).
+  const withTools = (value: string) => `---
+name: confidence
+version: "0.1.0"
+description: drives planning loop
+slug: confidence
+targets:
+  claude-code:
+    allowed-tools: ${value}
+---
+# Confidence
+
+Body text.
+`;
+
+  const allowedToolsLine = async (skill: ReturnType<typeof parseSkill>) => {
+    await claudeCodeTarget.install({ skill, scope: "local", mode: "slash", projectRoot });
+    const contents = await readFile(
+      join(projectRoot, ".claude", "commands", "confidence.md"),
+      "utf8",
+    );
+    // The trailer still travels: it is appended whatever the frontmatter says.
+    expect(contents).toContain("!`skillset track confidence`");
+    return contents.split("\n").find((line) => line.startsWith("allowed-tools: "));
+  };
+
+  it("keeps the target's pattern alongside a declared string", async () => {
+    expect(await allowedToolsLine(parseSkill(withTools('"Bash(git *) Bash(date *)"')))).toBe(
+      'allowed-tools: "Bash(skillset *) Bash(git *) Bash(date *)"',
+    );
+  });
+
+  it("keeps the target's pattern alongside a declared array, as an element", async () => {
+    expect(await allowedToolsLine(parseSkill(withTools('["Bash(git *)", "Read"]')))).toBe(
+      'allowed-tools: ["Bash(skillset *)", "Bash(git *)", Read]',
+    );
+  });
+
+  it("does not duplicate a pattern the declaration already names", async () => {
+    expect(await allowedToolsLine(parseSkill(withTools('"Bash(git *) Bash(skillset *)"')))).toBe(
+      'allowed-tools: "Bash(git *) Bash(skillset *)"',
+    );
   });
 });
 
