@@ -6,7 +6,7 @@ import { listBundledSkills, loadBundledSkill } from "../core/bundle.js";
 import { loadDeclarations } from "../core/declarations.js";
 import { fileExists } from "../core/fs.js";
 import { parseSkill } from "../core/parse.js";
-import { claudeCodeTarget, copilotTarget, opencodeTarget, piTarget } from "./index.js";
+import { claudeCodeBridge, copilotBridge, opencodeBridge, piBridge } from "./index.js";
 
 const SKILL_SRC = `---
 name: confidence
@@ -28,7 +28,7 @@ afterEach(async () => {
 
 describe("pi target", () => {
   it("slash → .pi/prompts/<slug>.md", async () => {
-    const rec = await piTarget.install({
+    const rec = await piBridge.install({
       skill: parseSkill(SKILL_SRC),
       scope: "local",
       mode: "slash",
@@ -36,12 +36,12 @@ describe("pi target", () => {
     });
     const p = join(projectRoot, ".pi", "prompts", "confidence.md");
     expect(await fileExists(p)).toBe(true);
-    await piTarget.uninstall(rec);
+    await piBridge.uninstall(rec);
     expect(await fileExists(p)).toBe(false);
   });
 
   it("auto → .pi/skills/<name>/SKILL.md", async () => {
-    const rec = await piTarget.install({
+    const rec = await piBridge.install({
       skill: parseSkill(SKILL_SRC),
       scope: "local",
       mode: "auto",
@@ -51,12 +51,12 @@ describe("pi target", () => {
     expect(await fileExists(p)).toBe(true);
     const body = await readFile(p, "utf8");
     expect(body).toContain("name: confidence");
-    await piTarget.uninstall(rec);
+    await piBridge.uninstall(rec);
     expect(await fileExists(p)).toBe(false);
   });
 
   it("always → marker block in APPEND_SYSTEM.md, removed cleanly", async () => {
-    const rec = await piTarget.install({
+    const rec = await piBridge.install({
       skill: parseSkill(SKILL_SRC),
       scope: "local",
       mode: "always",
@@ -67,14 +67,14 @@ describe("pi target", () => {
     const body = await readFile(anchor, "utf8");
     expect(body).toContain("skillset:begin confidence");
     expect(body).toContain("Body text.");
-    await piTarget.uninstall(rec);
+    await piBridge.uninstall(rec);
     expect(await fileExists(anchor)).toBe(false);
   });
 });
 
 describe("opencode target", () => {
   it("slash → .opencode/commands/<slug>.md", async () => {
-    const rec = await opencodeTarget.install({
+    const rec = await opencodeBridge.install({
       skill: parseSkill(SKILL_SRC),
       scope: "local",
       mode: "slash",
@@ -82,12 +82,12 @@ describe("opencode target", () => {
     });
     const p = join(projectRoot, ".opencode", "commands", "confidence.md");
     expect(await fileExists(p)).toBe(true);
-    await opencodeTarget.uninstall(rec);
+    await opencodeBridge.uninstall(rec);
     expect(await fileExists(p)).toBe(false);
   });
 
   it("auto → .opencode/skills/<name>/SKILL.md", async () => {
-    const rec = await opencodeTarget.install({
+    const rec = await opencodeBridge.install({
       skill: parseSkill(SKILL_SRC),
       scope: "local",
       mode: "auto",
@@ -95,12 +95,12 @@ describe("opencode target", () => {
     });
     const p = join(projectRoot, ".opencode", "skills", "confidence", "SKILL.md");
     expect(await fileExists(p)).toBe(true);
-    await opencodeTarget.uninstall(rec);
+    await opencodeBridge.uninstall(rec);
     expect(await fileExists(p)).toBe(false);
   });
 
   it("always → AGENTS.md marker block", async () => {
-    const rec = await opencodeTarget.install({
+    const rec = await opencodeBridge.install({
       skill: parseSkill(SKILL_SRC),
       scope: "local",
       mode: "always",
@@ -110,14 +110,14 @@ describe("opencode target", () => {
     expect(await fileExists(anchor)).toBe(true);
     const body = await readFile(anchor, "utf8");
     expect(body).toContain("skillset:begin confidence");
-    await opencodeTarget.uninstall(rec);
+    await opencodeBridge.uninstall(rec);
     expect(await fileExists(anchor)).toBe(false);
   });
 });
 
 describe("copilot target", () => {
   it("slash → .github/prompts/<slug>.prompt.md with mode: agent default", async () => {
-    const rec = await copilotTarget.install({
+    const rec = await copilotBridge.install({
       skill: parseSkill(SKILL_SRC),
       scope: "local",
       mode: "slash",
@@ -127,12 +127,12 @@ describe("copilot target", () => {
     expect(await fileExists(p)).toBe(true);
     const body = await readFile(p, "utf8");
     expect(body).toContain("mode: agent");
-    await copilotTarget.uninstall(rec);
+    await copilotBridge.uninstall(rec);
     expect(await fileExists(p)).toBe(false);
   });
 
   it("always → .github/copilot-instructions.md marker block", async () => {
-    const rec = await copilotTarget.install({
+    const rec = await copilotBridge.install({
       skill: parseSkill(SKILL_SRC),
       scope: "local",
       mode: "always",
@@ -142,13 +142,13 @@ describe("copilot target", () => {
     expect(await fileExists(anchor)).toBe(true);
     const body = await readFile(anchor, "utf8");
     expect(body).toContain("skillset:begin confidence");
-    await copilotTarget.uninstall(rec);
+    await copilotBridge.uninstall(rec);
     expect(await fileExists(anchor)).toBe(false);
   });
 
   it("rejects auto", async () => {
     await expect(
-      copilotTarget.install({
+      copilotBridge.install({
         skill: parseSkill(SKILL_SRC),
         scope: "local",
         mode: "auto",
@@ -162,7 +162,7 @@ describe("copilot target", () => {
     const anchor = join(projectRoot, ".github", "copilot-instructions.md");
     await mkdir(dirname(anchor), { recursive: true });
     await writeFile(anchor, "# user content\n\nimportant rules\n");
-    const rec = await copilotTarget.install({
+    const rec = await copilotBridge.install({
       skill: parseSkill(SKILL_SRC),
       scope: "local",
       mode: "always",
@@ -172,7 +172,7 @@ describe("copilot target", () => {
     expect(afterInstall).toContain("user content");
     expect(afterInstall).toContain("important rules");
     expect(afterInstall).toContain("skillset:begin confidence");
-    await copilotTarget.uninstall(rec);
+    await copilotBridge.uninstall(rec);
     const afterUninstall = await readFile(anchor, "utf8");
     expect(afterUninstall).toContain("user content");
     expect(afterUninstall).toContain("important rules");
@@ -191,7 +191,7 @@ import { dirname } from "node:path";
  * or one that shadows a harness built-in all fail here.
  */
 describe("frontmatter capability matrix", () => {
-  const targets = [claudeCodeTarget, piTarget, opencodeTarget, copilotTarget];
+  const targets = [claudeCodeBridge, piBridge, opencodeBridge, copilotBridge];
 
   it("declares a field set for every mode the target supports", () => {
     for (const target of targets) {

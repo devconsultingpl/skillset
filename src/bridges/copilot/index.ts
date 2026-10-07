@@ -1,14 +1,14 @@
 import { readFile, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
-import { assetPath } from "../core/bundle.js";
-import { compose } from "../core/frontmatter.js";
-import { readMaybe, writeAtomic } from "../core/fs.js";
-import { layoutFor } from "../core/locations.js";
-import { MD, extract, remove, upsert } from "../core/markers.js";
-import { STATUSLINE_COMMAND, addStatusLine, dropStatusLine } from "../core/statusline.js";
-import type { AgentTarget, InstallContext } from "../core/target.js";
-import type { InstallRecord } from "../core/types.js";
+import type { Bridge, InstallContext } from "../../core/bridge.js";
+import { assetPath } from "../../core/bundle.js";
+import { compose } from "../../core/frontmatter.js";
+import { readMaybe, writeAtomic } from "../../core/fs.js";
+import { MD, extract, remove, upsert } from "../../core/markers.js";
+import type { InstallRecord } from "../../core/types.js";
+import { STATUSLINE_COMMAND, addStatusLine, dropStatusLine } from "../_shared/settings.js";
+import { artifactPath, layout, skillDirectory } from "./paths.js";
 
 function targetOverrides(skill: InstallContext["skill"]): Record<string, unknown> {
   return skill.frontmatter.targets?.copilot ?? {};
@@ -38,7 +38,7 @@ function renderPromptFile(ctx: InstallContext): string {
   return compose(fields, ctx.skill.body);
 }
 
-export const copilotTarget: AgentTarget = {
+export const copilotBridge: Bridge = {
   name: "copilot",
   // Copilot has no model-driven auto-trigger concept — only slash + always.
   supportedModes: ["slash", "always"],
@@ -66,7 +66,6 @@ export const copilotTarget: AgentTarget = {
     if (mode === "auto") {
       throw new Error("copilot does not support mode 'auto'. Use 'slash' or 'always' instead.");
     }
-    const layout = layoutFor("copilot");
     const name = skill.frontmatter.name;
     const slug = (skill.frontmatter as { slug?: string }).slug ?? name;
     const files: string[] = [];
@@ -172,4 +171,7 @@ export const copilotTarget: AgentTarget = {
     const current = filePath ? await readMaybe(filePath) : null;
     return { current, next };
   },
+
+  artifactPath,
+  skillDirectory,
 };

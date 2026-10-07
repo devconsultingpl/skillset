@@ -1,12 +1,12 @@
 import pc from "picocolors";
+import { requireBridge } from "../bridges/index.js";
 import { readState, removeInstall, writeState } from "../core/state.js";
-import type { AgentName, Scope } from "../core/types.js";
-import { targetFor } from "../targets/index.js";
+import type { BridgeName, Scope } from "../core/types.js";
 
 export interface UninstallOptions {
   skills: string[];
   /** When empty, uninstall from every agent the skill is installed for. */
-  agents?: AgentName[];
+  agents?: BridgeName[];
   /** When undefined, uninstall from any scope. */
   scope?: Scope;
   projectRoot?: string;
@@ -31,7 +31,7 @@ export async function uninstall(opts: UninstallOptions): Promise<void> {
     }
 
     for (const rec of matches) {
-      const target = targetFor(rec.agent);
+      const target = requireBridge(rec.agent);
       await target.uninstall(rec);
       state = removeInstall(state, rec);
       console.log(

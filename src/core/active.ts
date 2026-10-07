@@ -25,21 +25,30 @@ function sanitizeKey(key: string): string {
   return cleaned.length > 0 ? cleaned : "default";
 }
 
-/** Stable short key for agents that expose no session id (opencode): scope the
- * state to the project root instead. */
+/** Stable short key for a harness that exposes no session id: scope the state to
+ * the project root instead. */
 export function projectKey(projectRoot: string): string {
   return `project-${createHash("sha256").update(projectRoot).digest("hex").slice(0, 16)}`;
 }
 
-/** Resolve the storage key: an explicit session id when present, else the
- * Claude Code session id from the env (its slash-trailer can't pass `--session`
- * because the permission gate rejects `${…}` in `!`-commands; see plan 0018),
- * else a project-scoped fallback derived from `cwd`. */
-export function resolveSessionKey(explicit: string | undefined, cwd = process.cwd()): string {
+/** Resolve the storage key: an explicit session id when present, else the one a
+ * harness handed us through the environment, else a project-scoped fallback
+ * derived from `cwd`.
+ *
+ * `fromEnv` is an *argument* rather than a lookup: which environment variable
+ * carries a session id is the harness's business, so the caller asks its bridge
+ * (`Bridge.sessionKeyFromEnv`) and passes the answer in. A slash trailer cannot
+ * pass `--session` where the harness rejects command substitution in `!`-style
+ * invocations, which is why the environment path exists at all (plan 0018). */
+export function resolveSessionKey(
+  explicit: string | undefined,
+  cwd = process.cwd(),
+  fromEnv?: string,
+): string {
   const trimmed = explicit?.trim();
   if (trimmed) return trimmed;
-  const fromEnv = process.env.CLAUDE_CODE_SESSION_ID?.trim();
-  if (fromEnv) return fromEnv;
+  const env = fromEnv?.trim();
+  if (env) return env;
   return projectKey(cwd);
 }
 

@@ -1,6 +1,10 @@
-export type AgentName = "claude-code" | "pi" | "opencode" | "copilot";
-
-export const AGENTS: readonly AgentName[] = ["claude-code", "pi", "opencode", "copilot"] as const;
+/**
+ * The name of one harness bridge. A plain string on purpose: which harnesses
+ * exist is registry data (`src/bridges/index.ts`), not a closed union the core
+ * holds. The core must not know that any particular harness exists — that is
+ * slice 2e's rule, and a test enforces it.
+ */
+export type BridgeName = string;
 
 export type Mode = "slash" | "auto" | "always";
 
@@ -18,7 +22,7 @@ export interface SkillFrontmatter {
    * reports the active set instead of recording itself as an active mode. */
   statusReader?: boolean;
   config?: Record<string, unknown>;
-  targets?: Partial<Record<AgentName, Record<string, unknown>>>;
+  targets?: Partial<Record<BridgeName, Record<string, unknown>>>;
 }
 
 export interface ParsedSkill {
@@ -55,7 +59,7 @@ export interface InstallRecord {
    * written before this field existed. */
   slug?: string;
   version: string;
-  agent: AgentName;
+  agent: BridgeName;
   scope: Scope;
   mode: Mode;
   /** Install root — directory the artifacts were written under. */
@@ -73,8 +77,9 @@ export interface InstallRecord {
   /** Absolute path of the settings file holding our statusLine, so uninstall
    * removes it without re-deriving an agent-specific path. */
   statusLinePath?: string;
-  /** Absolute paths to standalone executable artifacts (opencode plugin, pi
-   * extension, Copilot CLI hook). Removed verbatim on uninstall (decision 8). */
+  /** Absolute paths to standalone executable artifacts shipped by a skill (an
+   * editor plugin, a harness extension, a hook config). Removed verbatim on
+   * uninstall (decision 8). */
   assets?: string[];
   projectPath?: string;
   installedAt: string;
@@ -94,7 +99,7 @@ export interface SkillsetState {
  */
 export interface InstallDeclaration {
   skill: string;
-  agent: AgentName;
+  agent: BridgeName;
   mode: Mode;
   scope: Scope;
   /** Required for `local` declarations; absent for `global`. */
@@ -115,7 +120,7 @@ export interface Declarations {
  * the skill itself. A requirement no renderer can satisfy is an error rather
  * than a degraded install (slice 2c criterion 3).
  */
-export type RequiredFields = Record<string, Partial<Record<AgentName, readonly string[]>>>;
+export type RequiredFields = Record<string, Partial<Record<BridgeName, readonly string[]>>>;
 
 /**
  * What one harness can actually carry, declared once per target so the matrix is

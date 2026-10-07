@@ -1,3 +1,4 @@
+import { envSessionKey } from "../bridges/index.js";
 import { clearActive, resolveSessionKey } from "../core/active.js";
 import { sessionFromStdin } from "./status.js";
 
@@ -13,5 +14,5 @@ import { sessionFromStdin } from "./status.js";
  */
 export async function resetCmd(opts: { session?: string; stdinJson?: boolean }): Promise<void> {
   const explicit = opts.stdinJson ? (opts.session ?? (await sessionFromStdin())) : opts.session;
-  await clearActive(resolveSessionKey(explicit));
+  await clearActive(resolveSessionKey(explicit, process.cwd(), envSessionKey()));
 }

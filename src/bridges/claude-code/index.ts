@@ -1,12 +1,12 @@
 import { rm } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
-import { compose } from "../core/frontmatter.js";
-import { copySiblings, readMaybe, writeAtomic } from "../core/fs.js";
-import { layoutFor } from "../core/locations.js";
-import { MD, remove, upsert } from "../core/markers.js";
-import { STATUSLINE_COMMAND, addStatusLine, dropStatusLine } from "../core/statusline.js";
-import type { AgentTarget, InstallContext } from "../core/target.js";
-import type { InstallRecord } from "../core/types.js";
+import type { Bridge, InstallContext } from "../../core/bridge.js";
+import { compose } from "../../core/frontmatter.js";
+import { copySiblings, readMaybe, writeAtomic } from "../../core/fs.js";
+import { MD, remove, upsert } from "../../core/markers.js";
+import type { InstallRecord } from "../../core/types.js";
+import { STATUSLINE_COMMAND, addStatusLine, dropStatusLine } from "../_shared/settings.js";
+import { artifactPath, layout, skillDirectory } from "./paths.js";
 
 const HOOK_TAG = "# skillset:";
 
@@ -193,7 +193,7 @@ const CLAUDE_SKILL_FIELDS = [
  * filename is the command name — and `paths`, which is skill-only. */
 const CLAUDE_COMMAND_FIELDS = CLAUDE_SKILL_FIELDS.filter((f) => f !== "name" && f !== "paths");
 
-export const claudeCodeTarget: AgentTarget = {
+export const claudeCodeBridge: Bridge = {
   name: "claude-code",
   supportedModes: ["slash", "auto", "always"],
 
@@ -218,7 +218,6 @@ export const claudeCodeTarget: AgentTarget = {
 
   async install(ctx) {
     const { skill, scope, mode, projectRoot } = ctx;
-    const layout = layoutFor("claude-code");
     const name = skill.frontmatter.name;
     const slug = skill.frontmatter.slug ?? name;
     const files: string[] = [];
@@ -331,6 +330,15 @@ export const claudeCodeTarget: AgentTarget = {
     const filePath = record.files[0] ? join(record.location, record.files[0]) : null;
     const current = filePath ? await readMaybe(filePath) : null;
     return { current, next };
+  },
+
+  artifactPath,
+  skillDirectory,
+  /** This harness hands a session id to its hook children through the
+   * environment; the variable's name is this bridge's business, so the core asks
+   * instead of reading the environment itself. */
+  sessionKeyFromEnv() {
+    return process.env.CLAUDE_CODE_SESSION_ID?.trim() || undefined;
   },
 };
 

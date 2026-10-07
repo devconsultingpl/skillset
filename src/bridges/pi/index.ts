@@ -1,24 +1,15 @@
 import { readFile, rm } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
-import { assetPath } from "../core/bundle.js";
-import { compose } from "../core/frontmatter.js";
-import { copySiblings, readMaybe, writeAtomic } from "../core/fs.js";
-import { layoutFor } from "../core/locations.js";
-import { MD, extract, remove, upsert } from "../core/markers.js";
-import type { AgentTarget, InstallContext } from "../core/target.js";
-import type { InstallRecord, Scope } from "../core/types.js";
+import type { Bridge, InstallContext } from "../../core/bridge.js";
+import { assetPath } from "../../core/bundle.js";
+import { compose } from "../../core/frontmatter.js";
+import { copySiblings, readMaybe, writeAtomic } from "../../core/fs.js";
+import { MD, extract, remove, upsert } from "../../core/markers.js";
+import type { InstallRecord, Scope } from "../../core/types.js";
+import { artifactPath, extensionPath, layout, skillDirectory } from "./paths.js";
 
 function targetOverrides(skill: InstallContext["skill"]): Record<string, unknown> {
-  return skill.frontmatter.targets?.opencode ?? {};
-}
-
-/** opencode plugin path: `.opencode/plugins/skillset.js` (local) or
- * `~/.config/opencode/plugins/skillset.js` (global). */
-function pluginPath(scope: Scope, projectRoot: string): string {
-  const base =
-    scope === "global" ? join(homedir(), ".config", "opencode") : join(projectRoot, ".opencode");
-  return join(base, "plugins", "skillset.js");
+  return skill.frontmatter.targets?.pi ?? {};
 }
 
 function renderSkillFile(ctx: InstallContext): string {
@@ -26,46 +17,60 @@ function renderSkillFile(ctx: InstallContext): string {
   return compose({ name, description, ...targetOverrides(ctx.skill) }, ctx.skill.body);
 }
 
-/** Only the status-reader command gets a shell trailer (a project-scoped read).
- * Tracking is owned by the plugin (`command.execute.before`), which is more
- * reliable than a per-command trailer and avoids a double-write race. */
-function renderCommandFile(ctx: InstallContext): string {
+function renderPromptFile(ctx: InstallContext): string {
   const { description } = ctx.skill.frontmatter;
   const overrides = targetOverrides(ctx.skill);
+  // pi prompt template frontmatter: `description`, `argument-hint`. Strip `name`
+  // if present so the filename governs the slash command name.
   const { name: _omit, ...rest } = overrides as { name?: unknown };
   void _omit;
-  if (ctx.mode !== "slash" || !ctx.skill.frontmatter.statusReader) {
-    return compose({ description, ...rest }, ctx.skill.body);
-  }
-  return compose({ description, ...rest }, `${ctx.skill.body.trimEnd()}\n\n!\`skillset status\``);
+  // pi substitutes `$@` (all invocation args) — without a placeholder, args are
+  // dropped entirely, so every slash prompt gets a labeled argument slot. Empty
+  // when invoked bare; carries e.g. `/sk-caveman off`, `/sk-commit-suggest fix auth`.
+  const body = `${ctx.skill.body.trimEnd()}\n\nArguments: $@\n`;
+  return compose({ description, ...rest }, body);
 }
 
-export const opencodeTarget: AgentTarget = {
-  name: "opencode",
+export const piBridge: Bridge = {
+  name: "pi",
   supportedModes: ["slash", "auto", "always"],
 
-  // From opencode's own docs (opencode.ai/docs/skills and /docs/commands,
-  // fetched 2026-10-07). Skills recognise only `name`, `description`, `license`,
-  // `compatibility` and `metadata` — every other field, `disable-model-invocation`
-  // included, is ignored — while commands read `description`, `agent`, `model`
-  // and `subtask`. `always` appends a marker block to AGENTS.md: no frontmatter.
+  // What pi can carry, from the installed package's own docs (docs/skills.md,
+  // docs/prompt-templates.md) and from what its loader returns. `contract` is
+  // read from the installed file by FLOW's contract harvester rather than by pi
+  // itself — declared here because that is where the review's gate has to travel
+  // (0023 slice 2b). A prompt template reads `description` and `argument-hint`
+  // only, and `name` is stripped on purpose: the filename is the command name.
   frontmatter: {
     expresses: {
-      slash: ["description", "agent", "model", "subtask"],
-      auto: ["name", "description", "license", "compatibility", "metadata"],
+      slash: ["description", "argument-hint"],
+      auto: [
+        "name",
+        "description",
+        "license",
+        "compatibility",
+        "metadata",
+        "allowed-tools",
+        "disable-model-invocation",
+        "contract",
+      ],
+      // `always` writes a marker block into APPEND_SYSTEM.md: no frontmatter.
       always: [],
     },
-    consequence: {
-      "disable-model-invocation":
-        "opencode ignores it, so this skill stays model-invocable there — the only control is a `permission.skill` rule in opencode.json",
-    },
-    // opencode's built-in commands; custom commands override same-named built-ins.
-    native: "init undo redo share help".split(" "),
+    native: [
+      // pi's built-in slash commands (docs/slash-commands.md in the installed
+      // package). Compacted: the `sk-` slug rule is what actually prevents a
+      // collision, this is the namespace inventory behind it.
+      ..."settings model thinking scoped-models login logout llama new resume name session".split(
+        " ",
+      ),
+      ..."tree fork clone compact import copy export share bug trust".split(" "),
+      ..."reload hotkeys changelog quit".split(" "),
+    ],
   },
 
   async install(ctx) {
     const { skill, scope, mode, projectRoot } = ctx;
-    const layout = layoutFor("opencode");
     const name = skill.frontmatter.name;
     const slug = (skill.frontmatter as { slug?: string }).slug ?? name;
     const files: string[] = [];
@@ -78,24 +83,25 @@ export const opencodeTarget: AgentTarget = {
       installRoot = dirname(path);
       await writeAtomic(path, renderSkillFile(ctx));
       files.push(relative(installRoot, path));
-      // Declared sibling files land beside SKILL.md, verbatim (2a).
+      // Declared sibling files land beside SKILL.md, verbatim (2a). The skill
+      // directory is the destination a harness resolves relative paths against.
       await copySiblings(ctx.siblings, installRoot, files);
     } else if (mode === "slash") {
       const path = layout.slash(slug, scope, projectRoot);
       installRoot = dirname(path);
-      await writeAtomic(path, renderCommandFile(ctx));
+      await writeAtomic(path, renderPromptFile(ctx));
       files.push(relative(installRoot, path));
-      // The status-reader skill ships the tracking plugin (decision 8).
+      // The status-reader skill ships the tracking + footer extension (decision 8).
       if (skill.frontmatter.statusReader) {
-        const dest = pluginPath(scope, projectRoot);
+        const dest = extensionPath(scope, projectRoot);
         await writeAtomic(
           dest,
-          await readFile(assetPath("skillset-status", "opencode-plugin.js"), "utf8"),
+          await readFile(assetPath("skillset-status", "pi-extension.ts"), "utf8"),
         );
         assets.push(dest);
       }
     } else {
-      // always: marker-wrapped block in AGENTS.md.
+      // always: marker-wrapped append to APPEND_SYSTEM.md (no separate skill file).
       const anchor = layout.always(scope, projectRoot);
       const existing = (await readMaybe(anchor)) ?? "";
       await writeAtomic(anchor, upsert(existing, name, ctx.skill.body, MD));
@@ -107,7 +113,7 @@ export const opencodeTarget: AgentTarget = {
       skill: name,
       slug,
       version: skill.frontmatter.version,
-      agent: "opencode",
+      agent: "pi",
       scope,
       mode,
       location: installRoot,
@@ -144,15 +150,20 @@ export const opencodeTarget: AgentTarget = {
 
   async preview(ctx, record) {
     if (ctx.mode === "always") {
-      // Marker interior in AGENTS.md; user content outside is invisible.
+      // Marker interior in APPEND_SYSTEM.md; user content outside is invisible.
       const anchor = record.insertions?.[0];
       const existing = anchor ? await readMaybe(anchor) : null;
       const current = existing ? extract(existing, record.skill, MD) : null;
       return { current, next: ctx.skill.body.trim() };
     }
-    const next = ctx.mode === "slash" ? renderCommandFile(ctx) : renderSkillFile(ctx);
+    const next = ctx.mode === "slash" ? renderPromptFile(ctx) : renderSkillFile(ctx);
     const filePath = record.files[0] ? join(record.location, record.files[0]) : null;
     const current = filePath ? await readMaybe(filePath) : null;
     return { current, next };
   },
+
+  // The contract's path surface. Resolution only, from this bridge's own layout:
+  // the core asks where an artifact goes, and never learns what a ".pi" is.
+  artifactPath,
+  skillDirectory,
 };

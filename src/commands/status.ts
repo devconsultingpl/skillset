@@ -1,3 +1,4 @@
+import { envSessionKey } from "../bridges/index.js";
 import { readActive, resolveSessionKey } from "../core/active.js";
 
 /** Claude Code (and Copilot CLI) feed a statusLine command — and SessionStart/
@@ -25,7 +26,7 @@ export async function sessionFromStdin(): Promise<string | undefined> {
  * line that serves both the `/skillset-status` command and the statusline. */
 export async function statusCmd(opts: { session?: string; stdinJson?: boolean }): Promise<void> {
   const explicit = opts.stdinJson ? (opts.session ?? (await sessionFromStdin())) : opts.session;
-  const state = await readActive(resolveSessionKey(explicit));
+  const state = await readActive(resolveSessionKey(explicit, process.cwd(), envSessionKey()));
   const skills = [...state.active].sort();
   console.log(skills.length > 0 ? `skills: ${skills.join(" ")}` : "skills: (none)");
 }

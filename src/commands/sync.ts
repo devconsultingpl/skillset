@@ -10,6 +10,7 @@
  */
 import { homedir } from "node:os";
 import pc from "picocolors";
+import { BRIDGE_NAMES, bridgeFor, requireBridge } from "../bridges/index.js";
 import { loadBundledSkill } from "../core/bundle.js";
 import {
   type ClassifiedInstall,
@@ -25,7 +26,6 @@ import { lineDiff } from "../core/diff.js";
 import { readState, removeInstall, upsertInstall, writeState } from "../core/state.js";
 import { applyConfigToSkill } from "../core/template.js";
 import type { SkillsetState } from "../core/types.js";
-import { targetFor } from "../targets/index.js";
 
 export interface SyncOptions {
   dryRun?: boolean;
@@ -99,7 +99,9 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
   const projectRoot = opts.projectRoot ?? process.cwd();
   const { declarations, siblings, requires, problems } = await loadDeclarations();
   const coverage =
-    declarations.length > 0 ? await declarationCoverage(declarations, siblings, requires) : [];
+    declarations.length > 0
+      ? await declarationCoverage(declarations, siblings, requires, BRIDGE_NAMES)
+      : [];
   const allProblems = [...problems, ...coverage];
   if (allProblems.length > 0) {
     for (const problem of allProblems) {
@@ -122,9 +124,14 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
       declaration.agent,
       declaration.scope,
     );
+    const bridge = bridgeFor(declaration.agent);
+    if (!bridge) {
+      supportErrors.push(`${declaration.skill} → ${declaration.agent}: unknown harness`);
+      continue;
+    }
     const support = fieldSupport(
       declared,
-      declaration.agent,
+      bridge,
       modes.length > 0 ? modes : [declaration.mode],
       requires[declaration.skill]?.[declaration.agent] ?? [],
     );
@@ -137,7 +144,7 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
   }
 
   let state = await readState();
-  const classified = await classifyAll(declarations, state, siblings);
+  const classified = await classifyAll(declarations, state, bridgeFor, siblings);
   classified.sort((a, b) => {
     const order = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
     return order !== 0 ? order : describe(a).localeCompare(describe(b));
@@ -193,7 +200,7 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
     if (item.status === "undeclared") {
       if (!opts.prune) continue;
       if (item.record) {
-        await targetFor(item.record.agent).uninstall(item.record);
+        await requireBridge(item.record.agent).uninstall(item.record);
         state = removeInstall(state, item.record);
         changed += 1;
       }
@@ -204,7 +211,7 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
     // Same render path as `install`: config placeholders are substituted at
     // write time, so sync must not write the raw bundle.
     const skill = applyConfigToSkill(await loadBundledSkill(declaration.skill));
-    const record = await targetFor(declaration.agent).install({
+    const record = await requireBridge(declaration.agent).install({
       skill,
       scope: declaration.scope,
       mode: declaration.mode,
@@ -253,9 +260,12 @@ export async function classifyReport(
   opts: { projectRoot?: string } = {},
 ): Promise<{ items: ClassifiedInstall[]; problems: string[]; state: SkillsetState }> {
   const { declarations, siblings, problems } = await loadDeclarations();
-  const coverage = declarations.length > 0 ? await declarationCoverage(declarations, siblings) : [];
+  const coverage =
+    declarations.length > 0
+      ? await declarationCoverage(declarations, siblings, {}, BRIDGE_NAMES)
+      : [];
   const state = await readState();
-  const items = await classifyAll(declarations, state, siblings);
+  const items = await classifyAll(declarations, state, bridgeFor, siblings);
   return { items, problems: [...problems, ...coverage], state };
 }
 

@@ -1,16 +1,16 @@
 import pc from "picocolors";
+import { requireBridge } from "../bridges/index.js";
 import { alwaysWarnLines, bodyLineCount } from "../core/body-size.js";
 import { loadBundledSkill } from "../core/bundle.js";
 import { loadDeclarations } from "../core/declarations.js";
 import { readState, removeInstall, upsertInstall, writeState } from "../core/state.js";
 import { applyConfigToSkill } from "../core/template.js";
-import type { AgentName, Mode, Scope } from "../core/types.js";
-import { targetFor } from "../targets/index.js";
+import type { BridgeName, Mode, Scope } from "../core/types.js";
 
 export interface SetModeOptions {
   skill: string;
   mode: Mode;
-  agents?: AgentName[];
+  agents?: BridgeName[];
   scope?: Scope;
   projectRoot?: string;
 }
@@ -50,7 +50,7 @@ export async function setMode(opts: SetModeOptions): Promise<void> {
   }
 
   for (const rec of matches) {
-    const target = targetFor(rec.agent);
+    const target = requireBridge(rec.agent);
     if (!target.supportedModes.includes(opts.mode)) {
       console.error(
         pc.yellow(

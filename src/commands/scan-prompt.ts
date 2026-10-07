@@ -1,3 +1,4 @@
+import { envSessionKey } from "../bridges/index.js";
 import { resolveSessionKey, track } from "../core/active.js";
 import { readState } from "../core/state.js";
 
@@ -42,7 +43,7 @@ export async function scanPromptCmd(): Promise<void> {
     if (i.slug) known.add(i.slug);
   }
   const statusReaderSlugs = new Set(["sk-status", "skillset-status"]);
-  const key = resolveSessionKey(sessionId);
+  const key = resolveSessionKey(sessionId, process.cwd(), envSessionKey());
   const seen = new Set<string>();
   for (const m of prompt.matchAll(SLASH_TOKEN)) {
     const skill = m[1];

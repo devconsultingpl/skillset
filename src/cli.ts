@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import pc from "picocolors";
+import { BRIDGE_NAMES } from "./bridges/index.js";
 import { emit } from "./commands/emit.js";
 import { init } from "./commands/init.js";
 import { install, parseAgentArg, parseModeArg } from "./commands/install.js";
@@ -26,7 +27,7 @@ function scopeOf(opts: { global?: boolean; local?: boolean }): Scope {
 
 program
   .name("skillset")
-  .description("Install agent skills across Claude Code, pi, opencode, and Copilot.")
+  .description("Install skills, commands and agents into the harnesses this project bridges.")
   .version("0.1.0-dev");
 
 program
@@ -35,7 +36,7 @@ program
   .argument("<skills...>", "skill name(s)")
   .requiredOption(
     "--agent <agents>",
-    'comma-separated agent list, or "all" (claude-code, pi, opencode, copilot)',
+    `comma-separated harness list, or "all" (${BRIDGE_NAMES.join(", ")})`,
   )
   .option(
     "--mode <mode>",

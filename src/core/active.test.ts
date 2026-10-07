@@ -74,16 +74,15 @@ describe("session keys", () => {
     expect(a).toMatch(/^project-[0-9a-f]{16}$/);
   });
 
-  it("honors CLAUDE_CODE_SESSION_ID when no explicit id is given", () => {
-    process.env.CLAUDE_CODE_SESSION_ID = "env-claude-sess";
-    try {
-      expect(resolveSessionKey(undefined, "/proj")).toBe("env-claude-sess");
-      // Explicit --session still wins over the env var.
-      expect(resolveSessionKey("explicit", "/proj")).toBe("explicit");
-    } finally {
-      // biome-ignore lint: see note above.
-      delete process.env.CLAUDE_CODE_SESSION_ID;
-    }
+  it("uses the harness-supplied key when no explicit id is given", () => {
+    // The core is *told* the key: which environment variable carries it is the
+    // harness's business, so the caller asks its bridge (slice 2e). The bridge
+    // that reads the variable is asserted in src/bridges/claude-code/index.test.ts.
+    expect(resolveSessionKey(undefined, "/proj", "env-sess")).toBe("env-sess");
+    // Explicit --session still wins.
+    expect(resolveSessionKey("explicit", "/proj", "env-sess")).toBe("explicit");
+    // An empty or absent harness key falls through to the project key.
+    expect(resolveSessionKey(undefined, "/proj", "  ")).toMatch(/^project-/);
   });
 
   it("project key differs per root", () => {

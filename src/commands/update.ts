@@ -1,15 +1,14 @@
 import { join } from "node:path";
 import pc from "picocolors";
+import { bridgeFor } from "../bridges/index.js";
+import type { InstallContext } from "../core/bridge.js";
 import { loadBundledSkill } from "../core/bundle.js";
 import { classifySiblings, loadDeclarations } from "../core/declarations.js";
 import { lineDiff } from "../core/diff.js";
-import { skillDirectoryFor } from "../core/locations.js";
 import { isInteractive, readlineAsker, resolveDivergence } from "../core/prompt.js";
 import { readState, upsertInstall, writeState } from "../core/state.js";
-import type { InstallContext } from "../core/target.js";
 import { applyConfigToSkill } from "../core/template.js";
 import type { InstallRecord, ParsedSkill } from "../core/types.js";
-import { targetFor } from "../targets/index.js";
 
 export interface UpdateOptions {
   /** Overwrite every install, including diverged ones, without prompting. */
@@ -62,7 +61,11 @@ export async function update(opts: UpdateOptions = {}): Promise<void> {
       continue;
     }
 
-    const target = targetFor(rec.agent);
+    const target = bridgeFor(rec.agent);
+    if (!target) {
+      console.error(pc.yellow(`skip ${rec.skill}: unknown harness ${rec.agent}`));
+      continue;
+    }
     const declared = siblings[rec.skill] ?? [];
     const ctx: InstallContext = {
       skill,
@@ -73,8 +76,7 @@ export async function update(opts: UpdateOptions = {}): Promise<void> {
     };
     const label = `${rec.skill} → ${rec.agent} (${rec.mode}, ${rec.scope})`;
 
-    const directory = skillDirectoryFor({
-      agent: rec.agent,
+    const directory = target.skillDirectory({
       mode: rec.mode,
       name: skill.frontmatter.name,
       scope: rec.scope,

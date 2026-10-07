@@ -1,3 +1,4 @@
+import { envSessionKey } from "../bridges/index.js";
 import { resolveSessionKey, track } from "../core/active.js";
 import { readState } from "../core/state.js";
 
@@ -36,5 +37,5 @@ export async function trackCmd(args: {
 }): Promise<void> {
   if (args.knownOnly && !(await installedSkills()).has(args.skill)) return;
   const on = (args.state ?? "on").trim().toLowerCase() !== "off";
-  await track(resolveSessionKey(args.session), args.skill, on);
+  await track(resolveSessionKey(args.session, process.cwd(), envSessionKey()), args.skill, on);
 }

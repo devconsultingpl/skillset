@@ -2,9 +2,9 @@
  * booleans, flat arrays of strings, and nested mappings of those). We don't pull
  * a full YAML serializer to keep deps small.
  *
- * Nested mappings exist because a harness field can be one: a pi skill's
- * `contract:` block is an object the contract harvester parses, and it is the
- * only reason a workflow gate can read `blockers_count` (0023 slice 2b).
+ * Nested mappings exist because a harness field can be one: a skill's
+ * `contract:` block is an object another tool parses, and it is the only reason
+ * a workflow gate can read `blockers_count` (0023 slice 2b).
  * Arrays of mappings are still refused — nothing needs them, and a hand-rolled
  * renderer should refuse what it has not been tested against. */
 export function renderFrontmatter(fields: Record<string, unknown>): string {

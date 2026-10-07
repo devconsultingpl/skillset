@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { BRIDGE_NAMES, requireBridge } from "../bridges/index.js";
 import {
   classifySiblings,
   configPlaceholdersIn,
@@ -32,19 +33,31 @@ describe("parseDeclarations — requires", () => {
     expect(requires["code-review"]?.pi).toEqual(["contract"]);
   });
 
-  it("rejects an unknown agent, a non-array, and an empty field name", () => {
+  it("rejects a non-array and an empty field name at parse time", () => {
     const { problems } = parseDeclarations({
       version: 1,
       installs: { "code-review": [{ agent: "pi", mode: "auto" }] },
       requires: {
-        "code-review": { cursor: ["contract"], pi: "contract", opencode: [""] },
+        "code-review": { pi: "contract", opencode: [""] },
       },
     });
 
-    expect(problems).toHaveLength(3);
-    expect(problems[0]).toContain('unknown agent "cursor"');
+    expect(problems).toHaveLength(2);
+    expect(problems[0]).toContain("must be an array of frontmatter field names");
     expect(problems[1]).toContain("must be an array of frontmatter field names");
-    expect(problems[2]).toContain("must be an array of frontmatter field names");
+  });
+
+  it("reports a harness nothing provides, naming the registry's list", async () => {
+    // Existence is coverage's job, not the parser's: which harnesses exist is
+    // registry data, and the core is handed the names (slice 2e).
+    const { declarations, requires } = parseDeclarations({
+      version: 1,
+      installs: { "code-review": [{ agent: "cursor", mode: "auto" }] },
+      requires: { "code-review": { cursor: ["contract"] } },
+    });
+    const problems = await declarationCoverage(declarations, {}, requires, BRIDGE_NAMES);
+    expect(problems.join("\n")).toContain('unknown harness "cursor"');
+    expect(problems.join("\n")).toContain("known: ");
   });
 
   it("rejects a requirement on skillset's own keys, or for an agent it never installs on", async () => {
@@ -66,9 +79,11 @@ describe("parseDeclarations — requires", () => {
  */
 describe("fieldSupport", () => {
   it("stays silent for a field the harness can carry", () => {
-    const report = fieldSupport(skillWith("targets:\n  opencode:\n    license: MIT"), "opencode", [
-      "auto",
-    ]);
+    const report = fieldSupport(
+      skillWith("targets:\n  opencode:\n    license: MIT"),
+      requireBridge("opencode"),
+      ["auto"],
+    );
     expect(report).toEqual({ warnings: [], errors: [] });
   });
 
@@ -78,16 +93,26 @@ describe("fieldSupport", () => {
     // skill required it, which is exactly what the review declares (2b).
     const skill = skillWith("targets:\n  pi:\n    contract:\n      produces: {}\n");
 
-    expect(fieldSupport(skill, "pi", ["auto"])).toEqual({ warnings: [], errors: [] });
-    expect(fieldSupport(skill, "pi", ["auto", "slash"])).toEqual({ warnings: [], errors: [] });
-    expect(fieldSupport(skill, "pi", ["auto", "slash"], ["contract"]).errors).toEqual([]);
-    expect(fieldSupport(skill, "pi", ["slash"], ["contract"]).errors).toHaveLength(1);
+    expect(fieldSupport(skill, requireBridge("pi"), ["auto"])).toEqual({
+      warnings: [],
+      errors: [],
+    });
+    expect(fieldSupport(skill, requireBridge("pi"), ["auto", "slash"])).toEqual({
+      warnings: [],
+      errors: [],
+    });
+    expect(
+      fieldSupport(skill, requireBridge("pi"), ["auto", "slash"], ["contract"]).errors,
+    ).toEqual([]);
+    expect(fieldSupport(skill, requireBridge("pi"), ["slash"], ["contract"]).errors).toHaveLength(
+      1,
+    );
   });
 
   it("names the field and the consequence when the harness ignores it", () => {
     const { warnings } = fieldSupport(
       skillWith("targets:\n  opencode:\n    disable-model-invocation: true"),
-      "opencode",
+      requireBridge("opencode"),
       ["auto"],
     );
 
@@ -97,7 +122,11 @@ describe("fieldSupport", () => {
   });
 
   it("reports a top-level harness field, which no renderer forwards", () => {
-    const { warnings } = fieldSupport(skillWith("disable-model-invocation: true"), "pi", ["slash"]);
+    const { warnings } = fieldSupport(
+      skillWith("disable-model-invocation: true"),
+      requireBridge("pi"),
+      ["slash"],
+    );
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain("declared at the top level");
@@ -107,9 +136,11 @@ describe("fieldSupport", () => {
   it("reports a field the mode cannot carry even when another mode can", () => {
     // `name` is stripped from prompt files on purpose — the filename governs —
     // but it is a field of a skill file.
-    const { warnings } = fieldSupport(skillWith("targets:\n  pi:\n    name: demo"), "pi", [
-      "slash",
-    ]);
+    const { warnings } = fieldSupport(
+      skillWith("targets:\n  pi:\n    name: demo"),
+      requireBridge("pi"),
+      ["slash"],
+    );
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain("cannot express `name`");
@@ -118,7 +149,7 @@ describe("fieldSupport", () => {
   it("errors on a required field with no renderer", () => {
     const { warnings, errors } = fieldSupport(
       skillWith(""),
-      "opencode",
+      requireBridge("opencode"),
       ["slash"],
       ["disable-model-invocation"],
     );
@@ -130,7 +161,12 @@ describe("fieldSupport", () => {
   });
 
   it("warns when a required field is expressible but nothing writes a value", () => {
-    const { warnings, errors } = fieldSupport(skillWith(""), "pi", ["auto"], ["contract"]);
+    const { warnings, errors } = fieldSupport(
+      skillWith(""),
+      requireBridge("pi"),
+      ["auto"],
+      ["contract"],
+    );
 
     expect(errors).toEqual([]);
     expect(warnings).toHaveLength(1);
@@ -158,20 +194,20 @@ describe("parseDeclarations", () => {
     expect(declaredModes(declarations, "architect", "pi", "global")).toEqual(["slash", "auto"]);
   });
 
-  it("rejects unknown agents and modes by name", () => {
+  it("rejects an unknown mode, and a harness that is not a name at all", () => {
     const { problems } = parseDeclarations({
       version: 1,
       installs: {
         architect: [
-          { agent: "cursor", mode: "slash" },
           { agent: "pi", mode: "sometimes" },
+          { agent: "", mode: "slash" },
         ],
       },
     });
 
     expect(problems).toHaveLength(2);
-    expect(problems[0]).toContain('unknown agent "cursor"');
-    expect(problems[1]).toContain('unknown mode "sometimes"');
+    expect(problems[0]).toContain('unknown mode "sometimes"');
+    expect(problems[1]).toContain("must name a harness");
   });
 
   it("requires a projectPath for a local declaration", () => {

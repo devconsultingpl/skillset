@@ -2,9 +2,9 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { fileExists } from "../core/fs.js";
-import { parseSkill } from "../core/parse.js";
-import { claudeCodeTarget } from "./claude-code.js";
+import { fileExists } from "../../core/fs.js";
+import { parseSkill } from "../../core/parse.js";
+import { claudeCodeBridge } from "./index.js";
 
 const SKILL = `---
 name: confidence
@@ -29,7 +29,7 @@ afterEach(async () => {
 
 describe("claude-code target — slash", () => {
   it("writes .claude/commands/<slug>.md and removes on uninstall", async () => {
-    const record = await claudeCodeTarget.install({
+    const record = await claudeCodeBridge.install({
       skill: parseSkill(SKILL),
       scope: "local",
       mode: "slash",
@@ -41,7 +41,7 @@ describe("claude-code target — slash", () => {
     expect(contents).toContain("description: drives planning loop");
     expect(contents).toContain("# Confidence");
 
-    await claudeCodeTarget.uninstall(record);
+    await claudeCodeBridge.uninstall(record);
     expect(await fileExists(cmdPath)).toBe(false);
   });
 });
@@ -60,7 +60,7 @@ Report active skills.
 `;
 
   it("appends a track line + allowed-tools for a slash skill", async () => {
-    await claudeCodeTarget.install({
+    await claudeCodeBridge.install({
       skill: parseSkill(SKILL),
       scope: "local",
       mode: "slash",
@@ -86,7 +86,7 @@ Report active skills.
   });
 
   it("the status reader prints status and never tracks itself", async () => {
-    await claudeCodeTarget.install({
+    await claudeCodeBridge.install({
       skill: parseSkill(STATUS),
       scope: "local",
       mode: "slash",
@@ -102,7 +102,7 @@ Report active skills.
   });
 
   it("does not append a trailer for auto mode", async () => {
-    await claudeCodeTarget.install({
+    await claudeCodeBridge.install({
       skill: parseSkill(SKILL),
       scope: "local",
       mode: "auto",
@@ -137,7 +137,7 @@ Body text.
 `;
 
   const allowedToolsLine = async (skill: ReturnType<typeof parseSkill>) => {
-    await claudeCodeTarget.install({ skill, scope: "local", mode: "slash", projectRoot });
+    await claudeCodeBridge.install({ skill, scope: "local", mode: "slash", projectRoot });
     const contents = await readFile(
       join(projectRoot, ".claude", "commands", "confidence.md"),
       "utf8",
@@ -181,7 +181,7 @@ Report active skills.
   const settingsPath = () => join(projectRoot, ".claude", "settings.json");
   const readSettings = async () => JSON.parse(await readFile(settingsPath(), "utf8"));
   const installStatus = () =>
-    claudeCodeTarget.install({
+    claudeCodeBridge.install({
       skill: parseSkill(STATUS),
       scope: "local",
       mode: "slash",
@@ -196,7 +196,7 @@ Report active skills.
       command: "skillset status --stdin-json",
     });
 
-    await claudeCodeTarget.uninstall(record);
+    await claudeCodeBridge.uninstall(record);
     // Nothing else in settings → file removed entirely.
     expect(await fileExists(settingsPath())).toBe(false);
   });
@@ -209,7 +209,7 @@ Report active skills.
     expect(entry).toBeDefined();
     expect(entry.hooks[0].command).toContain("skillset reset --stdin-json");
 
-    await claudeCodeTarget.uninstall(record);
+    await claudeCodeBridge.uninstall(record);
     expect(await fileExists(settingsPath())).toBe(false);
   });
 
@@ -240,7 +240,7 @@ Report active skills.
     expect((await readSettings()).statusLine).toEqual(mine);
 
     // Uninstall must leave the user's statusLine alone.
-    await claudeCodeTarget.uninstall(record);
+    await claudeCodeBridge.uninstall(record);
     expect((await readSettings()).statusLine).toEqual(mine);
   });
 
@@ -251,7 +251,7 @@ Report active skills.
     const mine = { type: "command", command: "my-own.sh" };
     await writeFile(settingsPath(), JSON.stringify({ statusLine: mine }, null, 2));
 
-    await claudeCodeTarget.uninstall(record);
+    await claudeCodeBridge.uninstall(record);
     expect((await readSettings()).statusLine).toEqual(mine);
   });
 
@@ -261,14 +261,14 @@ Report active skills.
     await writeFile(settingsPath(), JSON.stringify({ theme: "dark" }, null, 2));
 
     const record = await installStatus();
-    await claudeCodeTarget.uninstall(record);
+    await claudeCodeBridge.uninstall(record);
     expect(await readSettings()).toEqual({ theme: "dark" });
   });
 });
 
 describe("claude-code target — auto", () => {
   it("writes SKILL.md under .claude/skills/<name>/ and cleans up dir on uninstall", async () => {
-    const record = await claudeCodeTarget.install({
+    const record = await claudeCodeBridge.install({
       skill: parseSkill(SKILL),
       scope: "local",
       mode: "auto",
@@ -280,7 +280,7 @@ describe("claude-code target — auto", () => {
     expect(contents).toContain("name: confidence");
     expect(contents).toContain("description: drives planning loop");
 
-    await claudeCodeTarget.uninstall(record);
+    await claudeCodeBridge.uninstall(record);
     expect(await fileExists(skillPath)).toBe(false);
     expect(await fileExists(join(projectRoot, ".claude", "skills", "confidence"))).toBe(false);
   });
@@ -288,7 +288,7 @@ describe("claude-code target — auto", () => {
 
 describe("claude-code target — always", () => {
   it("writes SKILL.md and adds a SessionStart hook tagged for the skill", async () => {
-    const record = await claudeCodeTarget.install({
+    const record = await claudeCodeBridge.install({
       skill: parseSkill(SKILL),
       scope: "local",
       mode: "always",
@@ -301,7 +301,7 @@ describe("claude-code target — always", () => {
     expect(settings.hooks.SessionStart[0].hooks[0].command).toContain("# skillset:confidence");
     expect(settings.hooks.SessionStart[0].hooks[0].command).toContain("skillset emit confidence");
 
-    await claudeCodeTarget.uninstall(record);
+    await claudeCodeBridge.uninstall(record);
     expect(await fileExists(settingsPath)).toBe(false);
   });
 
@@ -317,7 +317,7 @@ describe("claude-code target — always", () => {
     await mkdir(join(projectRoot, ".claude"), { recursive: true });
     await writeFile(settingsPath, JSON.stringify(existing, null, 2));
 
-    const record = await claudeCodeTarget.install({
+    const record = await claudeCodeBridge.install({
       skill: parseSkill(SKILL),
       scope: "local",
       mode: "always",
@@ -326,9 +326,31 @@ describe("claude-code target — always", () => {
     const after = JSON.parse(await readFile(settingsPath, "utf8"));
     expect(after.hooks.SessionStart).toHaveLength(2);
 
-    await claudeCodeTarget.uninstall(record);
+    await claudeCodeBridge.uninstall(record);
     const final = JSON.parse(await readFile(settingsPath, "utf8"));
     expect(final.hooks.SessionStart).toHaveLength(1);
     expect(final.hooks.SessionStart[0].hooks[0].command).toBe("echo other");
+  });
+});
+
+describe("claude-code bridge — session identity", () => {
+  it("reads its own environment variable, and only its own", () => {
+    const bridge = claudeCodeBridge;
+    const previous = process.env.CLAUDE_CODE_SESSION_ID;
+    try {
+      process.env.CLAUDE_CODE_SESSION_ID = "sess-123";
+      expect(bridge.sessionKeyFromEnv?.()).toBe("sess-123");
+      process.env.CLAUDE_CODE_SESSION_ID = "   ";
+      expect(bridge.sessionKeyFromEnv?.()).toBeUndefined();
+    } finally {
+      if (previous === undefined) {
+        // The variable must be *absent*, not the string "undefined", for the CLI
+        // tests that spawn children.
+        // biome-ignore lint/performance/noDelete: absence is what the child needs
+        delete process.env.CLAUDE_CODE_SESSION_ID;
+      } else {
+        process.env.CLAUDE_CODE_SESSION_ID = previous;
+      }
+    }
   });
 });

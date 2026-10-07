@@ -42,8 +42,8 @@ export function skillSourcePath(skillName: string, rel: string): string {
   return resolve(skillsRoot, skillName, rel);
 }
 
-/** Path to a bundled executable artifact shipped alongside a skill (e.g. the
- * opencode plugin / pi extension installed with `skillset-status`). */
+/** Path to a bundled executable artifact shipped alongside a skill — the editor
+ * plugin, harness extension or hook config a skill installs as an asset. */
 export function assetPath(skillName: string, file: string): string {
   return resolve(skillsRoot, skillName, "assets", file);
 }

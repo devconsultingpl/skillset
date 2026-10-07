@@ -8,8 +8,8 @@
  * invisible become reportable: an installed copy that was edited locally
  * (`drifted`), a declared install that is absent (`missing`), and a file at an
  * owned destination that skillset never wrote (`foreign`) — the last being the
- * case `scripts/sync-pi-auto.mjs` created by writing four auto skills that could
- * not be recorded (docs/decisions/0005).
+ * case docs/decisions/0005 records: a one-off script wrote four auto skills it
+ * could not record.
  *
  * Comparison reuses each target's `preview`, which already returns comparable
  * on-disk vs would-write bytes for the mode's primary artifact. For an
@@ -19,14 +19,14 @@
  */
 import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, normalize } from "node:path";
-import { targetFor } from "../targets/index.js";
+import type { Bridge, BridgeLookup } from "./bridge.js";
 import { listBundledSkills, loadBundledSkill, skillSourcePath } from "./bundle.js";
 import { fileExists, readMaybe, readMaybeBytes } from "./fs.js";
-import { artifactPath, declarationsFilePath, skillDirectoryFor } from "./locations.js";
+import { declarationsFilePath } from "./locations.js";
 import { MD, extract } from "./markers.js";
 import { applyConfigToSkill } from "./template.js";
 import type {
-  AgentName,
+  BridgeName,
   InstallDeclaration,
   InstallRecord,
   Mode,
@@ -36,7 +36,7 @@ import type {
   SiblingFile,
   SkillsetState,
 } from "./types.js";
-import { AGENTS, MODES, SKILLSET_FIELDS } from "./types.js";
+import { MODES, SKILLSET_FIELDS } from "./types.js";
 
 export type InstallStatus =
   /** Recorded, and the on-disk bytes match what we would write. */
@@ -178,8 +178,8 @@ function parseRequires(raw: unknown, problems: string[]): RequiredFields {
       continue;
     }
     for (const [agent, fields] of Object.entries(perAgent as Record<string, unknown>)) {
-      if (!isKnown(AGENTS, agent)) {
-        problems.push(`${skill}: \`requires\` names unknown agent ${JSON.stringify(agent)}`);
+      if (typeof agent !== "string" || agent.length === 0) {
+        problems.push(`${skill}: \`requires\` names an empty harness`);
         continue;
       }
       if (!Array.isArray(fields) || fields.some((f) => typeof f !== "string" || f.length === 0)) {
@@ -235,8 +235,8 @@ export function parseDeclarations(raw: unknown): DeclarationParseResult {
         continue;
       }
       const { agent, mode, scope, projectPath } = entry as Record<string, unknown>;
-      if (!isKnown(AGENTS, agent)) {
-        problems.push(`${skill}: unknown agent ${JSON.stringify(agent)}`);
+      if (typeof agent !== "string" || agent.length === 0) {
+        problems.push(`${skill}: install must name a harness`);
         continue;
       }
       if (!isKnown(MODES, mode)) {
@@ -302,8 +302,21 @@ export async function declarationCoverage(
   declarations: readonly InstallDeclaration[],
   siblings: Record<string, SiblingFile[]> = {},
   requires: RequiredFields = {},
+  knownHarnesses?: readonly BridgeName[],
 ): Promise<string[]> {
   const problems: string[] = [];
+  // Harness *existence* is checked here rather than at parse time: which
+  // harnesses exist is registry data, and the core is handed the names instead
+  // of importing them (slice 2e). Shape is all `parseDeclarations` can judge.
+  if (knownHarnesses) {
+    for (const declaration of declarations) {
+      if (!knownHarnesses.includes(declaration.agent)) {
+        problems.push(
+          `${declaration.skill}: declares an install for unknown harness ${JSON.stringify(declaration.agent)} (known: ${knownHarnesses.join(", ")})`,
+        );
+      }
+    }
+  }
   const bundled = new Set(await listBundledSkills());
   const declared = new Set(declarations.map((d) => d.skill));
   for (const skill of declared) {
@@ -344,6 +357,9 @@ export async function declarationCoverage(
       continue;
     }
     for (const [agent, fields] of Object.entries(perAgent)) {
+      if (knownHarnesses && !knownHarnesses.includes(agent)) {
+        problems.push(`${skill}: \`requires\` names unknown harness ${JSON.stringify(agent)}`);
+      }
       if (!declarations.some((d) => d.skill === skill && d.agent === agent)) {
         problems.push(`${skill}: requires fields for ${agent} but does not install on ${agent}`);
       }
@@ -377,15 +393,16 @@ export async function declarationCoverage(
  */
 export function fieldSupport(
   skill: ParsedSkill,
-  agent: AgentName,
+  bridge: Bridge,
   modes: readonly Mode[],
   required: readonly string[] = [],
 ): { warnings: string[]; errors: string[] } {
-  const target = targetFor(agent);
+  const target = bridge;
+  const agent = bridge.name;
   // Expressibility is judged across every mode this (skill, agent) is installed
   // in, not per artifact: `targets.<agent>` is written into each of them, so a
   // field one mode carries reaches the harness even where another mode drops it.
-  // Judging per mode reported `contract` as unrenderable for pi's slash install
+  // Judging per mode reported `contract` as unrenderable for a slash install
   // while its auto skill carried it — and refused a required one outright.
   const expresses = new Set(modes.flatMap((mode) => target.frontmatter.expresses[mode] ?? []));
   const overrides = (skill.frontmatter.targets?.[agent] ?? {}) as Record<string, unknown>;
@@ -462,10 +479,9 @@ export function findRecord(
   );
 }
 
-/** The path a declaration's primary artifact occupies, from `artifactPath`. */
-function primaryPath(declaration: InstallDeclaration, skill: ParsedSkill): string {
-  return artifactPath({
-    agent: declaration.agent,
+/** The path a declaration's primary artifact occupies, from the bridge. */
+function primaryPath(declaration: InstallDeclaration, skill: ParsedSkill, bridge: Bridge): string {
+  return bridge.artifactPath({
     mode: declaration.mode,
     scope: declaration.scope,
     slug: skill.frontmatter.slug ?? skill.frontmatter.name,
@@ -550,6 +566,7 @@ function worstStatus(statuses: readonly InstallStatus[]): InstallStatus {
 export async function classifyInstall(
   declaration: InstallDeclaration,
   state: SkillsetState,
+  bridge: Bridge,
   siblings: Record<string, SiblingFile[]> = {},
 ): Promise<ClassifiedInstall> {
   // Render through the same path an install takes: a skill whose frontmatter
@@ -558,13 +575,12 @@ export async function classifyInstall(
   // to its placeholders.
   const skill = applyConfigToSkill(await loadBundledSkill(declaration.skill));
   const record = findRecord(state, declaration);
-  const path = primaryPath(declaration, skill);
-  const primary = await classifyPrimary(declaration, skill, record, path);
+  const path = primaryPath(declaration, skill, bridge);
+  const primary = await classifyPrimary(declaration, skill, record, path, bridge);
 
   // Siblings only travel where the mode writes a per-skill directory, so a
   // slash prompt or a marker block has none to classify.
-  const directory = skillDirectoryFor({
-    agent: declaration.agent,
+  const directory = bridge.skillDirectory({
     mode: declaration.mode,
     name: skill.frontmatter.name,
     scope: declaration.scope,
@@ -587,10 +603,11 @@ async function classifyPrimary(
   skill: ParsedSkill,
   record: InstallRecord | undefined,
   path: string,
+  bridge: Bridge,
 ): Promise<ClassifiedInstall> {
   const { agent, scope, mode } = declaration;
   if (record) {
-    const { current, next } = await targetFor(agent).preview(
+    const { current, next } = await bridge.preview(
       { skill, scope, mode, projectRoot: declaration.projectPath ?? process.cwd() },
       record,
     );
@@ -618,7 +635,7 @@ async function classifyPrimary(
   if (current === null) {
     return { declaration, status: "missing", path };
   }
-  const { next } = await targetFor(agent).preview(
+  const { next } = await bridge.preview(
     { skill, scope, mode, projectRoot: declaration.projectPath ?? process.cwd() },
     standInRecord(declaration, skill, path),
   );
@@ -631,11 +648,16 @@ async function classifyPrimary(
 export async function classifyAll(
   declarations: readonly InstallDeclaration[],
   state: SkillsetState,
+  lookup: BridgeLookup,
   siblings: Record<string, SiblingFile[]> = {},
 ): Promise<ClassifiedInstall[]> {
   const classified: ClassifiedInstall[] = [];
   for (const declaration of declarations) {
-    classified.push(await classifyInstall(declaration, state, siblings));
+    const bridge = lookup(declaration.agent);
+    if (!bridge) {
+      throw new Error(`unknown harness: ${declaration.agent}`);
+    }
+    classified.push(await classifyInstall(declaration, state, bridge, siblings));
   }
   for (const record of state.installs) {
     const stillDeclared = declarations.some(
@@ -667,7 +689,7 @@ export async function classifyAll(
 export function declaredModes(
   declarations: readonly InstallDeclaration[],
   skill: string,
-  agent: AgentName,
+  agent: BridgeName,
   scope: Scope,
 ): Mode[] {
   return declarations

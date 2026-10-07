@@ -1,4 +1,5 @@
 import pc from "picocolors";
+import { BRIDGE_NAMES, bridgeFor } from "../bridges/index.js";
 import { alwaysWarnLines, bodyLineCount } from "../core/body-size.js";
 import { loadBundledSkill } from "../core/bundle.js";
 import {
@@ -9,13 +10,12 @@ import {
 } from "../core/declarations.js";
 import { matchInstall, readState, upsertInstall, writeState } from "../core/state.js";
 import { applyConfigToSkill } from "../core/template.js";
-import type { AgentName, InstallDeclaration, Mode, ParsedSkill, Scope } from "../core/types.js";
-import { AGENTS, MODES } from "../core/types.js";
-import { targetFor } from "../targets/index.js";
+import type { BridgeName, InstallDeclaration, Mode, ParsedSkill, Scope } from "../core/types.js";
+import { MODES } from "../core/types.js";
 
 export interface InstallOptions {
   skills: string[];
-  agents: AgentName[];
+  agents: BridgeName[];
   /** Omitted means "use the repository declaration" for this skill and agent. */
   mode?: Mode;
   scope: Scope;
@@ -35,7 +35,7 @@ export interface InstallOptions {
 async function resolveMode(
   declarations: readonly InstallDeclaration[],
   skill: string,
-  agent: AgentName,
+  agent: BridgeName,
   opts: InstallOptions,
 ): Promise<Mode | null> {
   if (opts.mode) return opts.mode;
@@ -71,9 +71,9 @@ function parseList<T extends string>(input: string, allowed: readonly T[]): T[] 
   return [...seen];
 }
 
-export function parseAgentArg(arg: string): AgentName[] {
-  if (arg === "all") return [...AGENTS];
-  return parseList(arg, AGENTS);
+export function parseAgentArg(arg: string): BridgeName[] {
+  if (arg === "all") return [...BRIDGE_NAMES];
+  return parseList(arg, BRIDGE_NAMES);
 }
 
 export function parseModeArg(arg: string): Mode {
@@ -110,7 +110,15 @@ export async function install(opts: InstallOptions): Promise<number> {
       const mode = await resolveMode(declarations, skillName, agent, opts);
       if (mode === null) continue;
       if (mode === "always") warnIfBodyLarge(skill.body, skillName);
-      const target = targetFor(agent);
+      const target = bridgeFor(agent);
+      if (!target) {
+        failures += 1;
+        console.error(
+          pc.red("error"),
+          `${skillName} → ${agent}: unknown harness (known: ${BRIDGE_NAMES.join(", ")})`,
+        );
+        continue;
+      }
       if (!target.supportedModes.includes(mode)) {
         console.error(
           pc.yellow(
@@ -129,7 +137,7 @@ export async function install(opts: InstallOptions): Promise<number> {
       const declaredFor = declaredModes(declarations, skillName, agent, opts.scope);
       const support = fieldSupport(
         skill,
-        agent,
+        target,
         declaredFor.length > 0 ? declaredFor : [mode],
         requires[skillName]?.[agent] ?? [],
       );
@@ -154,6 +162,7 @@ export async function install(opts: InstallOptions): Promise<number> {
             ...(projectPath ? { projectPath } : {}),
           },
           state,
+          target,
           siblings,
         );
         if (classified.status === "foreign") {
