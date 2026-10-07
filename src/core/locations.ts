@@ -1,6 +1,9 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { AgentName, Mode, Scope } from "./types.js";
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Layout per agent — one path per (mode, scope). `always` returns the anchor
@@ -119,4 +122,13 @@ export function artifactPath(opts: {
 /** Path of skillset's own state file (~/.skillset/state.json). */
 export function stateFilePath(): string {
   return join(homedir(), ".skillset", "state.json");
+}
+
+/**
+ * Path of the repository-level install declarations (`skillset.config.json`).
+ * Resolved next to `skillsRoot`, so it is the package root in both `src/` (dev)
+ * and `dist/` (installed).
+ */
+export function declarationsFilePath(): string {
+  return resolve(here, "..", "..", "skillset.config.json");
 }

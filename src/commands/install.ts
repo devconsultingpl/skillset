@@ -1,14 +1,9 @@
 import pc from "picocolors";
 import { alwaysWarnLines, bodyLineCount } from "../core/body-size.js";
 import { loadBundledSkill } from "../core/bundle.js";
-import {
-  matchInstall,
-  readState,
-  removeInstall,
-  upsertInstall,
-  writeState,
-} from "../core/state.js";
-import { applyConfig } from "../core/template.js";
+import { classifyInstall, declaredModes, loadDeclarations } from "../core/declarations.js";
+import { matchInstall, readState, upsertInstall, writeState } from "../core/state.js";
+import { applyConfigToSkill } from "../core/template.js";
 import type { AgentName, Mode, ParsedSkill, Scope } from "../core/types.js";
 import { AGENTS, MODES } from "../core/types.js";
 import { targetFor } from "../targets/index.js";
@@ -16,13 +11,43 @@ import { targetFor } from "../targets/index.js";
 export interface InstallOptions {
   skills: string[];
   agents: AgentName[];
-  mode: Mode;
+  /** Omitted means "use the repository declaration" for this skill and agent. */
+  mode?: Mode;
   scope: Scope;
   projectRoot?: string;
   /** Configurable values that override frontmatter.config keys. */
   configOverrides?: Record<string, unknown>;
-  /** If true, replace any prior install for the same (skill, agent, scope) regardless of mode. */
+  /** If true, replace any prior install for the same (skill, agent, scope, mode), including a foreign destination. */
   force?: boolean;
+}
+
+/**
+ * Resolve the mode for one (skill, agent, scope): an explicit `--mode` wins,
+ * otherwise the repository declaration decides. A skill that declares two modes
+ * for the same agent (the deliberate slash+auto setup, ADR 0005) is ambiguous
+ * without a flag, so it asks instead of guessing.
+ */
+async function resolveMode(
+  skill: string,
+  agent: AgentName,
+  opts: InstallOptions,
+): Promise<Mode | null> {
+  if (opts.mode) return opts.mode;
+  const { declarations } = await loadDeclarations();
+  const modes = declaredModes(declarations, skill, agent, opts.scope);
+  if (modes.length === 1) return modes[0] ?? null;
+  if (modes.length === 0) {
+    console.error(
+      pc.red("error"),
+      `${skill} → ${agent} declares no ${opts.scope} install; pass --mode`,
+    );
+    return null;
+  }
+  console.error(
+    pc.red("error"),
+    `${skill} → ${agent} declares ${modes.join(" and ")}; pass --mode <${modes.join("|")}>`,
+  );
+  return null;
 }
 
 function parseList<T extends string>(input: string, allowed: readonly T[]): T[] {
@@ -65,66 +90,82 @@ function warnIfBodyLarge(body: string, skillName: string): void {
   }
 }
 
-function applyConfigToSkill(skill: ParsedSkill, overrides?: Record<string, unknown>): ParsedSkill {
-  const effective = { ...(skill.frontmatter.config ?? {}), ...(overrides ?? {}) };
-  if (Object.keys(effective).length === 0) return skill;
-  return {
-    ...skill,
-    body: applyConfig(skill.body, effective),
-    // Also propagate into description (visible to agents auto-loading skills).
-    frontmatter: {
-      ...skill.frontmatter,
-      description: applyConfig(skill.frontmatter.description, effective),
-      config: effective,
-    },
-  };
-}
-
-export async function install(opts: InstallOptions): Promise<void> {
+export async function install(opts: InstallOptions): Promise<number> {
   const projectRoot = opts.projectRoot ?? process.cwd();
   const projectPath = opts.scope === "local" ? projectRoot : undefined;
+  let failures = 0;
 
   let state = await readState();
   for (const skillName of opts.skills) {
     const raw = await loadBundledSkill(skillName);
     const skill = applyConfigToSkill(raw, opts.configOverrides);
-    if (opts.mode === "always") warnIfBodyLarge(skill.body, skillName);
     for (const agent of opts.agents) {
+      const mode = await resolveMode(skillName, agent, opts);
+      if (mode === null) continue;
+      if (mode === "always") warnIfBodyLarge(skill.body, skillName);
       const target = targetFor(agent);
-      if (!target.supportedModes.includes(opts.mode)) {
+      if (!target.supportedModes.includes(mode)) {
         console.error(
           pc.yellow(
-            `skipping ${skillName} → ${agent}: mode "${opts.mode}" not supported (supported: ${target.supportedModes.join(", ")})`,
+            `skipping ${skillName} → ${agent}: mode "${mode}" not supported (supported: ${target.supportedModes.join(", ")})`,
           ),
         );
         continue;
       }
 
-      const key = { skill: skillName, agent, scope: opts.scope, projectPath };
+      const key = { skill: skillName, agent, scope: opts.scope, mode, projectPath };
       const prior = state.installs.find((r) => matchInstall(r, key));
-      if (prior && prior.mode !== opts.mode) {
-        if (!opts.force) {
-          throw new Error(
-            `${skillName} already installed for ${agent} as "${prior.mode}" (${opts.scope}); use --force or run 'skillset set-mode ${skillName} ${opts.mode} --agent ${agent} --${opts.scope}'`,
+      if (!opts.force) {
+        // The identity now includes the mode, so an unrecorded destination is
+        // somebody else's file — or an artifact this repository once wrote
+        // without recording (ADR 0005). Classify before writing: adopt silently
+        // only when the bytes are exactly ours.
+        const classified = await classifyInstall(
+          {
+            skill: skillName,
+            agent,
+            mode,
+            scope: opts.scope,
+            ...(projectPath ? { projectPath } : {}),
+          },
+          state,
+        );
+        if (classified.status === "foreign") {
+          failures += 1;
+          console.error(
+            pc.red("refusing"),
+            `${skillName} → ${agent} (${mode}, ${opts.scope}): ${classified.path ?? "destination"} exists and was not written by skillset (pass --force to replace)`,
+          );
+          continue;
+        }
+      }
+      if (prior) {
+        const { current, next } = await target.preview(
+          { skill, scope: opts.scope, mode, projectRoot },
+          prior,
+        );
+        if (current !== null && current !== next && !opts.force) {
+          console.error(
+            pc.yellow("warning"),
+            `${skillName} → ${agent} (${mode}, ${opts.scope}) has local edits; overwriting from source`,
           );
         }
-        await target.uninstall(prior);
-        state = removeInstall(state, prior);
       }
 
       const record = await target.install({
         skill,
         scope: opts.scope,
-        mode: opts.mode,
+        mode,
         projectRoot,
       });
       state = upsertInstall(state, record);
       console.log(
         pc.green("installed"),
         `${skillName} → ${agent}`,
-        pc.dim(`(${opts.mode}, ${opts.scope}) ${record.location}`),
+        pc.dim(`(${mode}, ${opts.scope}) ${record.location}`),
       );
     }
   }
   await writeState(state);
+  return failures;
 }

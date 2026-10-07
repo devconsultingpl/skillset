@@ -34,14 +34,21 @@ export async function writeState(state: SkillsetState, path = stateFilePath()): 
   await writeFile(path, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 }
 
+/**
+ * Identity of one install: the same skill may be installed for the same agent
+ * and scope in several modes at once — the deliberate dual slash+auto setup
+ * (ADR 0005) — so `mode` is part of the key, not a property that replaces the
+ * previous record.
+ */
 export function matchInstall(
-  a: Pick<InstallRecord, "skill" | "agent" | "scope" | "projectPath">,
-  b: Pick<InstallRecord, "skill" | "agent" | "scope" | "projectPath">,
+  a: Pick<InstallRecord, "skill" | "agent" | "scope" | "mode" | "projectPath">,
+  b: Pick<InstallRecord, "skill" | "agent" | "scope" | "mode" | "projectPath">,
 ): boolean {
   return (
     a.skill === b.skill &&
     a.agent === b.agent &&
     a.scope === b.scope &&
+    a.mode === b.mode &&
     (a.projectPath ?? null) === (b.projectPath ?? null)
   );
 }
@@ -54,7 +61,7 @@ export function upsertInstall(state: SkillsetState, record: InstallRecord): Skil
 
 export function removeInstall(
   state: SkillsetState,
-  key: Pick<InstallRecord, "skill" | "agent" | "scope" | "projectPath">,
+  key: Pick<InstallRecord, "skill" | "agent" | "scope" | "mode" | "projectPath">,
 ): SkillsetState {
   return { ...state, installs: state.installs.filter((i) => !matchInstall(i, key)) };
 }

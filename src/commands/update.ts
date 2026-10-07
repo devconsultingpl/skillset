@@ -5,7 +5,7 @@ import { lineDiff } from "../core/diff.js";
 import { isInteractive, readlineAsker, resolveDivergence } from "../core/prompt.js";
 import { readState, upsertInstall, writeState } from "../core/state.js";
 import type { InstallContext } from "../core/target.js";
-import { applyConfig } from "../core/template.js";
+import { applyConfigToSkill } from "../core/template.js";
 import type { InstallRecord, ParsedSkill } from "../core/types.js";
 import { targetFor } from "../targets/index.js";
 
@@ -16,19 +16,6 @@ export interface UpdateOptions {
   dryRun?: boolean;
   /** Non-interactively skip diverged installs; still rewrite untouched ones. */
   skipCustomized?: boolean;
-}
-
-function applyConfigToSkill(skill: ParsedSkill): ParsedSkill {
-  const config = skill.frontmatter.config;
-  if (!config || Object.keys(config).length === 0) return skill;
-  return {
-    ...skill,
-    body: applyConfig(skill.body, config),
-    frontmatter: {
-      ...skill.frontmatter,
-      description: applyConfig(skill.frontmatter.description, config),
-    },
-  };
 }
 
 /** Path of the artifact a divergence prompt should name, for display only. */

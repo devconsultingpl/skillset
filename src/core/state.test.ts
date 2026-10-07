@@ -42,11 +42,16 @@ describe("state", () => {
     expect(after).toEqual(before);
   });
 
-  it("upsert replaces existing entry with same key", async () => {
+  it("upsert replaces the same identity, and keeps a different mode beside it", async () => {
     let s = upsertInstall({ version: 1, installs: [] }, record());
-    s = upsertInstall(s, record({ mode: "always" }));
+    s = upsertInstall(s, record());
     expect(s.installs).toHaveLength(1);
-    expect(s.installs[0]!.mode).toBe("always");
+
+    // Mode is part of the identity (ADR 0005): the deliberate slash+auto setup
+    // must record both, not have one replace the other.
+    s = upsertInstall(s, record({ mode: "always" }));
+    expect(s.installs).toHaveLength(2);
+    expect(s.installs.map((i) => i.mode).sort()).toEqual(["always", "slash"]);
   });
 
   it("upsert keeps distinct scopes/agents separate", async () => {
@@ -60,7 +65,12 @@ describe("state", () => {
     let s: { version: 1; installs: InstallRecord[] } = { version: 1, installs: [] };
     s = upsertInstall(s, record());
     s = upsertInstall(s, record({ agent: "pi" }));
-    s = removeInstall(s, { skill: "confidence", agent: "pi", scope: "global" });
+    s = removeInstall(s, {
+      skill: "confidence",
+      agent: "pi",
+      scope: "global",
+      mode: "slash",
+    });
     expect(s.installs).toHaveLength(1);
     expect(s.installs[0]!.agent).toBe("claude-code");
   });

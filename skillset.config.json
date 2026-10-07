@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "installs": {
+    "appsec-review": [
+      {
+        "agent": "claude-code",
+        "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ],
+    "architect": [
+      {
+        "agent": "claude-code",
+        "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ],
+    "builder": [
+      {
+        "agent": "claude-code",
+        "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ],
+    "caveman": [
+      {
+        "agent": "claude-code",
+        "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ],
+    "code-review": [
+      {
+        "agent": "claude-code",
+        "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ],
+    "commit-suggestion": [
+      {
+        "agent": "claude-code",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ],
+    "confidence": [
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ],
+    "convention": [
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ],
+    "declutter": [
+      {
+        "agent": "claude-code",
+        "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ],
+    "instruction-ownership": [
+      {
+        "agent": "pi",
+        "mode": "always"
+      }
+    ],
+    "ponytail": [
+      {
+        "agent": "claude-code",
+        "mode": "slash"
+      },
+      {
+        "agent": "copilot",
+        "mode": "slash"
+      },
+      {
+        "agent": "opencode",
+        "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ],
+    "remediate": [
+      {
+        "agent": "claude-code",
+        "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ],
+    "retro": [
+      {
+        "agent": "claude-code",
+        "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ],
+    "skillset-status": [
+      {
+        "agent": "claude-code",
+        "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "slash"
+      }
+    ]
+  }
+}

@@ -9,6 +9,7 @@ import { resetCmd } from "./commands/reset.js";
 import { scanPromptCmd } from "./commands/scan-prompt.js";
 import { setMode } from "./commands/set-mode.js";
 import { statusCmd } from "./commands/status.js";
+import { sync } from "./commands/sync.js";
 import { trackCmd } from "./commands/track.js";
 import { uninstall } from "./commands/uninstall.js";
 import { update } from "./commands/update.js";
@@ -36,7 +37,10 @@ program
     "--agent <agents>",
     'comma-separated agent list, or "all" (claude-code, pi, opencode, copilot)',
   )
-  .option("--mode <mode>", "invocation mode: slash | auto | always", "slash")
+  .option(
+    "--mode <mode>",
+    "invocation mode: slash | auto | always (defaults to the repository declaration)",
+  )
   .option("--global", "install at the user-global level")
   .option("--local", "install into the current project (default)")
   .option(
@@ -44,13 +48,26 @@ program
     "replace any prior install for the same skill+agent+scope, even if its mode differs",
   )
   .action(async (skills: string[], opts) => {
-    await install({
+    const failures = await install({
       skills,
       agents: parseAgentArg(opts.agent),
-      mode: parseModeArg(opts.mode),
+      mode: opts.mode ? parseModeArg(opts.mode) : undefined,
       scope: scopeOf(opts),
       force: Boolean(opts.force),
     });
+    if (failures > 0) process.exitCode = 1;
+  });
+
+program
+  .command("sync")
+  .description(
+    "Reconcile every declared install to the repository sources: report drift, adopt unrecorded artifacts, repair edits, refuse foreign files.",
+  )
+  .option("--dry-run", "report the classification and change nothing")
+  .option("--prune", "also remove recorded installs the declarations no longer mention")
+  .action(async (opts) => {
+    const code = await sync({ dryRun: Boolean(opts.dryRun), prune: Boolean(opts.prune) });
+    process.exitCode = code;
   });
 
 program

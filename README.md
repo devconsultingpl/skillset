@@ -123,9 +123,10 @@ Copilot doesn't have an auto-trigger concept; `auto` is rejected with a clear me
 ## Commands
 
 ```
-skillset install <skills...> --agent <agents> --mode <mode> [--global|--local] [--force]
+skillset install <skills...> --agent <agents> [--mode <mode>] [--global|--local] [--force]
 skillset uninstall <skills...> [--agent ...] [--global|--local]
 skillset set-mode <skill> <mode> [--agent ...] [--global|--local]
+skillset sync [--dry-run|--prune]                # reconcile every declared install to sources
 skillset update [--force|--dry-run|--skip-customized]   # re-sync every install from bundled sources
 skillset list                         # what's available + what's installed
 skillset init <skill>                 # scaffold a skill's templates into cwd
@@ -136,7 +137,9 @@ skillset reset [--session <id>]       # clear the active set (compact/clear hook
 skillset scan-prompt                  # Copilot CLI hook: scan a prompt for /skill tokens
 ```
 
-`--agent` accepts a comma-separated list (e.g. `claude-code,pi`) or `all`.
+`--agent` accepts a comma-separated list (e.g. `claude-code,pi`) or `all`. `--mode` may be omitted:
+the repository declaration decides, and a skill declaring two modes for the same agent asks for the
+flag rather than guessing.
 
 ## Uninstall
 
@@ -151,12 +154,46 @@ skillset uninstall confidence --local              # only this project's local i
 
 > ⚠️ Bare uninstall and `--global` are **not** project-scoped: they fan out across every install in `~/.skillset/state.json`, including local installs recorded in *other* project directories. Only `--local` restricts to the current project. Run `skillset list` first to see what would be removed. Nothing to match exits 0 with a warning.
 
+## Declarations and sync
+
+Which skills belong in which harness directories is declared in `skillset.config.json`, keyed by
+skill:
+
+```json
+{
+  "version": 1,
+  "installs": {
+    "architect": [
+      { "agent": "claude-code", "mode": "slash" },
+      { "agent": "pi", "mode": "slash" },
+      { "agent": "pi", "mode": "auto" }
+    ]
+  }
+}
+```
+
+Nothing infers an install set from a skill's name, and a bundled skill that declares nothing is a
+reported error, not a silent omission. `skillset sync` reconciles every declaration against both the
+state file and the disk:
+
+| status | meaning | sync does |
+|---|---|---|
+| `in-sync` | recorded, bytes match | nothing |
+| `drifted` | recorded, bytes differ (you edited it) | rewrites from source, reporting the prior content |
+| `missing` | declared, nothing there | installs it |
+| `adoptable` | on disk unrecorded, bytes already ours | records it, rewriting nothing |
+| `foreign` | on disk unrecorded and **not** ours | refuses to touch it, exits non-zero |
+| `undeclared` | recorded, no longer declared | reports it; `--prune` removes it |
+
 ## Reinstall guard
 
-Installing a skill that's already installed for the same `(skill, agent, scope)` triple but with a **different mode** fails by default — old-mode artifacts would otherwise silently linger alongside the new ones. Two ways past the guard:
+A different mode is a different install: `--mode auto` beside an existing `slash` install records
+both and keeps both artifacts, which is the deliberate dual setup (`architect`, `caveman`,
+`ponytail`, `commit-suggestion` run as both under pi). Two flags remain meaningful:
 
-- **`skillset set-mode <skill> <mode>`** — preferred for plain mode switches. Atomically swaps the install's mode in place.
-- **`skillset install ... --force`** — uninstalls the prior record, then installs fresh. Use when you actually want a clean re-install (e.g. after a corrupt state, or to pick up changed install-time config).
+- **`skillset set-mode <skill> <mode>`** — swaps a mode in place, for when you meant to replace it.
+- **`skillset install ... --force`** — replaces a destination without asking, including one skillset
+  never wrote (without `--force`, an unrecorded file at an owned destination is refused).
 
 Same-mode reinstalls are idempotent and need neither flag.
 

@@ -1,5 +1,5 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type Sandbox, exists, makeSandbox, run } from "./helpers.js";
 
@@ -110,33 +110,36 @@ describe("cli — cross-mode reinstall guard", () => {
     expect(installs[0]).toMatchObject({ skill: "confidence", agent: "claude-code", mode: "slash" });
   });
 
-  it("conflicting mode without --force errors with a helpful message", async () => {
+  it("records a second mode beside the first instead of replacing it", async () => {
     expect(run(installArgs("slash"), sb.projectRoot, sb.env).status).toBe(0);
-    const out = run(installArgs("always"), sb.projectRoot, sb.env);
-    expect(out.status).toBe(1);
-    expect(out.stderr).toContain("already installed");
-    expect(out.stderr).toContain("--force");
-    expect(out.stderr).toContain("set-mode");
-    // Prior artifact must still exist; nothing changed.
+    expect(run(installArgs("auto"), sb.projectRoot, sb.env).status).toBe(0);
+    // Both artifacts survive, and both records exist: this is the deliberate
+    // dual slash+auto setup the old state model could not represent (ADR 0005).
     expect(await exists(join(sb.projectRoot, ".claude", "commands", "sk-confidence.md"))).toBe(
       true,
     );
-    expect(await exists(join(sb.projectRoot, ".claude", "settings.json"))).toBe(false);
+    expect(await exists(join(sb.projectRoot, ".claude", "skills", "confidence", "SKILL.md"))).toBe(
+      true,
+    );
     const installs = await readStateInstalls();
-    expect(installs).toHaveLength(1);
-    expect(installs[0].mode).toBe("slash");
+    expect(installs.map((i) => i.mode).sort()).toEqual(["auto", "slash"]);
   });
 
-  it("conflicting mode with --force cleans up prior artifact and replaces the record", async () => {
-    expect(run(installArgs("slash"), sb.projectRoot, sb.env).status).toBe(0);
-    expect(run(installArgs("always", ["--force"]), sb.projectRoot, sb.env).status).toBe(0);
-    expect(await exists(join(sb.projectRoot, ".claude", "commands", "sk-confidence.md"))).toBe(
-      false,
-    );
-    expect(await exists(join(sb.projectRoot, ".claude", "settings.json"))).toBe(true);
-    const installs = await readStateInstalls();
-    expect(installs).toHaveLength(1);
-    expect(installs[0].mode).toBe("always");
+  it("refuses an unrecorded file at an owned destination, and --force replaces it", async () => {
+    const promptPath = join(sb.projectRoot, ".claude", "commands", "sk-confidence.md");
+    await mkdir(dirname(promptPath), { recursive: true });
+    await writeFile(promptPath, "my own file\n", "utf8");
+
+    const refused = run(installArgs("slash"), sb.projectRoot, sb.env);
+    expect(refused.status).toBe(1);
+    expect(refused.stderr).toContain("not written by skillset");
+    // The user's file is untouched, and nothing was recorded for it.
+    expect(await readFile(promptPath, "utf8")).toBe("my own file\n");
+    expect(await readStateInstalls()).toHaveLength(0);
+
+    expect(run(installArgs("slash", ["--force"]), sb.projectRoot, sb.env).status).toBe(0);
+    expect(await readFile(promptPath, "utf8")).toContain("confidence");
+    expect(await readStateInstalls()).toHaveLength(1);
   });
 });
 
@@ -385,6 +388,47 @@ describe("cli — set-mode round-trips on every agent", () => {
       expect(await exists(tc.alwaysPath(sb))).toBe(false);
     });
   }
+});
+
+describe("cli — set-mode leaves one record", () => {
+  const readInstalls = async () => {
+    const statePath = join(sb.home, ".skillset", "state.json");
+    if (!(await exists(statePath))) return [];
+    const raw = JSON.parse(await readFile(statePath, "utf8"));
+    return raw.installs as Array<{ skill: string; agent: string; mode: string }>;
+  };
+
+  const forPi = async () =>
+    (await readInstalls()).filter((i) => i.skill === "confidence" && i.agent === "pi");
+
+  it("swaps the record instead of leaving the abandoned mode beside it", async () => {
+    const slashPrompt = join(sb.projectRoot, ".pi", "prompts", "sk-confidence.md");
+    const anchor = join(sb.projectRoot, ".pi", "APPEND_SYSTEM.md");
+    const setMode = (mode: string) =>
+      run(["set-mode", "confidence", mode, "--agent", "pi", "--local"], sb.projectRoot, sb.env);
+
+    expect(
+      run(
+        ["install", "confidence", "--agent", "pi", "--mode", "slash", "--local"],
+        sb.projectRoot,
+        sb.env,
+      ).status,
+    ).toBe(0);
+    expect((await forPi()).map((i) => i.mode)).toEqual(["slash"]);
+
+    expect(setMode("always").status).toBe(0);
+    // Identity includes the mode, so a switch must remove the record it replaced:
+    // leaving it behind means the artifact is gone while the record survives, and
+    // the next `sync` reinstalls the mode the developer switched away from.
+    expect((await forPi()).map((i) => i.mode)).toEqual(["always"]);
+    expect(await exists(slashPrompt)).toBe(false);
+    expect(await exists(anchor)).toBe(true);
+
+    expect(setMode("slash").status).toBe(0);
+    expect((await forPi()).map((i) => i.mode)).toEqual(["slash"]);
+    expect(await exists(slashPrompt)).toBe(true);
+    expect(await exists(anchor)).toBe(false);
+  });
 });
 
 describe("cli — caveman bundled skill", () => {

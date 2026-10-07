@@ -1,9 +1,9 @@
 import pc from "picocolors";
 import { alwaysWarnLines, bodyLineCount } from "../core/body-size.js";
 import { loadBundledSkill } from "../core/bundle.js";
-import { readState, upsertInstall, writeState } from "../core/state.js";
-import { applyConfig } from "../core/template.js";
-import type { AgentName, Mode, ParsedSkill, Scope } from "../core/types.js";
+import { readState, removeInstall, upsertInstall, writeState } from "../core/state.js";
+import { applyConfigToSkill } from "../core/template.js";
+import type { AgentName, Mode, Scope } from "../core/types.js";
 import { targetFor } from "../targets/index.js";
 
 export interface SetModeOptions {
@@ -12,19 +12,6 @@ export interface SetModeOptions {
   agents?: AgentName[];
   scope?: Scope;
   projectRoot?: string;
-}
-
-function applyConfigToSkill(skill: ParsedSkill): ParsedSkill {
-  const config = skill.frontmatter.config;
-  if (!config || Object.keys(config).length === 0) return skill;
-  return {
-    ...skill,
-    body: applyConfig(skill.body, config),
-    frontmatter: {
-      ...skill.frontmatter,
-      description: applyConfig(skill.frontmatter.description, config),
-    },
-  };
 }
 
 export async function setMode(opts: SetModeOptions): Promise<void> {
@@ -68,6 +55,10 @@ export async function setMode(opts: SetModeOptions): Promise<void> {
       continue;
     }
     await target.uninstall(rec);
+    // Mode is part of the install identity, so the record being replaced has to
+    // go explicitly: an upsert would record the new mode *beside* the old one,
+    // leaving a record whose artifact this loop just deleted.
+    state = removeInstall(state, rec);
     const next = await target.install({
       skill,
       scope: rec.scope,

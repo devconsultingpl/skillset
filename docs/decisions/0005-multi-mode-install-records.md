@@ -1,6 +1,6 @@
 # 0005 — allow recording multiple modes per (skill, agent, scope)
 
-**Status: proposal — not implemented.**
+**Status: implemented** — by mode-scoped record identity rather than by a mode list on one record. See the note at the end of this decision.
 
 ## Context
 
@@ -21,3 +21,21 @@ Rationale:
 - `state.json` install records gain a mode list (version bump); `track`/`status` semantics unchanged.
 - `--force` clears all modes of a record, not one.
 - `sync-pi-auto.mjs` and conventions step 3 become unnecessary once records support dual mode; retire them.
+
+## Implemented differently (2026-10-07)
+
+Plan 0023 delivered this by making `mode` part of the **record identity** — `matchInstall` now keys on
+`(skill, agent, scope, mode, projectPath)`, so one skill simply holds several records, one per mode.
+The mode-list alternative above was dropped for three reasons:
+
+- Recording two records is a smaller change than teaching every reader of a record to iterate modes
+  (`update`, `uninstall`, `list`, `track`, the four targets, and the classification added since).
+- No state migration: every existing single-mode record stays valid, so `version` remains 1.
+- Removing an install becomes expressible per mode rather than all-or-nothing.
+
+What this changes about the consequences above: there is **no version bump**, and `--force` no longer
+clears the other mode — a different mode is a different install, so installing `auto` beside `slash`
+keeps both artifacts and both records. `scripts/sync-pi-auto.mjs` is deleted and conventions step 3 is
+replaced by `skillset sync`, as this ADR anticipated. Installing a second mode beside the first is
+pinned by `test/cli.test.ts` ("records a second mode beside the first instead of replacing it") and by
+`src/core/state.test.ts`.

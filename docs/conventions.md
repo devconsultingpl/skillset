@@ -26,12 +26,31 @@ When creating a new skill, set the slug explicitly in frontmatter even if it equ
 
 ## Propagating skill edits
 
-Canonical source is `src/skills/<name>/SKILL.md`; every agent install renders from it.
+Canonical source is `src/skills/<name>/SKILL.md`; every agent install renders from it. Which skills
+belong in which harness directories is declared in `skillset.config.json` — never inferred from a
+skill's name.
 
 1. Edit the source, then `npm run build` — the installed bundle is `dist/skills/`.
-2. `skillset update --force` re-renders every recorded install. Without `--force`, a diverged install is skipped in non-interactive runs.
-3. The pi `auto` skills — `architect`, `caveman`, `ponytail`, `commit-suggestion` — are not state-managed (skillset can't record `auto` alongside an existing `slash` record; ADR 0005). Sync them with `node scripts/sync-pi-auto.mjs`. Never hand-write into `~/.pi` ad hoc.
-4. Verify against installed files with exact substrings from the rendered bundle — case and backticks matter; a paraphrase grep gives a false negative.
+2. `skillset sync` reconciles every declaration: it installs what is missing, adopts an
+   unrecorded artifact whose bytes already match, repairs a locally edited artifact (reporting
+   the prior content), and **refuses** a file at an owned destination that skillset never wrote.
+   It exits non-zero when it refuses something. `skillset sync --dry-run` reports without writing.
+3. A recorded install the declarations no longer mention is reported as `undeclared`;
+   `skillset sync --prune` removes it.
+4. Skill identity is `(skill, agent, scope, mode)`. A skill may hold several modes at once — the
+   deliberate slash+auto setup (ADR 0005) — so installing `auto` no longer replaces `slash`.
+   Omitting `--mode` takes the mode from the declaration; a skill declaring two modes for the same
+   agent asks for the flag instead of guessing.
+5. Verify against installed files with exact substrings from the rendered bundle — case and
+   backticks matter; a paraphrase grep gives a false negative.
+
+Installed content is an output. Never hand-edit `~/.pi/agent/**`, `~/.claude/**`,
+`~/.config/opencode/**`, a project-local equivalent, or a settings file: change the source and run
+`skillset sync`. A project agent that wants a change to owned content files a suggestion instead —
+one JSON object per line in `.skillset/suggestions.jsonl`
+(`{"target":"skills/<name>","change":"…","why":"…","evidence":"…","session":"…","at":"…"}`),
+which the developer triages in a skillset session. See ADR 0006 and
+the `instruction-ownership` skill.
 
 ## Tests
 

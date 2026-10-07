@@ -69,3 +69,25 @@ export interface SkillsetState {
   version: 1;
   installs: InstallRecord[];
 }
+
+/**
+ * One install the repository declares for a skill, read from
+ * `skillset.config.json`. A skill may declare several: the deliberate setup is
+ * that `architect`, `caveman`, `ponytail` and `commit-suggestion` are installed
+ * as *both* a slash prompt and an auto skill (ADR 0005), which the state model
+ * could not represent until records became mode-scoped.
+ */
+export interface InstallDeclaration {
+  skill: string;
+  agent: AgentName;
+  mode: Mode;
+  scope: Scope;
+  /** Required for `local` declarations; absent for `global`. */
+  projectPath?: string;
+}
+
+/** Shape of the repository-level declarations file. */
+export interface Declarations {
+  version: 1;
+  installs: InstallDeclaration[];
+}

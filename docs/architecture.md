@@ -11,7 +11,8 @@ Four layers: a CLI shell, command orchestrators, agent-agnostic core primitives,
   - `frontmatter` / `template` — render a restricted YAML subset by hand; substitute `{{key}}` config placeholders.
   - `markers` — wrap / remove / extract `skillset:begin…end` blocks in shared files.
   - `bundle` — enumerate and load bundled skills + their `templates/` and `assets/`.
-  - `state` — read/write the install registry; match/upsert/remove records.
+  - `state` — read/write the install registry; match/upsert/remove records keyed by `(skill, agent, scope, mode, projectPath)`.
+  - `declarations` — read and validate `skillset.config.json` (which skill belongs in which harness directory), and classify every declared install against both the state file and the disk: `in-sync` / `drifted` / `missing` / `adoptable` / `foreign` / `undeclared`. Reuses each target's `preview`, so the compared bytes come from the same renderer an install uses.
   - `active` — per-session active-skill store at `~/.skillset/active/<session-key>.json` (toggle/list helpers); session id or project-hash fallback. Backs `track`/`status` (see ADR 0002).
   - `statusline` — shared no-clobber add/remove for the singular `statusLine` settings field (Claude Code + Copilot CLI; see ADR 0003 / decision 9).
   - `locations` — per-agent path layout for each (mode, scope).
@@ -23,6 +24,7 @@ Four layers: a CLI shell, command orchestrators, agent-agnostic core primitives,
 
 - **install** — CLI → `install` loads the bundled skill (`bundle`), applies config, then for each agent calls `targetFor(agent).install(ctx)`. The target renders agent-specific frontmatter and writes per-skill files and/or a marker block in an anchor file (`fs`, `markers`, `locations`), returning an `InstallRecord` that `state` persists to `state.json`.
 - **update** — for each record, reload the skill and call `target.preview(ctx, record)` to compare on-disk bytes vs would-write bytes. Unchanged → re-install silently; diverged (local edits) → prompt / skip / overwrite per flags and TTY.
+- **sync** — read `skillset.config.json`, classify every declared install (`declarations`), then act per status: install what is `missing`, record an `adoptable` artifact whose bytes already match without rewriting it, repair `drifted` from source while reporting the prior content, refuse a `foreign` file (exit non-zero), and report `undeclared` records (`--prune` removes them). `--dry-run` classifies and writes nothing. Every write path renders through `applyConfigToSkill`, so a skill with `config:` placeholders compares against its substituted bytes.
 - **uninstall** — replay the record to remove exactly what was written: delete files (including recorded `assets`), strip the named marker block, drop the SessionStart hook entry, and remove the `statusLine` only if it's still ours (decision 9). Never touches unrecorded content.
 - **track / status / reset** — `track <skill> [on|off]` toggles the per-session active set via `core/active`; the indiscriminate write surfaces (opencode plugin, pi extension, Copilot hook) pass `--known-only` so only installed skills are recorded. `status` prints the active set (reading the session id from a `--session` flag or a statusline stdin payload). `reset` clears the set when the agent compacts or clears the conversation — wired per agent: Claude `SessionStart` `clear|compact` hook, Copilot `preCompact` hook, the opencode plugin's `session.compacted` event, the pi extension's `session_compact`/`session_shutdown`. See ADR 0002.
 
