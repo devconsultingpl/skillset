@@ -408,7 +408,7 @@ The file was restored and rebuilt. Without that run, "the refusal works" would h
 
 ### Slice-2c status — 2026-10-07
 
-Implemented, tested, and measured; **not committed** — the commit message is drafted and the developer runs it. 2b remains unauthorised, and its prerequisite is now closer to solved: the matrix states exactly which fields the review can carry per harness, so the skill-versus-command decision (claude-code `auto`, which has a directory for `review-range.mjs`, versus `slash`, which has none) can be made from data rather than from a reading.
+Implemented, tested, measured, and **committed** — `c8cc22d`, carried forward into `7eb7f75` with 2b. *(Superseded the same day: this entry first read "not committed"; the developer ran both messages before the next session.)* 2b's prerequisite was solved in the same session: the matrix states exactly which fields the review can carry per harness, so the skill-versus-command decision (claude-code `auto`, which has a directory for `review-range.mjs`, versus `slash`, which has none) can be made from data rather than from a reading.
 
 ### Implementation session — slice 2b — 2026-10-07
 
@@ -471,7 +471,7 @@ The arithmetic is explained, not asserted: the sandbox holds exactly 10 claude c
 | pi-extensions additions | not estimated | +144 across 15 tracked files, plus the renamed `flow-remediate/SKILL.md` (76) and a 33-line fixture | reported |
 | new runtime modules / dependencies | 0 / 0 | 0 / 0 | met |
 
-**Per-file logic, skillset (2c and 2b together, uncommitted):** `src/core/frontmatter.ts` +39/−17 (the nested renderer), `src/core/declarations.ts` +9/−8 (the mode-union fix), `src/commands/install.ts` +7/−1 and `src/commands/sync.ts` +8/−1 (the corrected call sites).
+**Per-file logic, skillset (2c and 2b together, committed as `c8cc22d` + `7eb7f75`):** `src/core/frontmatter.ts` +39/−17 (the nested renderer), `src/core/declarations.ts` +9/−8 (the mode-union fix), `src/commands/install.ts` +7/−1 and `src/commands/sync.ts` +8/−1 (the corrected call sites).
 
 **The body-size judgment, stated rather than buried.** 211 lines is below the 300-420 estimate because the port keeps the *method and the dispatch contract* and drops FLOW's choreography: the three-wave dispatch order, the Discovery Map's internal format spec, the five literal agent prompt bodies, the advisor integration, and the read-economy rules. Everything AC-1 names is present, and the checks that matter (citation contract, in-scope rule, verification tags, `blockers_count`) are intact — but a harness whose specialists are thinner than FLOW's receives a thinner review than FLOW's bundled agents delivered. If the developer wants that fidelity back, it is a second pass over the same file, and it should be asked for rather than slipped in.
 
@@ -479,7 +479,7 @@ The arithmetic is explained, not asserted: the sandbox holds exactly 10 claude c
 
 ### Slice-2b status — 2026-10-07
 
-Implemented, both suites green, not committed. Two commits are drafted — one per repository — and the developer runs them. The two-copy window for `review-range.mjs` is **closed**: FLOW's copy, its test and the template are gone. AC-3 is satisfied in intent and deviated in letter (FLOW keeps its renamed repair arm); AC-6 is satisfied in effect but not untouched: `PIPELINE_POINTER` changed text (`remediate` → `flow-remediate`) while its token surface did not move, which `token-surface.test.ts` confirms still passes without a re-pin.
+Implemented, both suites green, and **committed** — `7eb7f75` here, `4b66b55` in `pi-extensions`. The two-copy window for `review-range.mjs` is **closed**: FLOW's copy, its test and the template are gone. AC-3 is satisfied in intent and deviated in letter (FLOW keeps its renamed repair arm); AC-6 is satisfied in effect but not untouched: `PIPELINE_POINTER` changed text (`remediate` → `flow-remediate`) while its token surface did not move, which `token-surface.test.ts` confirms still passes without a re-pin.
 
 ## Decisions
 
@@ -736,6 +736,8 @@ No `drifted`, `missing` or `foreign` row appeared, and nothing was written. The 
 
 **Not yet done.** 2b (the review family moves here; FLOW's copies deleted) and 2c (per-target field support and the missing-renderer report) have **no go**, and 2b now has a prerequisite gap to close: `code-review` declares only `slash` installs, so its declared helper has no directory to travel into. If 2c runs first it decides which frontmatter fields the review must carry per harness — including whether claude-code takes the review as a skill (`auto`, which has a directory for the helper) rather than a command. Both slices still carry the two-copy window for `review-range.mjs` opened here.
 
+> **Superseded — 2026-10-07, the same day.** 2c and 2b were both built and are green; the two-copy window is closed. Read the 2b and 2c entries below, not this paragraph, for the current state.
+
 The parallel `pi-extensions` audit (plan 0017 step 1: all 13 tool-declaring packages, zero production code) was started from this session in the background; its result is reported separately and is not part of this repository's state.
 
 ### Slice-2a sign-off — 2026-10-07
@@ -756,20 +758,172 @@ The developer said go on 2c after the slice-3 inventory session, and answered th
 
 The developer said go on 2b with slash commands preferred for claude-code, and settled two forks the plan had left open: FLOW's repair arm is **renamed `flow-remediate`** rather than deleted (the two `remediate` bodies are different capabilities sharing a name), and the review declares **pi auto + pi slash + claude-code slash**. The session's record — the three prerequisites it uncovered (the frontmatter renderer refusing the nested `contract:`, 2c's per-mode false positive on `fieldSupport`, and two pi-extensions harnesses validating a configuration the move had made obsolete), the measured budget, and the honest note on the 211-line body against the 300-420 estimate — is in the entries above rather than restated here. Gates: skillset 26 files / 259 tests and biome clean; pi-extensions `pnpm -r run test` green across all 16 packages. The end-to-end claim was re-verified by execution (`buildUserSkillContracts` reading the installed skill, and claude-code's loader counting exactly our 10 commands and 1 skill dir). Nothing committed; two messages are drafted, one per repository. AC-3 is deviated from in letter (FLOW keeps a renamed repair arm) and AC-6 in method (the pointer's text changed; its token surface did not).
 
+### Sign-off — slices 2c and 2b — 2026-10-07
+
+Both slices are committed: `c8cc22d` (2c alone) and `7eb7f75` (2b, carrying 2c's frontmatter work forward) in this repository, `4b66b55` in `pi-extensions`. Confirmed by `git log` in the following session — this document's "not committed" statements were the only stale thing left, and they are corrected above.
+
+Re-verified by execution in that session, on the committed state, rather than restated: `npm run build` + `npm test` → **26 files / 259 tests**; `npx biome check .` → 68 files clean; `git status --short` in `pi-extensions` clean. Structure confirmed present: `src/skills/code-review/` (211-line body, `_helpers/review-range.mjs`, `_helpers/review-range.test.ts`, `templates/review.md`), `skillset.config.json` declaring both siblings and `requires.code-review.pi = ["contract"]`, `packages/flow/skills/code-review/` absent, `flow-remediate/` present.
+
+**The gap the commits left: propagation had not run.** `node dist/cli.js sync --dry-run` against the real home:
+
+```
+drifted    code-review → claude-code (slash, global)  ~/.claude/commands/sk-code-review.md   (43-line body → 211)
+drifted    code-review → pi (slash, global)           ~/.pi/agent/prompts/sk-code-review.md  (43-line body → 211, + contract:)
+missing    code-review → pi (auto, global)            ~/.pi/agent/skills/code-review/SKILL.md (+ both declared siblings)
+checked drifted 2 · missing 1 · undeclared 8 · in-sync 29      (exit 0)
+```
+
+A committed source change is not a propagated one. Until `skillset sync` runs, this machine serves the old 43-line review from both prompt files **and** holds no user-installed `code-review` skill — which, with FLOW's bundled copy deleted by `4b66b55`, is decision 4's documented failure mode (`produces-without-outcome`, `route-reads-unvalidated-data`) rather than a silent one. Both installs are reported `drifted`, not `foreign`: the destinations are ours and the rewrite is the intended repair, so `sync` repairs them without `--force`.
+
+Lesson for every later slice: a slice that changes a committed skill ends by running `sync` and recording its report, not by assuming the commit reached the home. 2c's `requires` gate makes that mandatory anyway — a declared required field with no renderer refuses the install — but nothing here fails when a *stale* install is still in place, which is why the dry run is the check.
+
+**Propagation run, and verified by execution — same session, at the developer's go.**
+
+```
+$ node dist/cli.js sync                                    (exit 0)
+reconciled drifted 2 · missing 1 · undeclared 8 · in-sync 29 · 3 written
+$ node dist/cli.js sync --dry-run                          (exit 0)
+checked undeclared 8 · in-sync 32                          # nothing drifted, missing or foreign
+```
+
+What `sync` wrote: both slash prompts re-rendered from the 211-line source (the pi one gaining `argument-hint`, `disable-model-invocation` and the `contract:` block, the claude-code one gaining the new description and body), and `~/.pi/agent/skills/code-review/` created with `SKILL.md` + the two declared siblings. The 8 `undeclared` records are the project-local claude-code installs slice 1 already documented; untouched, as intended.
+
+Three checks confirm the write is real rather than reported:
+
+1. **The gate's schema now reaches FLOW from the installed skill** — FLOW's own harvester, jiti-imported and pointed at the real agent dir: `buildUserSkillContracts()` → 1 contract, `code-review`, `artifactKind: review`, `required: ["blockers_count"]`, `world: working-tree`. Before `sync` this returned nothing, because the destination did not exist.
+2. **The installed helper runs from the installed location** — `node ~/.pi/agent/skills/code-review/_helpers/review-range.mjs "file:README.md"` inside this repository prints `default_branch: main / strategy: tree / files_list: README.md`, exit 0. AC-5's mechanism, on the real home rather than a sandbox.
+3. **Both siblings are byte-identical to the bundle source** — `diff` over `_helpers/review-range.mjs` and `templates/review.md` reports no difference, so the copy step did not reformat or re-encode anything.
+
+**Finding recorded, not fixed.** The classifier's drifted message reads *"edited locally; rewriting from source"*, but these two destinations were never edited locally — the **source** moved and the destination was stale. It cost nothing here, and it is the wrong diagnosis for the common case this program is built around (skillset changes, installs follow), so the wording should distinguish *local divergence* from *stale against a changed source* — a report-vocabulary change against criterion 5, needing its own go rather than a drive-by edit.
+
+### Go state — 2026-10-07
+
+Nothing is authorised. The three open questions, unchanged and in the handoff's order: **(a)** the body-fidelity call on the 211-line portable review — **now scoped as 2d below, awaiting go**; **(b)** `allowed-tools` left undeclared on claude-code, a permission-widening choice awaiting an answer rather than a default; **(c)** slice 3, whose first step (3a) is the agent-definition concept. The propagation step above is not a design question and is **done** — the developer's go was `skillset sync`, its outcome and verification are in the sign-off entry.
+
+### Scoped and awaiting go — 2d: restore the review body's fidelity — 2026-10-07
+
+The developer chose the body-fidelity call (open question (a)) and asked for it scoped before a line is written. This is that scope. **No go yet.**
+
+#### Goal
+
+The portable body is 211 lines against 2b's 300-420 estimate, and the gap is not evenly spread: the port kept the *method* and the dispatch contract, and lost the **specification** half. Artifacts the body still names are no longer defined, and the per-pass output contracts that made a pass's work checkable are gone. 2d restores the specification — enough that an independent harness runs this review as completely as FLOW's bundled agents did, without the reader re-inventing what a Discovery Map is. It does **not** restore the choreography, which was never the thin part.
+
+#### What was dropped — measured, not remembered
+
+Method, so it can be re-run: take 2b's deleted source (`git show 4b66b55^:packages/flow/skills/code-review/SKILL.md`, **573** lines), normalise both files line-by-line, and keep the v1 lines with no near-match in the portable body (difflib, cutoff 0.75). **355 of 574 lines** have no counterpart — most of that is FLOW's prose style, but six groups are substantive:
+
+| dropped | v1 shape | portable today |
+|---|---|---|
+| **Discovery Map format** | a `#### Discovery Map` block, 35 lines: header fields, the clustering rule, a 6-row role-tag table, the symbols-touched heuristic | named three times (lines 50, 109, 115) and **never specified**; the single sentence at 109 is the entire definition |
+| **Role-tag precedence** | 6 tags, "one tag per file, first match wins", `[test]` ordered before `[config]` before `[hub]` | one *processing-order* list (line 85) — classification and ordering are conflated, so a test file that also matches `[config]` mistags |
+| **Per-pass output contracts** | peer-mirror rows `peer_site \| new_site \| status \| delta` under `### Peer pair: <new> ↔ <peer>`; gap-finder `G<ordinal> — file:line — \`<line>\` — {role-tag} — <risk class>`; verifier `FINDING <id> \| <tag> \| <justification>`; the dependencies lens's 7-item enumeration; the CVE and precedents return shapes | compressed to prose — the emit strings and headings are gone, so the same work produces differently shaped evidence per run, and reconciliation has less to reconcile |
+| **Derived flags** | `LockstepSelfReview` (3 refs), `TreeInputMode`, intra-folder peers for a tree review, `PeerPairs` heuristics (stem similarity ≥60%, `I<Name>` ↔ `<Name>`, both-new exclusion) | `LockstepSelfReview` **0 refs** — while "lockstep-contract violation" survives in Step 5's severity rules (line 168): a **dangling reference**; `InScopeFiles` 8→2, `PeerPairs` 7→3 |
+| **Artifact metadata derivation** | `date` / `author` / `repository` / `branch` / `commit` derived via `_shared/now.mjs` + `git-context.mjs` | dropped together with the `_shared` call sites — but `templates/review.md` still carries all five frontmatter fields and nothing says where their values come from |
+| **Read economy, file orientation, isolation rationale** | "issue a `Read` only when (a)/(b)"; "hunks are evidence *within* a file's analysis, never the unit of analysis"; lens output under `### file/path.ext`; the DO-NOT-paste list, the self-check, and the observed failure mode (≈5× speedup with hallucinated findings and mis-cited lines) | the `-U30` / `-U10` / never-`-U0` rule survives (line 77); the orientation invariant and the enforcement list do not — one sentence at line 50 carries the rule without its teeth |
+
+**Two defects the diff surfaces, both cheap and both real:** the **dangling reference at line 54** — "ask one clarifying question with the same four options below", where v1's four options (A) branch-vs-default → `auto`, (B) staged + unstaged → `modified`, (C) unstaged → `working`, (D) restate → free text, were never carried over (the table below line 54 is the 8-row translation table, not those four); and the **`LockstepSelfReview` reference** above.
+
+#### Acceptance criteria
+
+1. Every artifact or flag the body names is **defined where it is used** — `Discovery Map`, `InScopeFiles`, `ManifestChanged`, `PeerPairs`, `HasGatingPredicate`, `ReviewType` each have a definition, not only a use. Checked by grep per token, with the definition cited.
+2. The Discovery Map is specified: header fields, clustering rule, symbols-touched hint, and a role-tag **classification** table with first-match-wins precedence, distinct from processing order.
+3. Each analysis pass states its own output shape (heading plus row/emit format) beside the pass, and the verifier's per-finding row format is restored.
+4. `LockstepSelfReview` has a derivation, **or** its reference in Step 5 is removed — no dangling reference in either direction, and the same check applied to the four clarifying options at line 54.
+5. The artifact's frontmatter values are derivable with plain `git` and `date` commands written in the body — no `${SKILL_DIR}`-relative sibling script, no `_shared` call.
+6. No pi-only tool name appears in the body — `advisor`, `ask_user_question`, `todo`, `flow-*`, `Write(` — checked by grep. Harness-specific dispatch stays parameterised as it is today.
+7. Wave-1/2/3 vocabulary is **not** restored; the flattened orientation → lens → coverage structure keeps its existing barriers.
+8. Body lands in **300-360 lines** — restored text is specification, not narrative; a body that hits 400 by padding fails this criterion even though 400 is inside 2b's original estimate.
+9. `templates/review.md` stays byte-identical (moved verbatim in 2b; its shape already matches the restored contracts).
+10. Gates stay green: `npm run build` → `npm test` → `npx biome check .`; a real-home `sync --dry-run` then reports the three `code-review` installs as the only drift, and a real `sync` re-installs them.
+
+#### Budget
+
+- **One file**: `src/skills/code-review/SKILL.md`, expected **+90-150 physical lines** (211 → 300-360), of which the restore itself is the whole of it — no new section is invented, each restored block has a v1 counterpart.
+- `docs/conventions.md`: **0-5 lines**, only if the portability rule ("a portable body names no harness tool") is not already implied by the subagent-dispatch rule 2b added. No other doc, no ADR: this restores a decision the plan already recorded.
+- **No new runtime file, no dependency, no config change, no sibling, no `skillset.config.json` edit.** No size ratchet applies: the body-size warning fires only for `always`-mode artifacts (`src/commands/install.ts:84-95`) and `code-review` declares pi `auto` + pi `slash` + claude-code `slash`.
+- Measurement, as 2a/2b/2c each did: `wc -l` before and after, the mechanical diff re-run to show what residue is deliberate, and the three gates' output pasted into this plan.
+
+#### Decisions
+
+**Scope locked 2026-10-07: the full restore**, all six dropped groups plus both dangling-reference fixes and the parameterised adjudication rule below — 211 → 300-360 lines (criterion 8 unchanged). The two narrower options (core-only ≈285, minimal ≈245) were offered and declined; neither needs re-opening. Decision 2 stands as written unless struck; the alternative remains "drop adjudication entirely", which no longer removes anything but the inline dimension sweep.
+
+1. **Specification yes, choreography no.** v1's wave vocabulary returns nowhere, including its own wart — Wave-1 dispatching prompts "defined in Step 3 below", which puts a pass's contract in a different section from its dispatch. Each pass's contract goes beside the pass.
+2. **Adjudication is parameterised, not dropped.** v1's advisor path is pi's tool and cannot be named; the *inline* path beneath it (the 6-dimension sweep: data model / API surface / integration / scope / verification / performance) is harness-neutral and is what a harness without an advisor needs. Recommended: one short rule — "if this harness exposes an adjudication tool, flush findings, call it once, paste its prose verbatim as a blockquote; otherwise run the dimension sweep" — and no `advisor` identifier anywhere. **Strike this if you disagree; the alternative is dropping adjudication entirely.**
+3. **Role-tag classification is restored with its precedence; the existing ordering list stays as ordering only.** One table, two clearly different jobs.
+4. **`allowed-tools` is untouched by 2d** — it stays open question (b), and the restored body does not depend on it.
+
+**Road not taken.** Keeping v1 as a second body with the portable one as a fallback for thin harnesses — two bodies for one capability, which is the drift this program exists to remove. Padding to 400 lines to sit inside the original estimate — the estimate measured a body that had not yet been written; a smaller body that names everything is the better read.
+
+#### Confidence
+
+**~93%.** The inventory is mechanical and re-runnable, the target is measured against the estimate, and the constraints are checked: no size ratchet (`install.ts:84-95`), no config or sibling change, and every gate green before and after because no runtime path changes. The residual is judgment — how much of v1's per-pass prompt text is *method* rather than FLOW's reporting taste — plus decision 2, which is yours. Nothing here is authorised; the go is a separate step.
+
+### Implemented — 2d, the body-fidelity restore — 2026-10-07 (Review log)
+
+The developer gave **go** on the full restore as scoped. One file changed in this repository: `src/skills/code-review/SKILL.md`. Nothing else was touched — no config, no sibling, no template, no runtime path — and the body is the only reason any gate could move.
+
+**What was restored**, each block with a v1 counterpart rather than invented: the Discovery Map specification (header block, clustering rule, a first-match-wins role-tag table, the symbols-touched hint) and the separation of role-tag *classification* from *processing order*; per-pass output contracts — integration connections, the precedents row, the dependencies pass's seven-item enumeration, the advisory row, the peer-mirror row plus its `### Peer pair:` heading, the quality and security lenses' per-file sections and file order, the predicate-trace row, the gap-finder emit string, the verifier's `FINDING <id> | <tag> | <justification>` row, the summary block, and the follow-up rules; the derived flags `LockstepSelfReview`, `ReviewType`, `TreeInputMode`, the `PeerPairs` heuristics (stem ≥ 60%, interface/impl, shared suffix, both-new exclusion) and intra-folder peers; artifact frontmatter derived with plain `git` and `date` instead of the `_shared` scripts; the read-economy and file-orientation invariants; the isolation enforcement list with its self-check; and the parameterised adjudication rule, which names no harness tool. Both dangling references are closed — the four clarifying options are back at Step 1, and `LockstepSelfReview` has a derivation where it previously had only a reference. Also restored: the section-omission and not-emitted rules, the title-line annotations, and the security lens's *prefer false negatives* stance.
+
+**Measured against its budget.**
+
+| area | budget | measured | verdict |
+|---|---|---|---|
+| body | 211 → 300-360 lines | 211 → **301** (`git show HEAD:… \| wc -l` = 211) | met, by one line — see the note |
+| physical lines | +90-150 | **+108 / −18 = +90 net** | met |
+| files | one (`SKILL.md`) | one | met |
+| config / siblings / template / dependency | none | none (`templates/review.md` and `_helpers/review-range.mjs` show no diff) | met |
+| docs | 0-5 lines | **0** | met — the portability rule was already implied by 2b's dispatch rule |
+
+**The one-line note, stated rather than smoothed over.** The first pass landed at **299**, one line under the floor, because three restored items compressed into fewer physical lines than estimated. Rather than amend the criterion down, two genuine v1 items still outstanding were restored: the run's step index near the top of the body, and the security lens's adjacent-context precision (an added, modified or reworded adjacent line is in region; a pre-existing sink is not). Body 299 → **301**. The scope was not widened on the second pass; both items come from v1 and were already in the dropped-group inventory.
+
+**Criteria as built.**
+
+1. Holds — `Discovery Map` (7), `ChangedFiles` (7), `InScopeFiles` (2), `ManifestChanged` (3), `LockstepSelfReview` (2), `HasGatingPredicate` (3), `PeerPairs` (3), `ReviewType` (2), `TreeInputMode` (1), `patch_path` (2), `null_tree` (2), `blockers_count` (5) each have a definition at first use.
+2. Holds — `#### The Discovery Map` carries the header block, the clustering rule, the first-match-wins table (six rows, `[test]` before `[config]` before `[hub]`) and the symbols-touched hint; Step 1's ordering list now says explicitly that it is not the classification rule.
+3. Holds — each of the five orientation passes, both lenses, the predicate trace, the gap finder and the verifier states its own output shape beside the pass.
+4. Holds — `LockstepSelfReview` is derived at Step 1.4 and read by the dependencies pass; the four clarifying options (A)-(D) are restored at Step 1.1.
+5. Holds — five frontmatter values derived from `date -u`, `git remote get-url origin`, `git rev-parse --abbrev-ref HEAD`, `git rev-parse --short HEAD`, with `unknown` preferred to a guess for the author. No `${SKILL_DIR}`-relative script and no `_shared` call added.
+6. Holds — `grep -nE "\badvisor\b|\bask_user_question\b|\btodo\b|\bflow-[a-z]|Write\("` returns **nothing**. The adjudication rule is phrased generically ("if this session exposes an adjudication tool"), so the harness-specific step is described, not named.
+7. Holds — `grep -ni wave` returns nothing.
+8. Holds — 301 lines, in range.
+9. Holds — `templates/review.md` is byte-identical to `HEAD`'s copy (no diff).
+10. Holds, by execution:
+
+```sh
+npm run build && npm test      # 26 files / 259 tests passed
+npx biome check .              # 68 files clean
+node dist/cli.js sync          # exit 0 — 3 written
+node dist/cli.js sync --dry-run # checked undeclared 8 · in-sync 32
+```
+
+**Propagated and verified after the write, not assumed.** All three installed copies were `drifted` against the restored source and were repaired. The installed skill now carries `#### The Discovery Map`, `first match wins`, `LockstepSelfReview`, `FINDING <id>` and `Review type:` — each present exactly once in both the pi skill directory and the pi slash prompt, so the restored specification is live rather than merely committed. Regression checks on 2b's wiring both still hold on the real home: FLOW's harvester returns `code-review` with `required: ["blockers_count"]` and `artifactKind: review`, and `node ~/.pi/agent/skills/code-review/_helpers/review-range.mjs "file:README.md"` prints `default_branch: main / strategy: tree`. Both siblings remain byte-identical to their bundle sources.
+
+**What is deliberately left unrestored — classified, so the number is not a loose end.** Re-running the mechanical diff against v1: **327 of 574 lines** still have no counterpart (down from 355). Split: **189** are v1's indented literal per-agent prompt prose (the `subagent_type:` / `Prompt:` blocks the plan already treats as one implementation's choreography), **20** are wave vocabulary or its barriers, **22** are pi-only machinery (`${SKILL_DIR}`, `_shared/*` call sites, `$ARGUMENTS`, `shell-timeout: 10`, `## Metadata`, `advisor`), and **97** are other — mostly lines the restore *rewrote* rather than dropped (a line-level diff counts a reworded line as residue), plus v1's own headings. The judgment call is in the 189, and it is the same call 2b made: the method and its contracts are restored; the verbatim prompt prose is not part of the portable body.
+
+**Not yet done.** Nothing is committed. Both changed files are in this repository only.
+
 ## Handoff — prompt for the next session
 
 Paste this into a skillset session to continue. It assumes nothing that is not written above.
 
-> Continue the skillset instruction-ownership program. Read `docs/plans/0023-skillset-owns-instructions.md` in full first — it is the spec, and its slice-2 sections carry the decisions, budgets and evidence you need. Do not re-derive anything marked verified; it was checked by execution and the transcripts are in the plan. Read *Slice-2a sign-off*, *Implementation session — slice 2a* and *Measured against 2a* before touching anything: they carry the criteria as built, the measured overrun, and the three mistakes that session made first.
+> Continue the skillset instruction-ownership program. Read `docs/plans/0023-skillset-owns-instructions.md` in full first — it is the spec. Do not re-derive anything marked verified: it was checked by execution and the transcripts are in the plan. Before touching anything, read *Implementation session — slice 2b*, *Measured against 2b*, *Slice-2b status*, *Implementation session — slice 2c* and *Measured against 2c*: they carry the criteria as built, the measured budgets, the deviations, and the three prerequisites 2b uncovered.
 >
-> **State.** Slice 1 (`880fdfe`) and slice 2a (`7e65d1a`) are committed and signed off. **Slices 2c and 2b are implemented, green and uncommitted** — two messages are drafted, one per repository. 2c: each target declares the frontmatter it can carry (`TargetFrontmatter`, per mode) and the native commands it must not shadow; `install`/`sync` report every declared field a target cannot express; a `requires` entry with no renderer is an error that writes nothing; the `sk-` slug rule is checked against each target's recorded built-ins; `SKILLSET_CONFIG=<path>` is the test seam. 2b: the portable review lives here (211-line body, `_helpers/review-range.mjs`, `templates/review.md`, declared as pi `auto` + pi `slash` + claude-code `slash`, with `requires: {code-review: {pi: ["contract"]}}`); FLOW's copy is deleted; FLOW's repair arm is renamed `flow-remediate`; the two-copy window for the helper is **closed**. 2b also fixed three prerequisites it uncovered: the frontmatter renderer now handles nested mappings, `fieldSupport` judges expressibility across the modes an agent is installed in (it refused a required field outright otherwise), and FLOW's invariant helper now threads user-installed contracts like production does.
+> **State.** Slices 1 (`880fdfe`), 2a (`7e65d1a`), 2c (`c8cc22d`) and 2b (`7eb7f75` here, `4b66b55` in `pi-extensions`) are **all committed** — verified by `git log`, not by this file's prose, which still claimed "not committed" until the next session corrected it. Nothing is being rebuilt. **Propagation has run**: `skillset sync` re-rendered both stale slash prompts and installed `~/.pi/agent/skills/code-review/` with its two declared siblings, and the follow-up `--dry-run` reports `in-sync 32 · undeclared 8` with nothing drifted, missing or foreign. Verified after the write: FLOW's harvester returns `code-review` with `required: ["blockers_count"]`, and the installed helper runs from its installed location. See *Sign-off — slices 2c and 2b*. **2d (the body-fidelity restore) is implemented, measured and propagated — uncommitted**, two files in this repository (`src/skills/code-review/SKILL.md` 211 → 301, and this plan); read *Implemented — 2d* for the criteria as built, the budget table and the residue classification. Open question (a) is therefore **closed**; (b) and (c) remain open below.
 >
-> **Go state.** Nothing is authorised next. The open questions, in the order I would take them: **(a)** the body-fidelity call — 211 lines keeps the method and dispatch contract but drops FLOW's wave choreography and literal agent prompts; a second pass restores it (ask, don't assume); **(b)** `allowed-tools` for the review on claude-code was deliberately left undeclared, so runs prompt for Bash permissions they could pre-approve; **(c)** slice 3 — the inventory is written, the first step is the agent-definition concept (3a), which needs the same per-target dialect work 2c built for skills.
+> **What 2c landed.** Every target declares in one place the frontmatter it can express (per mode) and the native commands it must not shadow; `install` and `sync` report every declared field a target cannot express, naming field and consequence; a `requires` entry with no renderer is an error that writes nothing (`sync` exits 2 before its first write); the `sk-` slug rule is checked against each target's recorded built-ins; `SKILLSET_CONFIG=<path>` points a run at a scratch declarations file. Two things it needed beyond its budget: a nested-mapping frontmatter renderer (`src/core/frontmatter.ts` — a pi `contract:` block is an object), and its capability check fixed to judge expressibility across the modes an agent is installed in, not per artifact. **Do not regress either**: a per-mode check refuses a required field outright, and the renderer refuses objects without the recursion.
 >
-> **The dependency is live and documented.** `packages/flow/docs/skills.md` (*The review is a dependency*) states what happens with the review uninstalled: `/wf` loads, and the workflows dispatching a `code-review` stage report `produces-without-outcome` and `route-reads-unvalidated-data` at validation. That is the pinned failure mode, not a silent empty stage.
+> **What 2b landed.** The portable review lives in `src/skills/code-review/` — 211-line body, `_helpers/review-range.mjs`, `templates/review.md`, `_helpers/review-range.test.ts` — declared as pi `auto` + pi `slash` + claude-code `slash`, with `requires: {code-review: {pi: ["contract"]}}`. FLOW's copy is deleted, its repair arm is renamed `flow-remediate`, and the two-copy window for the helper is closed. Both suites are green: skillset 26 files / 259 tests; pi-extensions `pnpm -r run test` across 16 packages (flow 1781, flow-workflow 2573). The gate was re-verified by execution, not restated: `buildUserSkillContracts()` pointed at a sandboxed install returns `code-review` with `required: ['blockers_count']`.
 >
-> **Verification lesson for 2b.** AC-5 was proved by execution on the claude-code side (its own loader logged `project: 1` with our artifact and `project: 0` without it; authentication failed, so no model call happened and the log is the loader's). The opencode side **could not be** proved: its installed arm64 binary is `invalid signature` and is SIGKILLed on every invocation, so reinstall it before trusting anything about opencode's discovery. Copilot CLI is installed nowhere on this machine and stays doc-level; this target writes `mode: agent` into `.github/prompts/*.prompt.md` where VS Code's current reference documents `agent:`.
+> **Go state — nothing is authorised.** The open questions, in the order I would take them:
 >
-> **Rules that are not negotiable.** Gates: `npm run build` *before* `npm test` (tests spawn `dist/cli.js`), then `npx biome check src test`. Commit messages are drafted, never run, and carry no trailers of any kind. Never hand-write into `~/.pi/agent/**`, `~/.claude/**`, `~/.config/opencode/**` or an installed copy — change the source and run `skillset sync`. Never re-introduce a raw-bundle render: every write and comparison path renders through `applyConfigToSkill`. A copied sibling is foreign-runtime code like `assets/`: excluded from `biome` and `tsc` (`src/skills/**/_helpers/**`) and never reformatted — the 2a session lost a round to `biome check --write` rewriting the payload. Keep the plan's acceptance criteria and budget current as you go, and report honestly, including failures.
+> **(a) The body-fidelity call.** The portable body is 211 lines against the plan's 300-420 estimate. It keeps the method and the dispatch contract and drops FLOW's three-wave choreography, the Discovery Map's format spec, and the five literal agent prompt bodies. Everything AC-1 names is present, but a harness whose specialists are thinner than FLOW's gets a thinner review than FLOW's bundled agents gave. A second pass over that one file restores the fidelity — **ask for the decision, do not assume it.**
 >
-> **Parallel workstream (separate session, `pi-extensions`) — step 1 done, step 2 not authorised.** `docs/plans/0017-context-economy-load-on-demand.md` now carries `## Step 1 — measured 2026-10-07`: 1,483 estTokens across the 13 tool-declaring packages against the 1,412 baseline from 2026-09-30, every surface classified `every-session`/`per-turn`/`on-demand`, 27 activation claims checked (8 Falsified, 4 Weakened, 1 Unverified), and a step-2 budget F1-F8. Two verified facts to carry forward: the `pi-subagents` pin is **not hermetic** — it renders `~/.pi/agent/agents` into its own tool schema, so with an empty `HOME` the test fails (2389 → 2146 schema bytes, ≈243 bytes of it FLOW's 15 agent descriptions) — and ≈234 estTokens/request of per-turn surface is pinned by nothing (`flow-args/args.ts:468` 170t, `flow-workflow/docs-protocol.ts:92` 64t, both packages pinning `estTokens: 0`). F1/F2 remove that per-turn cost, F5 up to ≈295 t/session, F6 repairs 10 stale or falsified claims, F7/F8 are the two confirmed defects (`isolated: true` inert on 14 agent files; `BUNDLED_SKILL_NAMES`'s docstring naming a consumer that does not exist). Nothing there is authorised yet — ask.
+> **(b) `allowed-tools` on claude-code was left undeclared deliberately**, so a review run prompts for Bash permissions it could pre-approve. It is a permission-widening choice; it should be answered, not defaulted.
+>
+> **(c) Slice 3 is parked but inventoried** (*Slice 3 — one place for instructions, one place per harness for extensions*). Its first step, **3a**, is the agent-definition concept: skillset gains the ability to render a subagent definition per harness, which needs the same per-target dialect work 2c built for skills — pi parses `display_name`, `description`, `tools`, `model`, `thinking`, `max_turns`, `prompt_mode`, `inherit_context`, `run_in_background`, `enabled`, and 14 of FLOW's files also declare `isolated: true`, which nothing parses. The roster stays FLOW's until that exists.
+>
+> **Rules that are not negotiable.** Gates — skillset: `npm run build` *before* `npm test` (tests spawn `dist/cli.js`), then `npx biome check .`; pi-extensions: `pnpm -r run test` from the workspace root (there is no root `npm test`). Commit messages are drafted, never run, and carry no trailers of any kind. Never hand-write into `~/.pi/agent/**`, `~/.claude/**`, `~/.config/opencode/**` or an installed copy — change the source and run `skillset sync`. Never re-introduce a raw-bundle render: every write and comparison path renders through `applyConfigToSkill`. A copied sibling or template is foreign-runtime content like `assets/`: excluded from `biome` and `tsc` (`src/skills/**/_helpers/**`, `templates/**`, `assets/**`) and never reformatted — running `biome check --write` over a payload has already cost one session a round. Keep the plan's acceptance criteria and budget current as you go, and report honestly, including failures.
+>
+> **Verification methods, learned this session — use them rather than reading.** claude-code's *own* loader is checkable: `HOME=<temp> claude --debug-file /tmp/x.log -p "…"`, then read `Loading skills from:`, `Loaded N unique skills (… user: N, …, legacy commands: N)` and `getSkills returning:`. Authentication failing does not matter — no model call means the log is the loader's, which is stronger evidence than a model's claim. FLOW's contract path is checkable the same way: `PI_CODING_AGENT_DIR=<temp>/.pi/agent` plus jiti-importing `extensions/flow-core/skill-contracts-source.ts` and reading `buildUserSkillContracts()`. **opencode cannot be verified on this machine** — its arm64 binary is `invalid signature` and SIGKILLed on every invocation, so a reinstall is the first step before trusting anything about its discovery. Copilot CLI is installed nowhere here and stays doc-level; note that this target writes `mode: agent` into `.github/prompts/*.prompt.md` where VS Code's current reference documents `agent:` — a finding recorded, unfixed, in the 2c entries.
+>
+> **Parallel workstream (separate session, `pi-extensions`) — step 1 done, step 2 not authorised.** `docs/plans/0017-context-economy-load-on-demand.md` carries `## Step 1 — measured 2026-10-07`: 1,483 estTokens across the 13 tool-declaring packages against the 1,412 baseline from 2026-09-30, every surface classified `every-session`/`per-turn`/`on-demand`, 27 activation claims checked (8 Falsified, 4 Weakened, 1 Unverified), and a step-2 budget F1-F8. Two verified facts to carry forward: the `pi-subagents` pin is **not hermetic** — it renders `~/.pi/agent/agents` into its own tool schema, so with an empty `HOME` the test fails (2389 → 2146 schema bytes, ≈243 bytes of it FLOW's 15 agent descriptions) — and ≈234 estTokens/request of per-turn surface is pinned by nothing (`flow-args/args.ts:468` 170t, `flow-workflow/docs-protocol.ts:92` 64t, both packages pinning `estTokens: 0`). F1/F2 remove that per-turn cost, F5 up to ≈295 t/session, F6 repairs 10 stale or falsified claims, F7/F8 are the two confirmed defects. Nothing there is authorised yet — ask.
