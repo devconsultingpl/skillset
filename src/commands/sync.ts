@@ -10,12 +10,13 @@
  */
 import { homedir } from "node:os";
 import pc from "picocolors";
-import { BRIDGE_NAMES, bridgeFor, requireBridge } from "../bridges/index.js";
-import { loadBundledSkill } from "../core/bundle.js";
+import { AGENT_BRIDGE_NAMES, BRIDGE_NAMES, bridgeFor, requireBridge } from "../bridges/index.js";
+import { loadBundledAgent, loadBundledSkill } from "../core/bundle.js";
 import {
   type ClassifiedInstall,
   type InstallStatus,
   STATUS_ORDER,
+  agentFieldSupport,
   classifyAll,
   declarationCoverage,
   declaredModes,
@@ -72,7 +73,8 @@ function describe(item: ClassifiedInstall): string {
   const { declaration } = item;
   const scope =
     declaration.scope === "local" ? `local:${declaration.projectPath ?? "?"}` : "global";
-  return `${declaration.skill} → ${declaration.agent} (${declaration.mode}, ${scope})`;
+  const delivery = declaration.kind === "agent" ? "agent" : declaration.mode;
+  return `${declaration.skill} → ${declaration.agent} (${delivery}, ${scope})`;
 }
 
 function indent(text: string): string {
@@ -100,7 +102,13 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
   const { declarations, siblings, requires, problems } = await loadDeclarations();
   const coverage =
     declarations.length > 0
-      ? await declarationCoverage(declarations, siblings, requires, BRIDGE_NAMES)
+      ? await declarationCoverage(
+          declarations,
+          siblings,
+          requires,
+          BRIDGE_NAMES,
+          AGENT_BRIDGE_NAMES,
+        )
       : [];
   const allProblems = [...problems, ...coverage];
   if (allProblems.length > 0) {
@@ -117,6 +125,22 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
   // artifact.
   const supportErrors: string[] = [];
   for (const declaration of declarations) {
+    const bridge = bridgeFor(declaration.agent);
+    if (!bridge) {
+      supportErrors.push(`${declaration.skill} → ${declaration.agent}: unknown harness`);
+      continue;
+    }
+    const required = requires[declaration.skill]?.[declaration.agent] ?? [];
+    if (declaration.kind === "agent") {
+      const support = agentFieldSupport(
+        await loadBundledAgent(declaration.skill),
+        bridge,
+        required,
+      );
+      for (const warning of support.warnings) console.error(pc.yellow("warning"), warning);
+      supportErrors.push(...support.errors);
+      continue;
+    }
     const declared = applyConfigToSkill(await loadBundledSkill(declaration.skill));
     const modes = declaredModes(
       declarations,
@@ -124,16 +148,11 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
       declaration.agent,
       declaration.scope,
     );
-    const bridge = bridgeFor(declaration.agent);
-    if (!bridge) {
-      supportErrors.push(`${declaration.skill} → ${declaration.agent}: unknown harness`);
-      continue;
-    }
     const support = fieldSupport(
       declared,
       bridge,
       modes.length > 0 ? modes : [declaration.mode],
-      requires[declaration.skill]?.[declaration.agent] ?? [],
+      required,
     );
     for (const warning of support.warnings) console.error(pc.yellow("warning"), warning);
     supportErrors.push(...support.errors);
@@ -208,14 +227,36 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
     }
 
     const declaration = item.declaration;
+    const bridge = requireBridge(declaration.agent);
+    const target = declaration.projectPath ?? projectRoot;
+    if (declaration.kind === "agent") {
+      const capability = bridge.agents;
+      if (!capability) {
+        // Coverage already refuses this before the first write; the branch keeps
+        // the invariant local rather than trusting a non-null assertion.
+        console.error(
+          pc.red("error"),
+          `${declaration.skill} → ${declaration.agent}: cannot install agent definitions (no renderer)`,
+        );
+        return 2;
+      }
+      const record = await capability.install({
+        agent: await loadBundledAgent(declaration.skill),
+        scope: declaration.scope,
+        projectRoot: target,
+      });
+      state = upsertInstall(state, record);
+      changed += 1;
+      continue;
+    }
     // Same render path as `install`: config placeholders are substituted at
     // write time, so sync must not write the raw bundle.
     const skill = applyConfigToSkill(await loadBundledSkill(declaration.skill));
-    const record = await requireBridge(declaration.agent).install({
+    const record = await bridge.install({
       skill,
       scope: declaration.scope,
       mode: declaration.mode,
-      projectRoot: declaration.projectPath ?? projectRoot,
+      projectRoot: target,
       siblings: siblings[declaration.skill] ?? [],
     });
     state = upsertInstall(state, record);
@@ -262,7 +303,7 @@ export async function classifyReport(
   const { declarations, siblings, problems } = await loadDeclarations();
   const coverage =
     declarations.length > 0
-      ? await declarationCoverage(declarations, siblings, {}, BRIDGE_NAMES)
+      ? await declarationCoverage(declarations, siblings, {}, BRIDGE_NAMES, AGENT_BRIDGE_NAMES)
       : [];
   const state = await readState();
   const items = await classifyAll(declarations, state, bridgeFor, siblings);

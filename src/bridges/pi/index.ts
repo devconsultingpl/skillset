@@ -1,12 +1,12 @@
 import { readFile, rm } from "node:fs/promises";
-import { dirname, join, relative } from "node:path";
-import type { Bridge, InstallContext } from "../../core/bridge.js";
+import { basename, dirname, join, relative } from "node:path";
+import type { AgentInstallContext, Bridge, InstallContext } from "../../core/bridge.js";
 import { assetPath } from "../../core/bundle.js";
 import { compose } from "../../core/frontmatter.js";
 import { copySiblings, readMaybe, writeAtomic } from "../../core/fs.js";
 import { MD, extract, remove, upsert } from "../../core/markers.js";
 import type { InstallRecord, Scope } from "../../core/types.js";
-import { artifactPath, extensionPath, layout, skillDirectory } from "./paths.js";
+import { agentPath, artifactPath, extensionPath, layout, skillDirectory } from "./paths.js";
 
 function targetOverrides(skill: InstallContext["skill"]): Record<string, unknown> {
   return skill.frontmatter.targets?.pi ?? {};
@@ -29,6 +29,12 @@ function renderPromptFile(ctx: InstallContext): string {
   // when invoked bare; carries e.g. `/sk-caveman off`, `/sk-commit-suggest fix auth`.
   const body = `${ctx.skill.body.trimEnd()}\n\nArguments: $@\n`;
   return compose({ description, ...rest }, body);
+}
+
+function renderAgentFile(ctx: AgentInstallContext): string {
+  const { name, description } = ctx.agent.frontmatter;
+  const overrides = ctx.agent.frontmatter.targets?.pi ?? {};
+  return compose({ name, description, ...overrides }, ctx.agent.body);
 }
 
 export const piBridge: Bridge = {
@@ -166,4 +172,56 @@ export const piBridge: Bridge = {
   // the core asks where an artifact goes, and never learns what a ".pi" is.
   artifactPath,
   skillDirectory,
+
+  agents: {
+    expresses: [
+      "display_name",
+      "description",
+      "tools",
+      "model",
+      "thinking",
+      "max_turns",
+      "prompt_mode",
+      "inherit_context",
+      "run_in_background",
+      "enabled",
+    ],
+
+    path: agentPath,
+
+    async install(ctx) {
+      const name = ctx.agent.frontmatter.name;
+      const path = agentPath({
+        name,
+        scope: ctx.scope,
+        projectRoot: ctx.projectRoot,
+      });
+      await writeAtomic(path, renderAgentFile(ctx));
+      return {
+        skill: name,
+        kind: "agent",
+        version: "",
+        agent: "pi",
+        scope: ctx.scope,
+        mode: "auto",
+        location: dirname(path),
+        files: [basename(path)],
+        projectPath: ctx.scope === "local" ? ctx.projectRoot : undefined,
+        installedAt: new Date().toISOString(),
+      } satisfies InstallRecord;
+    },
+
+    async uninstall(record) {
+      for (const rel of record.files) {
+        await rm(join(record.location, rel), { force: true });
+      }
+    },
+
+    async preview(ctx, record) {
+      const next = renderAgentFile(ctx);
+      const filePath = record.files[0] ? join(record.location, record.files[0]) : null;
+      const current = filePath ? await readMaybe(filePath) : null;
+      return { current, next };
+    },
+  },
 };

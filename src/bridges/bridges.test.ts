@@ -6,7 +6,13 @@ import { listBundledSkills, loadBundledSkill } from "../core/bundle.js";
 import { loadDeclarations } from "../core/declarations.js";
 import { fileExists } from "../core/fs.js";
 import { parseSkill } from "../core/parse.js";
-import { claudeCodeBridge, copilotBridge, opencodeBridge, piBridge } from "./index.js";
+import {
+  AGENT_BRIDGE_NAMES,
+  claudeCodeBridge,
+  copilotBridge,
+  opencodeBridge,
+  piBridge,
+} from "./index.js";
 
 const SKILL_SRC = `---
 name: confidence
@@ -197,6 +203,32 @@ describe("frontmatter capability matrix", () => {
     for (const target of targets) {
       for (const mode of target.supportedModes) {
         expect(target.frontmatter.expresses[mode], `${target.name} ${mode}`).toBeDefined();
+      }
+    }
+  });
+
+  it("declares an agent vocabulary only where the bridge can install agents", () => {
+    const withAgents = targets.filter((target) => target.agents !== undefined);
+    expect(withAgents.map((t) => t.name)).toEqual([...AGENT_BRIDGE_NAMES]);
+    for (const target of withAgents) {
+      expect(target.agents?.expresses.length, `${target.name} agent fields`).toBeGreaterThan(0);
+    }
+  });
+
+  it("installs no agent whose name shadows a native command", async () => {
+    // The same invariant the `sk-` slug rule gives skills, checked here for the
+    // agent kind rather than enforced at runtime (slice-3a decision 6): an agent
+    // file is addressed by its name, so a name that collides with a harness
+    // built-in would make the built-in unreachable.
+    const { declarations } = await loadDeclarations();
+    const agentNames = declarations.filter((d) => d.kind === "agent").map((d) => d.skill);
+    expect(agentNames.length).toBe(15);
+    for (const target of targets) {
+      for (const native of target.frontmatter.native ?? []) {
+        expect(
+          agentNames,
+          `${target.name} agent named after the built-in /${native}`,
+        ).not.toContain(native);
       }
     }
   });

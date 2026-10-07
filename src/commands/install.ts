@@ -1,8 +1,14 @@
 import pc from "picocolors";
 import { BRIDGE_NAMES, bridgeFor } from "../bridges/index.js";
 import { alwaysWarnLines, bodyLineCount } from "../core/body-size.js";
-import { loadBundledSkill } from "../core/bundle.js";
 import {
+  listBundledAgents,
+  listBundledSkills,
+  loadBundledAgent,
+  loadBundledSkill,
+} from "../core/bundle.js";
+import {
+  agentFieldSupport,
   classifyInstall,
   declaredModes,
   fieldSupport,
@@ -10,7 +16,17 @@ import {
 } from "../core/declarations.js";
 import { matchInstall, readState, upsertInstall, writeState } from "../core/state.js";
 import { applyConfigToSkill } from "../core/template.js";
-import type { BridgeName, InstallDeclaration, Mode, ParsedSkill, Scope } from "../core/types.js";
+import type {
+  ArtifactKind,
+  BridgeName,
+  InstallDeclaration,
+  InstallRecord,
+  Mode,
+  ParsedSkill,
+  RequiredFields,
+  Scope,
+  SkillsetState,
+} from "../core/types.js";
 import { MODES } from "../core/types.js";
 
 export interface InstallOptions {
@@ -95,6 +111,104 @@ function warnIfBodyLarge(body: string, skillName: string): void {
   }
 }
 
+interface AgentInstallDeps {
+  opts: InstallOptions;
+  projectRoot: string;
+  projectPath?: string;
+  requires: RequiredFields;
+  state: SkillsetState;
+}
+
+async function installAgentFor(
+  name: string,
+  harness: BridgeName,
+  deps: AgentInstallDeps,
+): Promise<{ status: "ok" | "skip" | "error"; record?: InstallRecord }> {
+  const { opts, projectRoot, projectPath, requires, state } = deps;
+  const target = bridgeFor(harness);
+  if (!target) {
+    console.error(
+      pc.red("error"),
+      `${name} → ${harness}: unknown harness (known: ${BRIDGE_NAMES.join(", ")})`,
+    );
+    return { status: "error" };
+  }
+  if (!target.agents) {
+    console.error(
+      pc.red("error"),
+      `${name} → ${harness}: ${harness} cannot install agent definitions (no renderer) — refusing a partial install`,
+    );
+    return { status: "error" };
+  }
+  if (opts.mode !== undefined && opts.mode !== "auto") {
+    console.error(
+      pc.red("error"),
+      `${name} → ${harness}: an agent has one delivery shape; \`--mode ${opts.mode}\` does not apply (declared mode: auto)`,
+    );
+    return { status: "error" };
+  }
+
+  const agent = await loadBundledAgent(name);
+  const support = agentFieldSupport(agent, target, requires[name]?.[harness] ?? []);
+  for (const warning of support.warnings) console.error(pc.yellow("warning"), warning);
+  if (support.errors.length > 0) {
+    for (const error of support.errors) console.error(pc.red("error"), error);
+    return { status: "error" };
+  }
+
+  const mode: Mode = "auto";
+  const key = {
+    skill: name,
+    kind: "agent" as ArtifactKind,
+    agent: harness,
+    scope: opts.scope,
+    mode,
+    projectPath,
+  };
+  const prior = state.installs.find((record) => matchInstall(record, key));
+  if (!opts.force) {
+    const classified = await classifyInstall(
+      {
+        skill: name,
+        kind: "agent",
+        agent: harness,
+        mode,
+        scope: opts.scope,
+        ...(projectPath ? { projectPath } : {}),
+      },
+      state,
+      target,
+    );
+    if (classified.status === "foreign") {
+      console.error(
+        pc.red("refusing"),
+        `${name} → ${harness} (agent, ${opts.scope}): ${classified.path ?? "destination"} exists and was not written by skillset (pass --force to replace)`,
+      );
+      return { status: "error" };
+    }
+  }
+  if (prior) {
+    const { current, next } = await target.agents.preview(
+      { agent, scope: opts.scope, projectRoot },
+      prior,
+    );
+    if (current !== null && current !== next && !opts.force) {
+      console.error(
+        pc.yellow("warning"),
+        `${name} → ${harness} (agent, ${opts.scope}) has local edits; overwriting from source`,
+      );
+    }
+  }
+
+  const record = await target.agents.install({ agent, scope: opts.scope, projectRoot });
+  console.log(
+    pc.green("installed"),
+    `${name} → ${harness}`,
+    pc.dim(`(agent, ${opts.scope}) ${record.location}`),
+  );
+  return { status: "ok", record };
+}
+
 export async function install(opts: InstallOptions): Promise<number> {
   const projectRoot = opts.projectRoot ?? process.cwd();
   const projectPath = opts.scope === "local" ? projectRoot : undefined;
@@ -102,7 +216,41 @@ export async function install(opts: InstallOptions): Promise<number> {
 
   let state = await readState();
   const { declarations, siblings, requires } = await loadDeclarations();
+  const [bundledSkills, bundledAgents] = await Promise.all([
+    listBundledSkills(),
+    listBundledAgents(),
+  ]);
   for (const skillName of opts.skills) {
+    const isSkill = bundledSkills.includes(skillName);
+    const isAgent = bundledAgents.includes(skillName);
+    if (!isSkill && !isAgent) {
+      failures += 1;
+      console.error(pc.red("error"), `${skillName}: no such skill or agent in the bundle`);
+      continue;
+    }
+    if (isSkill && isAgent) {
+      failures += 1;
+      console.error(
+        pc.red("error"),
+        `${skillName}: names both a skill and an agent; rename one rather than guessing which was meant`,
+      );
+      continue;
+    }
+    if (isAgent) {
+      for (const harness of opts.agents) {
+        const outcome = await installAgentFor(skillName, harness, {
+          opts,
+          projectRoot,
+          projectPath,
+          requires,
+          state,
+        });
+        if (outcome.status === "error") failures += 1;
+        if (outcome.record) state = upsertInstall(state, outcome.record);
+      }
+      continue;
+    }
+
     const raw = await loadBundledSkill(skillName);
     const skill = applyConfigToSkill(raw, opts.configOverrides);
     const declaredSiblings = siblings[skillName] ?? [];

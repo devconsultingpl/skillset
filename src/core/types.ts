@@ -10,6 +10,8 @@ export type Mode = "slash" | "auto" | "always";
 
 export const MODES: readonly Mode[] = ["slash", "auto", "always"] as const;
 
+export type ArtifactKind = "skill" | "agent";
+
 export type Scope = "global" | "local";
 
 export interface SkillFrontmatter {
@@ -27,6 +29,18 @@ export interface SkillFrontmatter {
 
 export interface ParsedSkill {
   frontmatter: SkillFrontmatter;
+  body: string;
+  source: string;
+}
+
+export interface AgentFrontmatter {
+  name: string;
+  description: string;
+  targets?: Partial<Record<BridgeName, Record<string, unknown>>>;
+}
+
+export interface ParsedAgent {
+  frontmatter: AgentFrontmatter;
   body: string;
   source: string;
 }
@@ -54,6 +68,7 @@ export interface SiblingFile {
 
 export interface InstallRecord {
   skill: string;
+  kind?: ArtifactKind;
   /** Slug used as the slash-command filename. May differ from `skill` (e.g. the
    * `sk-` prefix convention). Optional for backward compatibility with state
    * written before this field existed. */
@@ -99,6 +114,7 @@ export interface SkillsetState {
  */
 export interface InstallDeclaration {
   skill: string;
+  kind?: ArtifactKind;
   agent: BridgeName;
   mode: Mode;
   scope: Scope;
@@ -158,3 +174,5 @@ export const SKILLSET_FIELDS: readonly string[] = [
   "config",
   "targets",
 ];
+
+export const SKILLSET_AGENT_FIELDS: readonly string[] = ["name", "description", "targets"];

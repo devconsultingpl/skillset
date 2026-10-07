@@ -20,6 +20,10 @@ const BRIDGES: readonly Bridge[] = [claudeCodeBridge, piBridge, opencodeBridge, 
 /** Harness names, in the order the CLI lists them. */
 export const BRIDGE_NAMES: readonly BridgeName[] = BRIDGES.map((bridge) => bridge.name);
 
+export const AGENT_BRIDGE_NAMES: readonly BridgeName[] = BRIDGES.filter(
+  (bridge) => bridge.agents !== undefined,
+).map((bridge) => bridge.name);
+
 /** Resolve a bridge, or undefined when the name is unknown. */
 export const bridgeFor: BridgeLookup = (name) => BRIDGES.find((bridge) => bridge.name === name);
 

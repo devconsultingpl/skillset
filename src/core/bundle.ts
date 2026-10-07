@@ -2,14 +2,16 @@ import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fileExists } from "./fs.js";
-import { parseSkill } from "./parse.js";
-import type { ParsedSkill } from "./types.js";
+import { parseAgent, parseSkill } from "./parse.js";
+import type { ParsedAgent, ParsedSkill } from "./types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 /** Directory holding bundled skill sources. Same shape in src/ (dev via tsx)
  * and dist/ (prod) thanks to scripts/copy-skills.mjs. */
 export const skillsRoot = resolve(here, "..", "skills");
+
+export const agentsRoot = resolve(here, "..", "agents");
 
 export async function listBundledSkills(): Promise<string[]> {
   const entries = await readdir(skillsRoot, { withFileTypes: true });
@@ -33,6 +35,22 @@ export async function loadBundledSkill(name: string): Promise<ParsedSkill> {
 
 export function templatesRoot(skillName: string): string {
   return resolve(skillsRoot, skillName, "templates");
+}
+
+export async function listBundledAgents(): Promise<string[]> {
+  const entries = await readdir(agentsRoot, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => entry.name.slice(0, -3))
+    .sort();
+}
+
+export async function loadBundledAgent(name: string): Promise<ParsedAgent> {
+  const path = resolve(agentsRoot, `${name}.md`);
+  if (!(await fileExists(path))) {
+    throw new Error(`agent not found in bundle: ${name}`);
+  }
+  return parseAgent(await readFile(path, "utf8"));
 }
 
 /** Absolute path of a file shipped beside a skill's `SKILL.md` (a declared

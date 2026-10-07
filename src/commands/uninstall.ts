@@ -32,7 +32,18 @@ export async function uninstall(opts: UninstallOptions): Promise<void> {
 
     for (const rec of matches) {
       const target = requireBridge(rec.agent);
-      await target.uninstall(rec);
+      if (rec.kind === "agent") {
+        if (!target.agents) {
+          console.error(
+            pc.red("error"),
+            `${rec.skill} ← ${rec.agent}: this harness cannot install agent definitions (no renderer)`,
+          );
+          continue;
+        }
+        await target.agents.uninstall(rec);
+      } else {
+        await target.uninstall(rec);
+      }
       state = removeInstall(state, rec);
       console.log(
         pc.green("uninstalled"),

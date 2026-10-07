@@ -1,5 +1,82 @@
 {
   "version": 1,
+  "agents": {
+    "artifact-code-reviewer": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "artifact-coverage-reviewer": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "artifacts-analyzer": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "artifacts-locator": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "claim-verifier": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "codebase-analyzer": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "codebase-locator": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "codebase-pattern-finder": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "diff-auditor": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "integration-scanner": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "peer-comparator": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "precedent-locator": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "scope-tracer": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "slice-verifier": [
+      {
+        "agent": "pi"
+      }
+    ],
+    "web-search-researcher": [
+      {
+        "agent": "pi"
+      }
+    ]
+  },
   "siblings": {
     "code-review": ["_helpers/review-range.mjs", "templates/review.md"]
   },

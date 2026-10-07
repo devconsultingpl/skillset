@@ -2,6 +2,7 @@ import type {
   BridgeName,
   InstallRecord,
   Mode,
+  ParsedAgent,
   ParsedSkill,
   Scope,
   SiblingFile,
@@ -56,6 +57,27 @@ export interface ArtifactPathOptions {
   projectRoot: string;
 }
 
+export interface AgentArtifactOptions {
+  name: string;
+  scope: Scope;
+  projectRoot: string;
+}
+
+export interface AgentInstallContext {
+  agent: ParsedAgent;
+  scope: Scope;
+  projectRoot: string;
+}
+
+export interface AgentCapability {
+  readonly expresses: readonly string[];
+  readonly consequence?: Readonly<Record<string, string>>;
+  path(opts: AgentArtifactOptions): string;
+  install(ctx: AgentInstallContext): Promise<InstallRecord>;
+  uninstall(record: InstallRecord): Promise<void>;
+  preview(ctx: AgentInstallContext, record: InstallRecord): Promise<InstalledPreview>;
+}
+
 export interface SkillDirectoryOptions {
   mode: Mode;
   name: string;
@@ -91,6 +113,8 @@ export interface Bridge {
    * environment, if it has such a convention. The env var's *name* is the
    * harness's business, so core asks rather than reading it. */
   sessionKeyFromEnv?(): string | undefined;
+
+  agents?: AgentCapability;
 }
 
 /**

@@ -20,7 +20,13 @@
 import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, normalize } from "node:path";
 import type { Bridge, BridgeLookup } from "./bridge.js";
-import { listBundledSkills, loadBundledSkill, skillSourcePath } from "./bundle.js";
+import {
+  listBundledAgents,
+  listBundledSkills,
+  loadBundledAgent,
+  loadBundledSkill,
+  skillSourcePath,
+} from "./bundle.js";
 import { fileExists, readMaybe, readMaybeBytes } from "./fs.js";
 import { declarationsFilePath } from "./locations.js";
 import { MD, extract } from "./markers.js";
@@ -30,13 +36,14 @@ import type {
   InstallDeclaration,
   InstallRecord,
   Mode,
+  ParsedAgent,
   ParsedSkill,
   RequiredFields,
   Scope,
   SiblingFile,
   SkillsetState,
 } from "./types.js";
-import { MODES, SKILLSET_FIELDS } from "./types.js";
+import { MODES, SKILLSET_AGENT_FIELDS, SKILLSET_FIELDS } from "./types.js";
 
 export type InstallStatus =
   /** Recorded, and the on-disk bytes match what we would write. */
@@ -194,6 +201,51 @@ function parseRequires(raw: unknown, problems: string[]): RequiredFields {
   return requires;
 }
 
+function parseAgents(raw: unknown, problems: string[]): InstallDeclaration[] {
+  const declarations: InstallDeclaration[] = [];
+  if (raw === undefined) return declarations;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    problems.push("`agents` must be an object keyed by agent name");
+    return declarations;
+  }
+
+  for (const [name, entries] of Object.entries(raw as Record<string, unknown>)) {
+    if (!Array.isArray(entries) || entries.length === 0) {
+      problems.push(`${name}: must declare at least one install`);
+      continue;
+    }
+    for (const entry of entries) {
+      if (typeof entry !== "object" || entry === null) {
+        problems.push(`${name}: each install must be an object`);
+        continue;
+      }
+      const { agent, scope, projectPath } = entry as Record<string, unknown>;
+      if (typeof agent !== "string" || agent.length === 0) {
+        problems.push(`${name}: install must name a harness`);
+        continue;
+      }
+      const resolvedScope: Scope = scope === undefined || scope === "global" ? "global" : "local";
+      if (scope !== undefined && !isKnown(["global", "local"] as const, scope)) {
+        problems.push(`${name}: unknown scope ${JSON.stringify(scope)}`);
+        continue;
+      }
+      if (resolvedScope === "local" && typeof projectPath !== "string") {
+        problems.push(`${name}: a local install must declare \`projectPath\``);
+        continue;
+      }
+      declarations.push({
+        skill: name,
+        kind: "agent",
+        agent,
+        mode: "auto",
+        scope: resolvedScope,
+        ...(resolvedScope === "local" ? { projectPath: projectPath as string } : {}),
+      });
+    }
+  }
+  return declarations;
+}
+
 /** Parse the declarations file. Pure, so the shape rules are unit-testable. */
 export function parseDeclarations(raw: unknown): DeclarationParseResult {
   const problems: string[] = [];
@@ -206,16 +258,19 @@ export function parseDeclarations(raw: unknown): DeclarationParseResult {
   const {
     version,
     installs,
+    agents: agentBlock,
     siblings: siblingBlock,
     requires: requiresBlock,
   } = raw as {
     version?: unknown;
     installs?: unknown;
+    agents?: unknown;
     siblings?: unknown;
     requires?: unknown;
   };
   const siblings = parseSiblings(siblingBlock, problems);
   const requires = parseRequires(requiresBlock, problems);
+  declarations.push(...parseAgents(agentBlock, problems));
   if (version !== 1) {
     problems.push(`unsupported declarations version: ${String(version)}`);
   }
@@ -303,6 +358,7 @@ export async function declarationCoverage(
   siblings: Record<string, SiblingFile[]> = {},
   requires: RequiredFields = {},
   knownHarnesses?: readonly BridgeName[],
+  agentHarnesses: readonly BridgeName[] = [],
 ): Promise<string[]> {
   const problems: string[] = [];
   // Harness *existence* is checked here rather than at parse time: which
@@ -317,8 +373,17 @@ export async function declarationCoverage(
       }
     }
   }
+  for (const declaration of declarations) {
+    if (declaration.kind !== "agent") continue;
+    if (agentHarnesses.includes(declaration.agent)) continue;
+    problems.push(
+      `${declaration.skill}: ${declaration.agent} cannot install agent definitions (no renderer; harnesses that can: ${agentHarnesses.join(", ") || "none"})`,
+    );
+  }
+  const skillDeclarations = declarations.filter((d) => (d.kind ?? "skill") === "skill");
+  const agentDeclarations = declarations.filter((d) => d.kind === "agent");
   const bundled = new Set(await listBundledSkills());
-  const declared = new Set(declarations.map((d) => d.skill));
+  const declared = new Set(skillDeclarations.map((d) => d.skill));
   for (const skill of declared) {
     if (!bundled.has(skill)) {
       problems.push(`${skill}: declared but not present in src/skills/`);
@@ -327,6 +392,18 @@ export async function declarationCoverage(
   for (const skill of bundled) {
     if (!declared.has(skill)) {
       problems.push(`${skill}: bundled but declares no install`);
+    }
+  }
+  const bundledAgents = new Set(await listBundledAgents());
+  const declaredAgents = new Set(agentDeclarations.map((d) => d.skill));
+  for (const agent of declaredAgents) {
+    if (!bundledAgents.has(agent)) {
+      problems.push(`${agent}: declared but not present in src/agents/`);
+    }
+  }
+  for (const agent of bundledAgents) {
+    if (!declaredAgents.has(agent)) {
+      problems.push(`${agent}: bundled but declares no install`);
     }
   }
   for (const [skill, files] of Object.entries(siblings)) {
@@ -445,6 +522,64 @@ export function fieldSupport(
   return { warnings, errors };
 }
 
+export function agentFieldSupport(
+  agentDefinition: ParsedAgent,
+  bridge: Bridge,
+  required: readonly string[] = [],
+): { warnings: string[]; errors: string[] } {
+  const name = agentDefinition.frontmatter.name;
+  const harness = bridge.name;
+  const capability = bridge.agents;
+  if (!capability) {
+    return {
+      warnings: [],
+      errors: [
+        `${name} → ${harness}: ${harness} cannot install agent definitions (no renderer) — refusing a partial install`,
+      ],
+    };
+  }
+
+  const expresses = new Set(capability.expresses);
+  const overrides = (agentDefinition.frontmatter.targets?.[harness] ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  for (const field of Object.keys(agentDefinition.frontmatter)) {
+    if (SKILLSET_AGENT_FIELDS.includes(field) || field in overrides) continue;
+    warnings.push(
+      `${name} → ${harness}: \`${field}\` is declared at the top level, where no renderer forwards it for any target — put it under \`targets.${harness}\``,
+    );
+  }
+
+  for (const field of Object.keys(overrides)) {
+    if (expresses.has(field)) continue;
+    warnings.push(
+      `${name} → ${harness}: \`${harness}\` does not read \`${field}\` on an agent definition — ${
+        capability.consequence?.[field] ??
+        `the field is written to the artifact and ignored by ${harness}`
+      }`,
+    );
+  }
+
+  for (const field of required) {
+    if (expresses.has(field)) {
+      if (field in overrides) continue;
+      warnings.push(
+        `${name} → ${harness}: required field \`${field}\` is expressible but nothing declares a value for it — add \`targets.${harness}.${field}\``,
+      );
+      continue;
+    }
+    errors.push(
+      `${name} → ${harness}: required field \`${field}\` has no renderer for ${harness} — refusing a partial install`,
+    );
+  }
+
+  return { warnings, errors };
+}
+
 async function isFile(path: string): Promise<boolean> {
   if (!(await fileExists(path))) return false;
   try {
@@ -472,6 +607,7 @@ export function findRecord(
   return state.installs.find(
     (record) =>
       record.skill === declaration.skill &&
+      (record.kind ?? "skill") === (declaration.kind ?? "skill") &&
       record.agent === declaration.agent &&
       record.mode === declaration.mode &&
       record.scope === declaration.scope &&
@@ -569,6 +705,9 @@ export async function classifyInstall(
   bridge: Bridge,
   siblings: Record<string, SiblingFile[]> = {},
 ): Promise<ClassifiedInstall> {
+  if (declaration.kind === "agent") {
+    return classifyAgentInstall(declaration, state, bridge);
+  }
   // Render through the same path an install takes: a skill whose frontmatter
   // carries `config:` placeholders must compare against its *substituted* bytes,
   // or a correctly configured file reports as drifted and gets "repaired" back
@@ -595,6 +734,69 @@ export async function classifyInstall(
     status: worstStatus([primary.status, ...states.map((s) => s.status)]),
     siblings: states,
   };
+}
+
+function standInAgentRecord(
+  declaration: InstallDeclaration,
+  agent: ParsedAgent,
+  path: string,
+): InstallRecord {
+  return {
+    skill: agent.frontmatter.name,
+    kind: "agent",
+    version: "",
+    agent: declaration.agent,
+    scope: declaration.scope,
+    mode: declaration.mode,
+    location: dirname(path),
+    files: [basename(path)],
+    projectPath: declaration.projectPath,
+    installedAt: "",
+  };
+}
+
+async function classifyAgentInstall(
+  declaration: InstallDeclaration,
+  state: SkillsetState,
+  bridge: Bridge,
+): Promise<ClassifiedInstall> {
+  const capability = bridge.agents;
+  if (!capability) {
+    throw new Error(
+      `${bridge.name} cannot install agent definitions; a declaration asking for one is a coverage problem, not a runtime condition`,
+    );
+  }
+  const agent = await loadBundledAgent(declaration.skill);
+  const record = findRecord(state, declaration);
+  const context = {
+    agent,
+    scope: declaration.scope,
+    projectRoot: declaration.projectPath ?? process.cwd(),
+  };
+  const path = capability.path({
+    name: agent.frontmatter.name,
+    scope: declaration.scope,
+    projectRoot: context.projectRoot,
+  });
+
+  if (record) {
+    const { current, next } = await capability.preview(context, record);
+    if (current === null) {
+      return { declaration, status: "missing", path, record };
+    }
+    return current === next
+      ? { declaration, status: "in-sync", path, record }
+      : { declaration, status: "drifted", path, record, currentBytes: current, nextBytes: next };
+  }
+
+  const current = await readMaybe(path);
+  if (current === null) {
+    return { declaration, status: "missing", path };
+  }
+  const { next } = await capability.preview(context, standInAgentRecord(declaration, agent, path));
+  return current === next
+    ? { declaration, status: "adoptable", path, currentBytes: current }
+    : { declaration, status: "foreign", path, currentBytes: current, nextBytes: next };
 }
 
 /** The primary artifact's status — the whole install before siblings existed. */
@@ -663,6 +865,7 @@ export async function classifyAll(
     const stillDeclared = declarations.some(
       (d) =>
         d.skill === record.skill &&
+        (d.kind ?? "skill") === (record.kind ?? "skill") &&
         d.agent === record.agent &&
         d.mode === record.mode &&
         d.scope === record.scope &&
@@ -672,6 +875,7 @@ export async function classifyAll(
     classified.push({
       declaration: {
         skill: record.skill,
+        ...(record.kind ? { kind: record.kind } : {}),
         agent: record.agent,
         mode: record.mode,
         scope: record.scope,

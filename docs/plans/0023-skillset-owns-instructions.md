@@ -580,6 +580,93 @@ python3 -c …AGENT_ENABLEMENT_GRANTS                  # {} — "the machinery s
 
 Nothing is authorised. The go is a separate step.
 
+### Implemented — 3a, the agent-definition kind and the roster move — 2026-10-07 (Review log)
+
+The developer gave **go**, with four decisions already made: build it as a bridge capability (`src/bridges/pi/`), retire FLOW's agent sync with the content it transformed, retire `models.json`'s `agents` axis in favour of a static declaration in each agent file, and drop `isolated`/`extensions`/`skills`. All four landed as stated. Both repositories are green: skillset **30 files / 301 tests**, pi-extensions `pnpm -r run test` **exit 0, 16 packages** (flow 68/1668, flow-workflow 66/2573, pi-permission-system 136/2773, pi-subagents 66/1254, …).
+
+**Two criteria could not hold as written, and the reason is measurable rather than a choice.**
+
+- **AC-3 is restated**, because the classifier answered a question the criterion had assumed. Its middle clause — "`status` reports the 15 as `adoptable`; `sync` records them and writes nothing" — is unreachable once AC-5 drops a key: `classifyPrimary` calls an unrecorded artifact at an owned destination whose bytes differ from the render **`foreign`** (`declarations.ts:643`) and `sync` refuses it (exit 1). The first real run said exactly that:
+
+  ```
+  $ node dist/cli.js sync --dry-run
+  checked foreign 15 · undeclared 8 · in-sync 32          (exit 1, 15 files left untouched)
+  ```
+
+  So adoption-before-change was never available: the installed bytes were FLOW's, not ours, and they differ from what we would write by the same three changes AC-5 and the renderer imply. The cutover is therefore one deliberate write — `install <15 names> --agent pi --global --force`, the documented escape for a foreign destination — and AC-3's end-to-end claim now reads: **`foreign 15` before, one forced install, `in-sync 47` after, `drifted 0`**.
+- **AC-2 is restated in kind, not in spirit.** The artifacts differ from their pre-cutover copies by **three** changes, not one: the dropped `isolated:`/`extensions:` line, `tools:` re-quoted (`compose` quotes a scalar containing a comma — `tools: "read, grep, find, ls"`), and the description's redundant quotes dropped. All three are semantically null, and that is proved rather than asserted (AC-6, below). Only the last two are the renderer's normalisation; nothing else moved.
+
+**Criteria as built.**
+
+1. Holds — 15 files in `src/agents/`, and every body is byte-identical to `HEAD:packages/flow/agents/<name>.md`: a normalising diff (frontmatter stripped) reports **bodies byte-identical: 15 differ: 0**.
+2. Holds as restated — per-file `diff` against a pre-cutover copy shows the dropped key, the re-quoted `tools`, and the dropped description quotes, and nothing else in any of the 15.
+3. Holds as restated above. The recorded installs are `kind: "agent"`, `mode: "auto"`, `version: ""`.
+4. Holds — `agentFieldSupport` warns on a `targets.pi` key outside the ten-field set, warns on a top-level field no renderer forwards, and makes a `requires` entry with no renderer an **error**: `install` writes nothing, `sync` exits 2 before its first artifact. A bridge with no agent capability is an error too, so a declaration for one is refused rather than half-installed.
+5. Holds — `grep -rnE "^(isolated|skills|extensions):" src/agents/ ~/.pi/agent/agents/` returns nothing, in both the source and the installed roster.
+6. Holds, by execution — pi's own parser, run twice with `PI_CODING_AGENT_DIR` pointed at a pre-cutover copy and then at the installed directory:
+
+  ```
+  before dir: /tmp/agents-before-…  | agents: 15
+  after  dir: /tmp/agents-after-…   | agents: 15
+  same names: True
+  entries differing in any parsed field: NONE
+  claim-verifier: tools=['read','grep','find','ls','bash'] promptMode=append promptLen=4359
+  web-search-researcher: tools=['read','grep','find','ls','ext:flow-web-tools/web_search','ext:flow-web-tools/web_fetch']
+  ```
+
+  Every field `loadCustomAgents` returns — `builtinToolNames`, `description`, `maxTurns`, `thinking`, `promptMode`, `inheritContext`, `enabled`, `systemPrompt` — is identical across the cutover for all 15, which is what makes AC-2's three-change diff safe.
+7. Holds — `packages/flow/agents/` deleted (15 files, 1,769 body lines); `agents.ts` (774), `agent-enablement.ts` (164), `update-agents-command.ts` (62) and their three test files (1,012 + 155 + 106) deleted; `/flow-update-agents` unregistered from `flow-core/index.ts`; the agent arms removed from `session-hooks.ts`; `BUNDLED_AGENTS_DIR` gone from `paths.ts`. `rg -n "BUNDLED_AGENTS_DIR|syncBundledAgents|cleanupPerCwdAgents|flow-update-agents" packages/` returns only CHANGELOG history and completed plans.
+8. Holds — the `agents` axis is gone from `models-config.ts` (schema, resolution, `getAgentModelConfig`, `KnownModelKeys`), from `models-config-sources.ts` (`bundledAgentNames`), from `models-config-validate.ts`, and from the `/flow-models` picker (`SCOPE_AGENTS` + its descriptor). `~/.pi/agent/agents/.flow-managed.json` is deleted. **No writer other than skillset remains for that directory.**
+9. Holds — the state file's `version` stays **1**; `matchInstall` and `findRecord` compare `(kind ?? "skill")`, so a record written before this slice reads as a skill, pinned by a test.
+10. Holds — `sync --dry-run` after the cutover: `checked foreign 0 · undeclared 8 · in-sync 47`, and `~/.claude/`, `~/.config/opencode/`, `~/.skillset/copilot/` untouched (32 skill installs still `in-sync`).
+
+**Measured against 3a's budget.**
+
+| area | budget | measured | verdict |
+|---|---|---|---|
+| skillset runtime logic | ~320 | **+540 / −29 = +511 net** | **overrun +191 (60%)** |
+| skillset physical | +500 to +700 | **+711 / −46 tracked**, +433 in two new test files | over, of which +77 is the config and +2 the plan |
+| payload | counted apart (as 2a counted its helper) | `src/agents/*.md` **1,799 lines** | — |
+| new dependencies | none | none in either repository | met |
+| new runtime modules | 0 | 0 | met |
+| pi-extensions | −1,900 to −2,300 | **−4,856 / +136 across 41 files** (2,273 of it the four runtime modules and their tests, ~1,900 the roster) | met and then some |
+
+**Per-file runtime logic, and where the overrun went.**
+
+| file | net |
+|---|---|
+| `src/core/declarations.ts` | **+192** |
+| `src/commands/install.ts` | **+142** |
+| `src/bridges/pi/index.ts` | +52 |
+| `src/commands/sync.ts` | +39 |
+| `src/core/bridge.ts` | +20 |
+| `src/core/{bundle,parse,types,state}.ts`, `src/bridges/{index,pi/paths}.ts`, `src/commands/uninstall.ts` | +75 |
+
+1. **`declarations.ts` is the overrun, exactly as 2a's was**: `parseAgents` (~50), the agent-side coverage symmetry (~25), `agentFieldSupport` (~55 — a second field-support function rather than a branch inside the first, because the two kinds differ in all three of their inputs), and `classifyAgentInstall` + `standInAgentRecord` (~60). The budget's "~80" assumed one of each.
+2. **`install.ts` (142) is the second**: the agent branch mirrors the skill branch's order — capability check, foreign refusal, local-edit warning, write — which is the slice's point (an agent is covered by the existing guarantees) but costs ~90 lines of parallel structure. **The honest lever, if the overage is not acceptable, is a single per-kind "prepare" helper**; the two paths differ in mode resolution and sibling handling, which is why it was not done blind here.
+
+**Deviations, each deliberate.**
+
+- **The other three bridges declare no agent vocabulary.** The 3a budget line said "agent expressibility *declared*" for claude-code, opencode and copilot. It is not: a field set no renderer reads is the dead surface 2e refused to add, and their vocabularies are already recorded in this document's dialect matrix. A declaration for one of them is an error naming the missing renderer, which is 2c's shape.
+- **`extensions`/`tools` left `models.json` with the `agents` axis.** AC-7 asked only for the axis. Those two fields had exactly one consumer — the frontmatter injection this slice deleted — so leaving them would have left a schema that promises something nothing reads, plus a warn-on-miss message naming a consumer that no longer exists. `models-config.test.ts` lost its `agent-axis fields` and `getAgentModelConfig` suites (~150 lines) with them.
+- **Files beyond the budgeted list**: `models-config-sources.ts`, `models-config-validate.ts`, `flow-models/{index,items,overrides}.ts`, `flow-models/units.test.ts`, `flow-models-command.test.ts` (47/66 — the picker's agent scope re-pointed to `skills`), and `flow-test-utils/token-surface.contract.test.ts`, whose non-vacuity check asserted the workspace holds >10 agent files; it now asserts the scan finds **none**, because the workspace ships none.
+- **Doc rewrites beyond "−20 to −40"**: `docs/agents.md`'s *How they reach disk* section is now the ownership statement (skillset installs, `skillset sync` changes, model is a declaration in the file), and `docs/models-config.md` lost the axis row, the subagent example and the two `/flow-update-agents` instructions.
+- **Comment trim after the build.** The slice's first pass shipped heavy commentary in both repositories; it was cut back to near-nothing before the gates (the long doc blocks on `AgentCapability`, `AgentFrontmatter`, `parseAgent`, `renderAgentFile` and the classification branch are gone). Net effect: the logic counts above are logic, not prose.
+
+**Verification, in the order it ran.**
+
+```sh
+# skillset
+npm run build                   # tsc + copy-skills + copy-agents (both trees to dist/)
+npx biome check .               # 77 files clean
+npm test                        # 30 files / 301 tests
+node dist/cli.js sync --dry-run # checked foreign 0 · undeclared 8 · in-sync 47
+# pi-extensions
+pnpm -r run test                # exit 0 — 16 packages
+```
+
+**Not yet done.** Nothing is committed in either repository. Two follow-ups are named rather than implied: the other three harnesses' agent renderers (claude-code is the obvious next target, verifiable on this machine with a temp `HOME`) and the `install.ts` duplication lever above.
+
 ### Implementation session — slice 2c — 2026-10-07
 
 The developer said **go** on 2c (2c first, then 2b) and settled the one open design question: the capability report has **two sources** — a field present in the skill's own frontmatter *warns*, and a `requires` entry in `skillset.config.json` *errors*. Implemented tests-first, in the four steps the handoff named.
@@ -1058,7 +1145,25 @@ Three checks confirm the write is real rather than reported:
 
 ### Go state — 2026-10-07
 
-Nothing is authorised. The three open questions, unchanged and in the handoff's order: **(a)** the body-fidelity call on the 211-line portable review — **now scoped as 2d below, awaiting go**; **(b)** `allowed-tools` left undeclared on claude-code, a permission-widening choice awaiting an answer rather than a default; **(c)** slice 3, whose first step (3a) is the agent-definition concept. The propagation step above is not a design question and is **done** — the developer's go was `skillset sync`, its outcome and verification are in the sign-off entry.
+**3a is implemented and awaiting sign-off** (both repositories, gates green, nothing committed — see *Implemented — 3a*).
+
+The two decisions it was waiting on are settled and built: the artifact kind is a bridge capability (`src/bridges/pi/`), and FLOW's agent machinery retired with the content it transformed, `models.json`'s `agents` axis included.
+
+Still open, in the order the work now stands:
+
+**(d) The agent renderers for the other three harnesses** — claude-code first (its loader is checkable on this machine with `HOME=<temp>`), opencode and copilot doc-level until their loaders can be exercised. 3a deliberately shipped none of them: a renderer that cannot be verified against its own loader is the failure mode 2c already recorded.
+
+**(e) `install.ts`'s skill/agent duplication** — the measured lever if 3a's +191 logic overrun is not acceptable.
+
+**(f) Slice 3 proper** — 3b (the guidance channel), 3c (project scaffolds), 3d (the FLOW skill triage), 3e (workflow declarations), 3f (prompts and commands). 3a's completion removes the ordering blocker 3b sits behind.
+
+### Finding — the comment rule binds nobody, and the mechanism explains why (2026-10-07)
+
+The developer asked why the "no comments" instruction had no effect on this slice. Traced: the rule exists in exactly one place — **a completed plan**, `docs/plans/completed/0012-skill-architect.md:143,145` (*"Default to no comments. Self-documenting identifiers first."*, *"Never comment the *what*; the code says what."*). It is in **no skill body**, and `docs/conventions.md` has no comment policy at all.
+
+Even had it been a skill, it would not have bound: every coding skill — `builder`, `ponytail`, `architect` — installs as `slash` (loaded only when invoked by name) or `auto` (the model must choose to load it). Only `always` mode lands in a context window unasked, and the only `always` install in this repository is `instruction-ownership`. So the rule was invisible to every session that wrote code, and the failure is the same class 2b found twice in FLOW: a claim with no reader.
+
+This is **3b's work**, not a side quest — the channel that renders "rules about how work is done" already exists (pi's `APPEND_SYSTEM.md`, verified loaded in slice 1) and already carries one rule. The question 3b has to answer is which rules belong in it, because everything placed there is paid on **every request** (the cost 0017's F1/F2 measures). Candidate homes, cheapest first: `docs/conventions.md` (read by `architect`/`ponytail` orientation, but only when those skills are invoked), the coding skills' bodies (`builder` is slash-only on both harnesses — the weakest home), or one line in the always-mode rule (binds every session, costs ~1 line of always-surface). No decision is recorded here; the finding is, with the evidence.
 
 ### Scoped and awaiting go — 2d: restore the review body's fidelity — 2026-10-07
 
@@ -1285,9 +1390,9 @@ Why the estimate was low, stated rather than rounded away: the merge is four bra
 
 Paste this into a skillset session to continue. It assumes nothing that is not written above.
 
-> Continue the skillset instruction-ownership program. Read `docs/plans/0023-skillset-owns-instructions.md` in full first — it is the spec. Do not re-derive anything marked verified: it was checked by execution and the transcripts are in the plan. Before touching anything, read *Sign-off — slices 2c and 2b*, *Implemented — 2d*, *Implemented — (b)*, *Measured against 2b*, *Measured against 2c* and *Implemented — 2e* / *Slice 2e — the bridge boundary* (with *3a — scoped and awaiting go*): they carry the criteria as built, the measured budgets, the deviations, and the open questions.
+> Continue the skillset instruction-ownership program. Read `docs/plans/0023-skillset-owns-instructions.md` in full first — it is the spec. Do not re-derive anything marked verified: it was checked by execution and the transcripts are in the plan. Before touching anything, read *Sign-off — slices 2c and 2b*, *Implemented — 2d*, *Implemented — (b)*, *Measured against 2b*, *Measured against 2c* and *Implemented — 2e* (what the core no longer knows, and the one thing 3a must add back), *The agent-definition dialect per harness* (the measured field/path matrix for all four) and *3a — scoped and awaiting go*: they carry the criteria as built, the measured budgets, the deviations, and the open questions.
 >
-> **State.** Slices 1 (`880fdfe`), 2a (`7e65d1a`), 2c (`c8cc22d`), 2b (`7eb7f75` here, `4b66b55` in `pi-extensions`) and 2d (`cea2963`) are **all committed** — verified by `git log`, not by this file's prose, which twice claimed "not committed" after the fact. Nothing is being rebuilt. **Propagation has run** — and one correction to what this paragraph used to claim. `skillset sync` re-rendered both stale slash prompts and installed `~/.pi/agent/skills/code-review/` with its two declared siblings; that `in-sync 32` was true **before 2d's second pass** (299 → 301), which was never re-propagated. Re-verified 2026-10-07 during (b): `sync` reported `reconciled drifted 3 … · 3 written`, and the dry-run now genuinely reports `in-sync 32 · undeclared 8` with nothing drifted, missing or foreign. Verified after the write: FLOW's harvester returns `code-review` with `required: ["blockers_count"]`, and the installed helper runs from its installed location. See *Sign-off — slices 2c and 2b* and the drift note under *Implemented — (b)*. **2d (the body-fidelity restore) is committed — `cea2963`** — and its two files are `src/skills/code-review/SKILL.md` (211 → 301) and this plan. Read *Implemented — 2d* for the criteria as built, the budget table and the residue classification. Open question (a) is **closed**; **(b) is closed and committed — `90610ef`** — its three files (`claude-code.ts`, `claude-code.test.ts`, this plan) landed with the gates green and the installed copies verified. Nothing is dirty in this repository except the 3a scoping edits in this plan.
+> **State.** Slices 1 (`880fdfe`), 2a (`7e65d1a`), 2c (`c8cc22d`), 2b (`7eb7f75` here, `4b66b55` in `pi-extensions`) and 2d (`cea2963`) are **all committed** — verified by `git log`, not by this file's prose, which twice claimed "not committed" after the fact. Nothing is being rebuilt. **Propagation has run** — and one correction to what this paragraph used to claim. `skillset sync` re-rendered both stale slash prompts and installed `~/.pi/agent/skills/code-review/` with its two declared siblings; that `in-sync 32` was true **before 2d's second pass** (299 → 301), which was never re-propagated. Re-verified 2026-10-07 during (b): `sync` reported `reconciled drifted 3 … · 3 written`, and the dry-run now genuinely reports `in-sync 32 · undeclared 8` with nothing drifted, missing or foreign. Verified after the write: FLOW's harvester returns `code-review` with `required: ["blockers_count"]`, and the installed helper runs from its installed location. See *Sign-off — slices 2c and 2b* and the drift note under *Implemented — (b)*. **2d (the body-fidelity restore) is committed — `cea2963`** — and its two files are `src/skills/code-review/SKILL.md` (211 → 301) and this plan. Read *Implemented — 2d* for the criteria as built, the budget table and the residue classification. Open question (a) is **closed**; **(b) is closed and committed — `90610ef`** — its three files (`claude-code.ts`, `claude-code.test.ts`, this plan) landed with the gates green and the installed copies verified. Nothing is dirty in this repository except the 3a scoping edits in this plan **and 3a's own implementation** — *superseded the same day*: **3a is implemented in both repositories and awaits sign-off**, uncommitted. Read *Implemented — 3a* for its criteria as built, its two restated criteria (AC-3 adoption is unreachable once a key is dropped; AC-2's diff is three semantically-null changes, proved through pi's own parser), its measured budget (+511 logic against ~320) and its deviations. Gates: skillset `npm run build` → `npm test` (30 files / 301 tests) → `npx biome check .` → `sync --dry-run` = `in-sync 47`; pi-extensions `pnpm -r run test` exit 0 across 16 packages. Verify state with `git log` and `git status`, never with this file's prose — it has claimed "not committed" twice after the fact. **Use `git add` (never `git commit -am`) on any slice that adds files** — `c174158` exists because 2e's commit dropped nine new files.
 >
 > **What 2c landed.** Every target declares in one place the frontmatter it can express (per mode) and the native commands it must not shadow; `install` and `sync` report every declared field a target cannot express, naming field and consequence; a `requires` entry with no renderer is an error that writes nothing (`sync` exits 2 before its first write); the `sk-` slug rule is checked against each target's recorded built-ins; `SKILLSET_CONFIG=<path>` points a run at a scratch declarations file. Two things it needed beyond its budget: a nested-mapping frontmatter renderer (`src/core/frontmatter.ts` — a pi `contract:` block is an object), and its capability check fixed to judge expressibility across the modes an agent is installed in, not per artifact. **Do not regress either**: a per-mode check refuses a required field outright, and the renderer refuses objects without the recursion.
 >
@@ -1295,7 +1400,7 @@ Paste this into a skillset session to continue. It assumes nothing that is not w
 >
 > **What 2d landed.** The portable body regained the specification half it lost in the 2b port: the Discovery Map format (header block, clustering rule, first-match-wins role-tag table, symbols-touched hint) with role-tag *classification* now separate from *processing order*; per-pass output contracts (the five orientation passes, both lenses, the predicate trace, the gap finder, the verifier's `FINDING <id> | <tag> | <justification>` row, the summary block, the follow-up rules); the derived flags `LockstepSelfReview`, `ReviewType`, `TreeInputMode`, the `PeerPairs` heuristics and intra-folder peers; artifact frontmatter derived with plain `git` and `date` instead of the deleted `_shared` scripts; read-economy and file-orientation invariants; the isolation enforcement list; and a **parameterised** adjudication rule that names no harness tool. Two dangling references are closed — the four clarifying options at Step 1, and `LockstepSelfReview`, which Step 5 read and nothing derived. 211 → **301 lines**, +108/−18, one file, no config/sibling/template/dependency change. **Do not regress**: the body must stay harness-neutral (`grep -nE "\badvisor\b|\bask_user_question\b|\btodo\b|\bflow-[a-z]|Write\("` must return nothing) and free of wave vocabulary.
 >
-> **Go state — one go outstanding.** Open question (a), the body-fidelity call, is **closed and built** (2d). (b) is **closed, built and committed** (`90610ef`). **Slice 2e is built and uncommitted** — the core is harness-free, the bridges are in `src/bridges/`, and 586 installed files hash identical to before the refactor; read *Implemented — 2e*. That unblocks **3a** — the agent-definition concept plus the roster move for pi, now to be built as a bridge capability — which is **the next go**:
+> **Go state — 3a is implemented and awaiting sign-off; nothing is uncommitted-but-authorised.** *(Superseded text kept below the fold: it recorded 3a as **the next go**, and the caveat that `4852681` shipped without its nine files — since repaired by `c174158`, verified with `git ls-files src/core/bridge.ts src/bridges/index.ts` and `npm run build`.)* Open question (a) is **closed and built** (2d); (b) is **closed, built and committed** (`90610ef`); slice 2e is committed (`4852681` + `c174158`) — the core is harness-free and 586 installed files hash identical to before the refactor; read *Implemented — 2e*. **Slice 3a is implemented in both repositories and green — read *Implemented — 3a***: the agent artifact kind lives in `src/bridges/pi/`, FLOW's roster and agent machinery retired (−4,856 / +136 across 41 files in pi-extensions), `models.json`'s `agents` axis and the `/flow-models` agent scope are gone, and `~/.pi/agent/agents/` has one writer left. Gates: skillset 30 files / 301 tests + biome clean + `in-sync 47`; `pnpm -r run test` exit 0 across 16 packages. **Not committed in either repository.** Two criteria were restated because the classifier answered a question the criterion had assumed (AC-3: adoption is unreachable once a key is dropped, so the cutover is one forced install; AC-2: the artifacts differ by three changes, all semantically null and proved so through pi's own parser) — the details, the budget table and both transcripts are in that entry, not repeated here. What remains, in order: **(d)** agent renderers for claude-code, then opencode/copilot where their loaders can be exercised; **(e)** the `install.ts` duplication lever if 3a's +191 logic overrun is not acceptable; **(f)** slice 3 proper — 3b (guidance channel; also where the *comment rule binds nobody* finding below is resolved), 3c, 3d, 3e, 3f.
 >
 > **(b) `allowed-tools` on claude-code — done and committed — see *Implemented — (b)*.** The developer's criterion (2026-10-07): skillset guarantees the *availability* of the permission field in each target, never a permission level — content is the developer's. By that test the field was already expressible (`claude-code.ts:145-176`, slash + auto) and there was **nothing to port** (`grep -rn "allowed-tools" src/skills/` → nothing). What was built is the composition fix the question was hiding: `renderCommandFile` spread `targets.claude-code` over its own hardcoded `Bash(skillset *)`, so the first skill declaring `allowed-tools` would have silently dropped the pattern its own `!`skillset track`` trailer needs. Now merged, target pattern first; the undeclared render is byte-stable — one unique value across all 10 installed claude-code slash artifacts. **Over its budget** (15 logic lines vs 8, 81 physical vs 40-50, tests 53 vs 30) with the reasons in the measured table, and the estimate's low end was real: AC-1 caught a first implementation that omitted the pattern entirely when nothing declared one. Also found and repaired: 2d's second pass had never been propagated — see the drift note in that section.
 >
