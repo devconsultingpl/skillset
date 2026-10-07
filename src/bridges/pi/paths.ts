@@ -1,0 +1,35 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
+import type { ArtifactPathOptions, SkillDirectoryOptions } from "../../core/bridge.js";
+import type { Scope } from "../../core/types.js";
+import type { Layout } from "../_shared/paths.js";
+import { resolveArtifactPath, resolveSkillDirectory } from "../_shared/paths.js";
+
+/** Every path this harness reads, in one place. */
+function base(scope: Scope, projectRoot: string): string {
+  return scope === "global" ? join(homedir(), ".pi", "agent") : join(projectRoot, ".pi");
+}
+
+export const layout: Layout = {
+  slash(slug, scope, root) {
+    return join(base(scope, root), "prompts", `${slug}.md`);
+  },
+  auto(name, scope, root) {
+    return join(base(scope, root), "skills", name, "SKILL.md");
+  },
+  always(scope, root) {
+    return join(base(scope, root), "APPEND_SYSTEM.md");
+  },
+};
+
+export const artifactPath = (opts: ArtifactPathOptions): string =>
+  resolveArtifactPath(layout, opts);
+export function skillDirectory(opts: SkillDirectoryOptions): string | null {
+  return resolveSkillDirectory(layout, opts);
+}
+
+/** pi extension path: `.pi/extensions/skillset.ts` (local) or
+ * `~/.pi/agent/extensions/skillset.ts` (global). */
+export function extensionPath(scope: Scope, projectRoot: string): string {
+  return join(base(scope, projectRoot), "extensions", "skillset.ts");
+}
