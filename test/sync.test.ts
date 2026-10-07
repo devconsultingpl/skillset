@@ -1,7 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type Sandbox, exists, makeSandbox, run } from "./helpers.js";
+import { type Sandbox, exists, makeSandbox, repoRoot, run } from "./helpers.js";
 
 /**
  * `skillset sync` against a sandboxed HOME. The declarations it reads are the
@@ -155,12 +155,30 @@ describe("sync — sibling files", () => {
   };
 
   it("reports a declared sibling that no declared install can carry", async () => {
-    // code-review declares a helper but installs as a slash prompt, which is one
-    // file in a shared directory. The declaration promises tools; say so once,
-    // rather than leaving them silently absent until the mode changes.
+    // A declaration that promises tools with nowhere to put them is reported
+    // once. Since 2b this pins the *absence* for the repository's own set —
+    // code-review now declares a pi `auto` install, which carries both siblings
+    // — so the note must NOT appear for it.
     const out = run(["sync", "--dry-run"], sb.projectRoot, sb.env);
     expect(out.status).toBe(0);
-    expect(out.stderr).toContain("declared sibling file(s), but no declared install");
+    expect(out.stderr).not.toContain("declared sibling file(s), but no declared install");
+
+    // Drop the carrying install from the declarations and the note comes back —
+    // which is what makes the assertion above meaningful rather than vacuous.
+    // `requires` goes too: without it satisfied, sync refuses the whole run
+    // (exit 2) before reaching the sibling report, which is its own behaviour.
+    const config = JSON.parse(await readFile(join(repoRoot, "skillset.config.json"), "utf8"));
+    config.installs["code-review"] = config.installs["code-review"].filter(
+      (d: { mode: string }) => d.mode !== "auto",
+    );
+    config.requires = {};
+    const scratch = join(sb.projectRoot, "scratch-skillset.config.json");
+    await writeFile(scratch, JSON.stringify(config, null, 2), "utf8");
+    const without = run(["sync", "--dry-run"], sb.projectRoot, {
+      ...sb.env,
+      SKILLSET_CONFIG: scratch,
+    });
+    expect(without.stderr).toContain("declared sibling file(s), but no declared install");
   });
 
   it("refuses a foreign sibling at an owned skill path, exit non-zero", async () => {

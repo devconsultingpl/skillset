@@ -17,6 +17,7 @@ import {
   STATUS_ORDER,
   classifyAll,
   declarationCoverage,
+  declaredModes,
   fieldSupport,
   loadDeclarations,
 } from "../core/declarations.js";
@@ -115,10 +116,16 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
   const supportErrors: string[] = [];
   for (const declaration of declarations) {
     const declared = applyConfigToSkill(await loadBundledSkill(declaration.skill));
+    const modes = declaredModes(
+      declarations,
+      declaration.skill,
+      declaration.agent,
+      declaration.scope,
+    );
     const support = fieldSupport(
       declared,
       declaration.agent,
-      declaration.mode,
+      modes.length > 0 ? modes : [declaration.mode],
       requires[declaration.skill]?.[declaration.agent] ?? [],
     );
     for (const warning of support.warnings) console.error(pc.yellow("warning"), warning);

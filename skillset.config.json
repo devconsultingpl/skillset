@@ -1,7 +1,12 @@
 {
   "version": 1,
   "siblings": {
-    "code-review": ["_helpers/review-range.mjs"]
+    "code-review": ["_helpers/review-range.mjs", "templates/review.md"]
+  },
+  "requires": {
+    "code-review": {
+      "pi": ["contract"]
+    }
   },
   "installs": {
     "appsec-review": [
@@ -56,6 +61,10 @@
       {
         "agent": "claude-code",
         "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
       },
       {
         "agent": "pi",

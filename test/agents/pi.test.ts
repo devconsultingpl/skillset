@@ -156,13 +156,19 @@ describe("pi target", () => {
       expect(await readFile(installed(), "utf8")).toBe(await readFile(helperSource, "utf8"));
 
       // Recorded per file, relative to the skill directory — that is what makes
-      // the copy ours to repair rather than a foreign file to protect.
+      // the copy ours to repair rather than a foreign file to protect. Two
+      // siblings since 2b: the scope helper and the review template the body
+      // writes its document from.
       const state = JSON.parse(await readFile(join(sb.home, ".skillset", "state.json"), "utf8"));
       const record = state.installs.find(
         (i: { skill: string; agent: string; mode: string }) =>
           i.skill === "code-review" && i.agent === "pi" && i.mode === "auto",
       );
-      expect(record.files).toEqual(["SKILL.md", "_helpers/review-range.mjs"]);
+      expect([...record.files].sort()).toEqual([
+        "SKILL.md",
+        "_helpers/review-range.mjs",
+        "templates/review.md",
+      ]);
 
       expect(run(["uninstall", "code-review", "--global"], sb.projectRoot, sb.env).status).toBe(0);
       expect(await exists(installed())).toBe(false);
@@ -187,12 +193,30 @@ describe("pi target", () => {
       expect(out.stdout).toContain("README.md");
     });
 
-    it("says so when the mode has no directory for the skill's tools", async () => {
-      // `code-review` is declared for pi in slash mode, which writes one prompt
-      // file into a shared directory. A declared helper cannot travel there, and
-      // the gap is reported rather than left silent.
+    it("renders the review's contract into the installed skill file", async () => {
+      // The workflow gate reads `blockers_count` from this block, so it has to
+      // survive rendering as a nested mapping — the renderer refused objects
+      // before 2b, which is why this is pinned rather than assumed.
       const out = run(
-        ["install", "code-review", "--agent", "pi", "--global"],
+        ["install", "code-review", "--agent", "pi", "--mode", "auto", "--global"],
+        sb.projectRoot,
+        sb.env,
+      );
+      expect(out.status).toBe(0);
+
+      const skillFile = await readFile(join(skillDir(), "SKILL.md"), "utf8");
+      expect(skillFile).toContain("contract:\n  produces:\n");
+      expect(skillFile).toContain("      required: [blockers_count]");
+      expect(skillFile).toContain("disable-model-invocation: true");
+    });
+
+    it("says so when the mode has no directory for the skill's tools", async () => {
+      // `slash` writes one prompt file into a shared directory, so a declared
+      // helper cannot travel *there*. Since 2b the skill also declares `auto`,
+      // which carries both siblings — the note is now specific to the mode that
+      // has nowhere to put them, and `--mode` says which install is meant.
+      const out = run(
+        ["install", "code-review", "--agent", "pi", "--mode", "slash", "--global"],
         sb.projectRoot,
         sb.env,
       );

@@ -85,6 +85,26 @@ shadow a harness's own commands, and a test pins it against each target's record
 `SKILLSET_CONFIG=<path>` points a run at a different declarations file — the seam end-to-end tests
 use to exercise a declaration shape without editing the repository's own.
 
+## Portable bodies: dispatch, don't assume an agent roster
+
+A skill that is useful in more than one harness cannot name a subagent type from one
+harness's roster. The portable shape, first used by `code-review`:
+
+- **Role names describe the job**, not an agent type (`integration-scanner`,
+  `peer-comparator`, `claim-verifier`), and the body maps each to whatever the harness
+  offers — `subagent`, `Task`, an Agent tool.
+- **Check availability before dispatching.** No subagent mechanism → one bounded single pass,
+  naming what was not reached. Never pretend the passes ran.
+- **Return findings and the verdict, not the trail** — tool calls and intermediate output stay
+  in the subagent.
+- **A direct invocation wins**: the user typing the command, or saying "run it here", means
+  inline.
+- **Say what did not run.** A specialist with no equivalent, a skipped pass, a check that
+  could not execute — each is reported as not run, with the reason.
+
+The roster itself (FLOW's 15 agents) stays FLOW's until skillset can render agent definitions
+per harness; see `docs/plans/0023-skillset-owns-instructions.md`, slice 3a.
+
 ## Tests
 
 Vitest. Unit tests live next to source (`src/**/*.test.ts`). CLI end-to-end tests live under `test/`. Cover happy path + uninstall via markers for every target.

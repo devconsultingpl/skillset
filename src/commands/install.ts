@@ -124,7 +124,15 @@ export async function install(opts: InstallOptions): Promise<number> {
       // Honesty check before anything is written (slice 2c): a declared field
       // this harness cannot express is reported, and a *required* one is not a
       // degraded install but a missing renderer — nothing is written at all.
-      const support = fieldSupport(skill, agent, mode, requires[skillName]?.[agent] ?? []);
+      // Expressibility is judged across the modes declared for this (skill,
+      // agent): a field one of them carries reaches the harness.
+      const declaredFor = declaredModes(declarations, skillName, agent, opts.scope);
+      const support = fieldSupport(
+        skill,
+        agent,
+        declaredFor.length > 0 ? declaredFor : [mode],
+        requires[skillName]?.[agent] ?? [],
+      );
       for (const warning of support.warnings) console.error(pc.yellow("warning"), warning);
       if (support.errors.length > 0) {
         for (const error of support.errors) console.error(pc.red("error"), error);

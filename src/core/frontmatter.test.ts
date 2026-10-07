@@ -30,6 +30,43 @@ describe("renderFrontmatter", () => {
     const out = renderFrontmatter({ note: "with: colon" });
     expect(out).toContain('note: "with: colon"');
   });
+
+  it("renders a nested mapping, with the arrays and scalars inside it", () => {
+    const out = renderFrontmatter({
+      name: "code-review",
+      contract: {
+        produces: {
+          kind: "produces",
+          data: { type: "object", required: ["blockers_count"] },
+        },
+      },
+    });
+
+    expect(out).toBe(
+      [
+        "---",
+        "name: code-review",
+        "contract:",
+        "  produces:",
+        "    kind: produces",
+        "    data:",
+        "      type: object",
+        "      required: [blockers_count]",
+        "---",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("renders an empty mapping as {}, not as null", () => {
+    expect(renderFrontmatter({ contract: {} })).toContain("contract: {}");
+  });
+
+  it("refuses an array of mappings rather than guessing at YAML", () => {
+    expect(() => renderFrontmatter({ bad: [{ a: 1 }] })).toThrow(
+      /unsupported value type for frontmatter key bad/,
+    );
+  });
 });
 
 describe("compose", () => {

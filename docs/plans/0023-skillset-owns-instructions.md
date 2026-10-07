@@ -410,6 +410,77 @@ The file was restored and rebuilt. Without that run, "the refusal works" would h
 
 Implemented, tested, and measured; **not committed** — the commit message is drafted and the developer runs it. 2b remains unauthorised, and its prerequisite is now closer to solved: the matrix states exactly which fields the review can carry per harness, so the skill-versus-command decision (claude-code `auto`, which has a directory for `review-range.mjs`, versus `slash`, which has none) can be made from data rather than from a reading.
 
+### Implementation session — slice 2b — 2026-10-07
+
+The developer said **go**, with one preference that shaped the declaration: **slash commands in claude-code** for the review. Two forks were settled before building, because the plan's criteria did not decide them:
+
+1. **FLOW's `remediate` is renamed `flow-remediate`, not deleted.** Reading both bodies showed they are different capabilities sharing a name: skillset's is fix-from-review, FLOW's is a workflow-dispatched repair arm (`"validate-fix": acts({ skill: "remediate", reads: ["plans","validation"] })`, two workflows, its own `built-ins/remediation.ts`, outcome digest and tests). The developer chose the rename so each capability keeps one name. **AC-3 as written is therefore deviated from deliberately**: FLOW ships no copy of the *review*, but it keeps its repair arm — under a name that can no longer collide.
+2. **`code-review` installs as pi `auto` + pi `slash` + claude-code `slash`.** `auto` is not a preference: only a skill directory can hold `_helpers/review-range.mjs` and `templates/review.md`, and only a skill file can carry the `contract:` the gate reads (2c's matrix: pi *prompt templates* carry `description` and `argument-hint`, nothing else). The slash install keeps `/sk-code-review` on pi, and claude-code stays slash per the developer.
+
+**What landed.** In skillset: the portable review body (43 → 211 lines — scope resolution via the helper, the 13 quality surfaces with their mechanical triggers, the 8 sink classes with the in-scope rule, the interaction sweep's nine categories, gap-finder coverage arithmetic, the citation contract, reconciliation with cascade detection, the verifier's four checks and three tags, the review document with `blockers_count`, and the subagent-dispatch contract with its bounded fallback); `templates/review.md` (151) and `review-range.test.ts` (227) moved verbatim; `skillset.config.json` declaring the three installs, both siblings, and `requires: {code-review: {pi: ["contract"]}}`; and the conventions rule for portable dispatch.
+
+In pi-extensions: `packages/flow/skills/code-review/` deleted (1,390 lines); `remediate/` → `flow-remediate/` with its frontmatter name; the two `validate-fix` stages, the built-in remediation outcome, the pipeline pointer, the docs, a CHANGELOG entry, the invariant helper and its test updated; a fixture user-agent dir; and the tests that pinned the old state amended.
+
+Evidence, all of it by execution:
+
+```sh
+# skillset
+npm run build && npm test          # 26 files / 259 tests
+npx biome check .                  # 68 files clean
+# pi-extensions, whole workspace
+pnpm -r run test                   # 16 packages; flow 1781, flow-workflow 2573,
+                                   # pi-permission-system 2773, pi-subagents 1254, …
+```
+
+The claim that matters — **the gate's schema reaches FLOW from the installed skill** — was re-run against a real install rather than assumed. `skillset sync` into a sandboxed `HOME` wrote 32 installs; then FLOW's own harvester, pointed at that home:
+
+```
+$ PI_CODING_AGENT_DIR=$T/.pi/agent node …  # buildUserSkillContracts()
+user-skill contracts: code-review
+produces.kind:       produces
+artifactKind:        review
+required:            [ 'blockers_count' ]
+consumes.world:      working-tree
+```
+
+And the claude-code half, through its own loader (`HOME=$T claude --debug-file … -p …`; auth failed, so no model call — the log is the loader's):
+
+```
+Loading skills from: …, user=/tmp/2b-home-fx5F/.claude/skills, project=[]
+Loaded 11 unique skills (… user: 1, …, legacy commands: 10)
+```
+
+The arithmetic is explained, not asserted: the sandbox holds exactly 10 claude command files (including `sk-code-review.md`) and exactly one claude skill directory (`commit-suggestion`, the only claude-code `auto` install) — so both numbers are ours.
+
+**Three prerequisites the slice uncovered, each found by building rather than by reading:**
+
+1. **The frontmatter renderer refused objects.** `compose({ …, contract: {…} })` threw `unsupported value type for frontmatter key contract: object`, so the nested `contract:` block the gate parses could not be rendered at all. `src/core/frontmatter.ts` now renders nested mappings recursively (arrays of mappings still refused, deliberately), with tests — **+39/−17 logic lines, a file 2b's budget did not list.**
+2. **2c's capability check was wrong per mode.** `fieldSupport` judged one mode at a time, so a field expressible in the skill's `auto` install was reported unsupported — and, for a `requires` entry, refused outright — for the same agent's `slash` install. Demonstrated before fixing: with `contract` under `targets.pi` and pi installed twice, the slash install produced `required field \`contract\` has no renderer for pi — refusing a partial install`, i.e. `sync` would have exited 2 on the repository's own declaration. Now expressibility is judged across the modes an agent is installed in, with a regression test. **This is a 2c defect defeated by 2b use; 2c's entry records it as an amendment.**
+3. **Two pi-extensions harnesses validated a configuration that no longer exists.** `validate-workflow-invariant.mjs` threaded only the *bundled* contracts, so with the review unbundled the polish/vet `code-review` gate validated with no schema and reported `produces-without-outcome` and `route-reads-unvalidated-data`. The helper now mirrors production (bundled **and** user-installed contracts), and the test points `PI_CODING_AGENT_DIR` at a fixture so it stays hermetic. A repo-wide contract test also caught the fixture on first run — every `SKILL.md` under a scanned package must set `disable-model-invocation: true` — which is how the fixture came to match the real skill's frontmatter.
+
+**The failure mode is now documented, not silent** (`packages/flow/docs/skills.md`, *The review is a dependency*): with the review uninstalled, `/wf` still loads and the workflows that dispatch a `code-review` stage report `produces-without-outcome` and `route-reads-unvalidated-data` at validation. That is plan decision 4's "clear failure rather than a silently empty stage", and it is what the amended tests now pin.
+
+### Measured against 2b — 2026-10-07
+
+| area | budget | measured | verdict |
+|---|---|---|---|
+| skillset physical | 1,050-1,450 (≈820 moved verbatim) | **789** (411 tracked insertions + 378 moved: template 151, helper test 227) | **under, −261 (−25%)** |
+| skillset logic (`src/`, non-test) | not broken out by 2b | **+198/−53 = +145 net** | reported |
+| the review body | 43 → ~300-420 lines | 43 → **211** | **under — see the judgment note** |
+| pi-extensions deletions | ~1,470 | **1,490** (review 1,390 + remediate's body, renamed not deleted) | met |
+| pi-extensions additions | not estimated | +144 across 15 tracked files, plus the renamed `flow-remediate/SKILL.md` (76) and a 33-line fixture | reported |
+| new runtime modules / dependencies | 0 / 0 | 0 / 0 | met |
+
+**Per-file logic, skillset (2c and 2b together, uncommitted):** `src/core/frontmatter.ts` +39/−17 (the nested renderer), `src/core/declarations.ts` +9/−8 (the mode-union fix), `src/commands/install.ts` +7/−1 and `src/commands/sync.ts` +8/−1 (the corrected call sites).
+
+**The body-size judgment, stated rather than buried.** 211 lines is below the 300-420 estimate because the port keeps the *method and the dispatch contract* and drops FLOW's choreography: the three-wave dispatch order, the Discovery Map's internal format spec, the five literal agent prompt bodies, the advisor integration, and the read-economy rules. Everything AC-1 names is present, and the checks that matter (citation contract, in-scope rule, verification tags, `blockers_count`) are intact — but a harness whose specialists are thinner than FLOW's receives a thinner review than FLOW's bundled agents delivered. If the developer wants that fidelity back, it is a second pass over the same file, and it should be asked for rather than slipped in.
+
+**Findings recorded, not fixed:** the review's *Fix* line supersedes skillset's old "never writes solutions" posture (FLOW's template carries `**Fix**` and the next workflow round consumes it — the 43-line body's stance is now wrong and the description says so); `allowed-tools` is left undeclared on claude-code, so a command run prompts for Bash permissions it could pre-approve — a permission-widening decision worth its own answer rather than a default; and `remediate`'s own body was left untouched by the rename, so its lane inputs (`--plans`, `--validation`) and artifact conventions survive exactly as they were (AC-8).
+
+### Slice-2b status — 2026-10-07
+
+Implemented, both suites green, not committed. Two commits are drafted — one per repository — and the developer runs them. The two-copy window for `review-range.mjs` is **closed**: FLOW's copy, its test and the template are gone. AC-3 is satisfied in intent and deviated in letter (FLOW keeps its renamed repair arm); AC-6 is satisfied in effect but not untouched: `PIPELINE_POINTER` changed text (`remediate` → `flow-remediate`) while its token surface did not move, which `token-surface.test.ts` confirms still passes without a re-pin.
+
 ## Decisions
 
 ### Ownership by manifest and hash, not by convention
@@ -681,15 +752,21 @@ The developer asked whether the plan says how the remaining instruction content 
 
 The developer said go on 2c after the slice-3 inventory session, and answered the one design question 2c carried: the capability report reads **two** declarations — a field present in the skill's own frontmatter warns, a `requires` entry in `skillset.config.json` errors. Built tests-first; criteria as built, the measured overrun, and the falsification run are recorded in the *Implementation session — slice 2c*, *Measured against 2c* and *Slice-2c status — 2026-10-07* entries above, so this entry is the pointer rather than a second copy. Gates: `npm run build`, `npm test` (25 files / 241 tests), `npx biome check src test` — all clean. Nothing committed; the message is drafted for the developer to run. Two findings were recorded rather than fixed: the copilot target writes `mode:` where VS Code now documents `agent:`, and opencode's installed binary cannot launch on this machine (`invalid signature`), which is why its half of AC-5 rests on its docs plus path agreement rather than on its own discovery.
 
+### Implementation session — slice 2b — 2026-10-07 (Review log)
+
+The developer said go on 2b with slash commands preferred for claude-code, and settled two forks the plan had left open: FLOW's repair arm is **renamed `flow-remediate`** rather than deleted (the two `remediate` bodies are different capabilities sharing a name), and the review declares **pi auto + pi slash + claude-code slash**. The session's record — the three prerequisites it uncovered (the frontmatter renderer refusing the nested `contract:`, 2c's per-mode false positive on `fieldSupport`, and two pi-extensions harnesses validating a configuration the move had made obsolete), the measured budget, and the honest note on the 211-line body against the 300-420 estimate — is in the entries above rather than restated here. Gates: skillset 26 files / 259 tests and biome clean; pi-extensions `pnpm -r run test` green across all 16 packages. The end-to-end claim was re-verified by execution (`buildUserSkillContracts` reading the installed skill, and claude-code's loader counting exactly our 10 commands and 1 skill dir). Nothing committed; two messages are drafted, one per repository. AC-3 is deviated from in letter (FLOW keeps a renamed repair arm) and AC-6 in method (the pointer's text changed; its token surface did not).
+
 ## Handoff — prompt for the next session
 
 Paste this into a skillset session to continue. It assumes nothing that is not written above.
 
 > Continue the skillset instruction-ownership program. Read `docs/plans/0023-skillset-owns-instructions.md` in full first — it is the spec, and its slice-2 sections carry the decisions, budgets and evidence you need. Do not re-derive anything marked verified; it was checked by execution and the transcripts are in the plan. Read *Slice-2a sign-off*, *Implementation session — slice 2a* and *Measured against 2a* before touching anything: they carry the criteria as built, the measured overrun, and the three mistakes that session made first.
 >
-> **State.** Slice 1 (`880fdfe`) and slice 2a (`7e65d1a`) are implemented, committed, pushed and signed off. The plan stays in `docs/plans/` until the program finishes. 2a landed: declared `siblings.<skill>` payload files, copied verbatim beside `SKILL.md`, recorded per relative path, classified through the six existing statuses, removed on uninstall — plus `src/skills/code-review/_helpers/review-range.mjs` (443 lines incl. the normalised docstring) proven to run from the installed location. FLOW still keeps its copy **and its 227-line test**, so a two-copy window is open until 2b. **Slice 2c is implemented and measured but not committed** (see *Implementation session — slice 2c*, *Measured against 2c*, *Slice-2c status*): every target declares the frontmatter it can carry (`TargetFrontmatter`, per mode) and the native commands it must not shadow; `install` and `sync` report every declared field a target cannot express, naming the field and the consequence; a `requires` entry with no renderer is an error that writes nothing (sync exits 2 before its first write); the `sk-` slug rule is now checked against each target's recorded built-ins; and `SKILLSET_CONFIG=<path>` is the seam the end-to-end tests use. Gates were clean — 25 files / 241 tests, biome clean. Slice 3 has an inventory section but stays parked.
+> **State.** Slice 1 (`880fdfe`) and slice 2a (`7e65d1a`) are committed and signed off. **Slices 2c and 2b are implemented, green and uncommitted** — two messages are drafted, one per repository. 2c: each target declares the frontmatter it can carry (`TargetFrontmatter`, per mode) and the native commands it must not shadow; `install`/`sync` report every declared field a target cannot express; a `requires` entry with no renderer is an error that writes nothing; the `sk-` slug rule is checked against each target's recorded built-ins; `SKILLSET_CONFIG=<path>` is the test seam. 2b: the portable review lives here (211-line body, `_helpers/review-range.mjs`, `templates/review.md`, declared as pi `auto` + pi `slash` + claude-code `slash`, with `requires: {code-review: {pi: ["contract"]}}`); FLOW's copy is deleted; FLOW's repair arm is renamed `flow-remediate`; the two-copy window for the helper is **closed**. 2b also fixed three prerequisites it uncovered: the frontmatter renderer now handles nested mappings, `fieldSupport` judges expressibility across the modes an agent is installed in (it refused a required field outright otherwise), and FLOW's invariant helper now threads user-installed contracts like production does.
 >
-> **Go state.** 2b has **no go** — ask before building it. 2c is built; if the developer wants it committed, the message is drafted and they run it. 2b's prerequisite gap is smaller now but not closed: the matrix says which fields the review can carry per harness, so the remaining decision is whether claude-code takes the review as a **skill** (`auto`, which has a directory for `_helpers/review-range.mjs`) or a **command** (`slash`, which has none) — and `code-review` still declares only `slash` installs on pi and claude-code, so every `sync` run reports its declared helper on stderr (a CLI test pins that note).
+> **Go state.** Nothing is authorised next. The open questions, in the order I would take them: **(a)** the body-fidelity call — 211 lines keeps the method and dispatch contract but drops FLOW's wave choreography and literal agent prompts; a second pass restores it (ask, don't assume); **(b)** `allowed-tools` for the review on claude-code was deliberately left undeclared, so runs prompt for Bash permissions they could pre-approve; **(c)** slice 3 — the inventory is written, the first step is the agent-definition concept (3a), which needs the same per-target dialect work 2c built for skills.
+>
+> **The dependency is live and documented.** `packages/flow/docs/skills.md` (*The review is a dependency*) states what happens with the review uninstalled: `/wf` loads, and the workflows dispatching a `code-review` stage report `produces-without-outcome` and `route-reads-unvalidated-data` at validation. That is the pinned failure mode, not a silent empty stage.
 >
 > **Verification lesson for 2b.** AC-5 was proved by execution on the claude-code side (its own loader logged `project: 1` with our artifact and `project: 0` without it; authentication failed, so no model call happened and the log is the loader's). The opencode side **could not be** proved: its installed arm64 binary is `invalid signature` and is SIGKILLed on every invocation, so reinstall it before trusting anything about opencode's discovery. Copilot CLI is installed nowhere on this machine and stays doc-level; this target writes `mode: agent` into `.github/prompts/*.prompt.md` where VS Code's current reference documents `agent:`.
 >

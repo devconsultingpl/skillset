@@ -92,13 +92,16 @@ describe("cli — harness field support (0023 slice 2c)", () => {
 
   it("reports no unsupported field for the repository's own declarations", async () => {
     // The honest current state: no shipped skill declares a harness field its
-    // target cannot express, so a healthy sync is silent about the matrix. The
-    // first live subject is 2b's review declaration.
+    // target cannot express, so a healthy sync is silent about the matrix. Since
+    // 2b the review declares `contract` for pi — expressible there through the
+    // `auto` install, which is why the check judges a field across the modes an
+    // agent is installed in rather than per artifact.
     const out = run(["sync", "--dry-run"], sb.projectRoot, sb.env);
 
     expect(out.status).toBe(0);
     expect(out.stderr).not.toContain("cannot express");
-    expect(out.stderr).toContain("declared sibling file(s)");
+    // Neither the capability report nor the sibling note: both gaps are closed.
+    expect(out.stderr).not.toContain("declared sibling file(s)");
   });
 });
 

@@ -367,7 +367,10 @@ export async function declarationCoverage(
  * - a field declared at the top level reaches no renderer at all, because every
  *   renderer composes a fixed shape and forwards only `targets.<agent>`;
  * - a field declared under `targets.<agent>` reaches the artifact, but the
- *   harness may ignore it — the warning names the field and the consequence;
+ *   harness may ignore it — the warning names the field and the consequence.
+ *   Expressibility is judged across the modes this (skill, agent) is installed
+ *   in, because each mode writes its own artifact and the harness reads the
+ *   field from whichever of them carries it;
  * - a field listed in `requires` is not a preference: with no renderer for it,
  *   installing anyway would ship a skill whose stated requirement is unmet, so
  *   it is an error and the caller writes nothing.
@@ -375,27 +378,33 @@ export async function declarationCoverage(
 export function fieldSupport(
   skill: ParsedSkill,
   agent: AgentName,
-  mode: Mode,
+  modes: readonly Mode[],
   required: readonly string[] = [],
 ): { warnings: string[]; errors: string[] } {
   const target = targetFor(agent);
-  const expresses = target.frontmatter.expresses[mode] ?? [];
+  // Expressibility is judged across every mode this (skill, agent) is installed
+  // in, not per artifact: `targets.<agent>` is written into each of them, so a
+  // field one mode carries reaches the harness even where another mode drops it.
+  // Judging per mode reported `contract` as unrenderable for pi's slash install
+  // while its auto skill carried it — and refused a required one outright.
+  const expresses = new Set(modes.flatMap((mode) => target.frontmatter.expresses[mode] ?? []));
   const overrides = (skill.frontmatter.targets?.[agent] ?? {}) as Record<string, unknown>;
   const name = skill.frontmatter.name;
+  const where = modes.length === 0 ? "" : ` (${modes.join("|")})`;
   const warnings: string[] = [];
   const errors: string[] = [];
 
   for (const field of Object.keys(skill.frontmatter)) {
     if (SKILLSET_FIELDS.includes(field) || field in overrides) continue;
     warnings.push(
-      `${name} → ${agent} (${mode}): \`${field}\` is declared at the top level, where no renderer forwards it for any target — put it under \`targets.${agent}\``,
+      `${name} → ${agent}${where}: \`${field}\` is declared at the top level, where no renderer forwards it for any target — put it under \`targets.${agent}\``,
     );
   }
 
   for (const field of Object.keys(overrides)) {
-    if (expresses.includes(field)) continue;
+    if (expresses.has(field)) continue;
     warnings.push(
-      `${name} → ${agent} (${mode}): \`${agent}\` cannot express \`${field}\` — ${
+      `${name} → ${agent}${where}: \`${agent}\` cannot express \`${field}\` — ${
         target.frontmatter.consequence?.[field] ??
         `the field is written to the artifact and ignored by ${agent}`
       }`,
@@ -403,15 +412,15 @@ export function fieldSupport(
   }
 
   for (const field of required) {
-    if (!expresses.includes(field)) {
+    if (!expresses.has(field)) {
       errors.push(
-        `${name} → ${agent} (${mode}): required field \`${field}\` has no renderer for ${agent} — refusing a partial install`,
+        `${name} → ${agent}${where}: required field \`${field}\` has no renderer for ${agent} — refusing a partial install`,
       );
       continue;
     }
     if (!(field in overrides)) {
       warnings.push(
-        `${name} → ${agent} (${mode}): required field \`${field}\` is expressible but nothing declares a value for it — add \`targets.${agent}.${field}\``,
+        `${name} → ${agent}${where}: required field \`${field}\` is expressible but nothing declares a value for it — add \`targets.${agent}.${field}\``,
       );
     }
   }

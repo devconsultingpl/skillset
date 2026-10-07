@@ -66,19 +66,29 @@ describe("parseDeclarations — requires", () => {
  */
 describe("fieldSupport", () => {
   it("stays silent for a field the harness can carry", () => {
-    const report = fieldSupport(
-      skillWith("targets:\n  opencode:\n    license: MIT"),
-      "opencode",
+    const report = fieldSupport(skillWith("targets:\n  opencode:\n    license: MIT"), "opencode", [
       "auto",
-    );
+    ]);
     expect(report).toEqual({ warnings: [], errors: [] });
+  });
+
+  it("judges expressibility across every mode the agent is installed in", () => {
+    // Regression: `contract` is a pi *skill* field, so a per-mode check reported
+    // it unrenderable for the slash install — and refused it outright when a
+    // skill required it, which is exactly what the review declares (2b).
+    const skill = skillWith("targets:\n  pi:\n    contract:\n      produces: {}\n");
+
+    expect(fieldSupport(skill, "pi", ["auto"])).toEqual({ warnings: [], errors: [] });
+    expect(fieldSupport(skill, "pi", ["auto", "slash"])).toEqual({ warnings: [], errors: [] });
+    expect(fieldSupport(skill, "pi", ["auto", "slash"], ["contract"]).errors).toEqual([]);
+    expect(fieldSupport(skill, "pi", ["slash"], ["contract"]).errors).toHaveLength(1);
   });
 
   it("names the field and the consequence when the harness ignores it", () => {
     const { warnings } = fieldSupport(
       skillWith("targets:\n  opencode:\n    disable-model-invocation: true"),
       "opencode",
-      "auto",
+      ["auto"],
     );
 
     expect(warnings).toHaveLength(1);
@@ -87,7 +97,7 @@ describe("fieldSupport", () => {
   });
 
   it("reports a top-level harness field, which no renderer forwards", () => {
-    const { warnings } = fieldSupport(skillWith("disable-model-invocation: true"), "pi", "slash");
+    const { warnings } = fieldSupport(skillWith("disable-model-invocation: true"), "pi", ["slash"]);
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain("declared at the top level");
@@ -97,16 +107,21 @@ describe("fieldSupport", () => {
   it("reports a field the mode cannot carry even when another mode can", () => {
     // `name` is stripped from prompt files on purpose — the filename governs —
     // but it is a field of a skill file.
-    const { warnings } = fieldSupport(skillWith("targets:\n  pi:\n    name: demo"), "pi", "slash");
+    const { warnings } = fieldSupport(skillWith("targets:\n  pi:\n    name: demo"), "pi", [
+      "slash",
+    ]);
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain("cannot express `name`");
   });
 
   it("errors on a required field with no renderer", () => {
-    const { warnings, errors } = fieldSupport(skillWith(""), "opencode", "slash", [
-      "disable-model-invocation",
-    ]);
+    const { warnings, errors } = fieldSupport(
+      skillWith(""),
+      "opencode",
+      ["slash"],
+      ["disable-model-invocation"],
+    );
 
     expect(warnings).toEqual([]);
     expect(errors).toHaveLength(1);
@@ -115,7 +130,7 @@ describe("fieldSupport", () => {
   });
 
   it("warns when a required field is expressible but nothing writes a value", () => {
-    const { warnings, errors } = fieldSupport(skillWith(""), "pi", "auto", ["contract"]);
+    const { warnings, errors } = fieldSupport(skillWith(""), "pi", ["auto"], ["contract"]);
 
     expect(errors).toEqual([]);
     expect(warnings).toHaveLength(1);
