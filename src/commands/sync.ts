@@ -14,6 +14,7 @@ import { loadBundledSkill } from "../core/bundle.js";
 import {
   type ClassifiedInstall,
   type InstallStatus,
+  STATUS_ORDER,
   classifyAll,
   declarationCoverage,
   loadDeclarations,
@@ -31,16 +32,7 @@ export interface SyncOptions {
   projectRoot?: string;
 }
 
-/** Report order: what needs attention first, what is healthy last. */
-const STATUS_ORDER: readonly InstallStatus[] = [
-  "foreign",
-  "drifted",
-  "missing",
-  "adoptable",
-  "undeclared",
-  "in-sync",
-];
-
+/** Status labels, keyed by the classifier's report order — see STATUS_ORDER. */
 const STATUS_LABEL: Record<InstallStatus, (text: string) => string> = {
   foreign: (t) => pc.red(t),
   drifted: (t) => pc.yellow(t),
@@ -103,8 +95,8 @@ function reportPriorContent(current: string, next: string, maxLines = 60): strin
 
 export async function sync(opts: SyncOptions = {}): Promise<number> {
   const projectRoot = opts.projectRoot ?? process.cwd();
-  const { declarations, problems } = await loadDeclarations();
-  const coverage = declarations.length > 0 ? await declarationCoverage(declarations) : [];
+  const { declarations, siblings, problems } = await loadDeclarations();
+  const coverage = declarations.length > 0 ? await declarationCoverage(declarations, siblings) : [];
   const allProblems = [...problems, ...coverage];
   if (allProblems.length > 0) {
     for (const problem of allProblems) {
@@ -114,7 +106,7 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
   }
 
   let state = await readState();
-  const classified = await classifyAll(declarations, state);
+  const classified = await classifyAll(declarations, state, siblings);
   classified.sort((a, b) => {
     const order = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
     return order !== 0 ? order : describe(a).localeCompare(describe(b));
@@ -134,6 +126,22 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
       where,
       pc.dim(note),
     );
+
+    // A declared sibling file is reported per file: the install line above
+    // carries the rolled-up status, which hides *which* helper went missing.
+    for (const sibling of item.siblings ?? []) {
+      if (sibling.status === "in-sync") continue;
+      console.log(
+        `      ${sibling.rel}:`,
+        STATUS_LABEL[sibling.status](sibling.status),
+        pc.dim(displayPath(sibling.path)),
+        pc.dim(opts.dryRun ? inDryRun[sibling.status] : ACTION[sibling.status]),
+      );
+      if (sibling.currentBytes != null && sibling.nextBytes !== undefined) {
+        const report = reportPriorContent(sibling.currentBytes, sibling.nextBytes);
+        if (report) console.log(report);
+      }
+    }
 
     if (item.status === "foreign") {
       foreign += 1;
@@ -170,6 +178,7 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
       scope: declaration.scope,
       mode: declaration.mode,
       projectRoot: declaration.projectPath ?? projectRoot,
+      siblings: siblings[declaration.skill] ?? [],
     });
     state = upsertInstall(state, record);
     changed += 1;
@@ -182,6 +191,17 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
   const summary = STATUS_ORDER.filter((status) => counts.has(status)).map(
     (status) => `${status} ${counts.get(status)}`,
   );
+  // A declared sibling whose installs all write a single file into a shared
+  // directory has nowhere to go: the declaration promises tools nothing can
+  // carry. Report the gap instead of leaving it to a note at install time.
+  for (const [skillName, files] of Object.entries(siblings)) {
+    const placed = classified.some((item) => item.declaration.skill === skillName && item.siblings);
+    if (placed) continue;
+    console.error(
+      pc.yellow("note"),
+      `${skillName}: ${files.length} declared sibling file(s), but no declared install of it writes a skill directory (\`auto\` mode) — none are copied`,
+    );
+  }
   console.log(
     opts.dryRun ? pc.bold("checked") : pc.bold("reconciled"),
     pc.dim(summary.join(" · ")),
@@ -201,10 +221,10 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
 export async function classifyReport(
   opts: { projectRoot?: string } = {},
 ): Promise<{ items: ClassifiedInstall[]; problems: string[]; state: SkillsetState }> {
-  const { declarations, problems } = await loadDeclarations();
-  const coverage = declarations.length > 0 ? await declarationCoverage(declarations) : [];
+  const { declarations, siblings, problems } = await loadDeclarations();
+  const coverage = declarations.length > 0 ? await declarationCoverage(declarations, siblings) : [];
   const state = await readState();
-  const items = await classifyAll(declarations, state);
+  const items = await classifyAll(declarations, state, siblings);
   return { items, problems: [...problems, ...coverage], state };
 }
 

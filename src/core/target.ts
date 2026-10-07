@@ -1,10 +1,13 @@
-import type { InstallRecord, Mode, ParsedSkill, Scope } from "./types.js";
+import type { InstallRecord, Mode, ParsedSkill, Scope, SiblingFile } from "./types.js";
 
 export interface InstallContext {
   skill: ParsedSkill;
   scope: Scope;
   mode: Mode;
   projectRoot: string;
+  /** The skill's declared sibling files (2a): copied verbatim into the install
+   * directory when this (agent, mode) has one. Absent means none were declared. */
+  siblings?: SiblingFile[];
 }
 
 /**

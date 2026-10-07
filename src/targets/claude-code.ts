@@ -1,7 +1,7 @@
 import { rm } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { compose } from "../core/frontmatter.js";
-import { readMaybe, writeAtomic } from "../core/fs.js";
+import { copySiblings, readMaybe, writeAtomic } from "../core/fs.js";
 import { layoutFor } from "../core/locations.js";
 import { MD, remove, upsert } from "../core/markers.js";
 import { STATUSLINE_COMMAND, addStatusLine, dropStatusLine } from "../core/statusline.js";
@@ -160,6 +160,9 @@ export const claudeCodeTarget: AgentTarget = {
       installRoot = dirname(path);
       await writeAtomic(path, renderSkillFile(ctx));
       files.push(relative(installRoot, path));
+      // Declared sibling files land beside SKILL.md, verbatim (2a). Kept in step
+      // with `always` below, which writes into the same directory.
+      await copySiblings(ctx.siblings, installRoot, files);
     } else if (mode === "slash") {
       const path = layout.slash(slug, scope, projectRoot);
       installRoot = dirname(path);
@@ -185,12 +188,13 @@ export const claudeCodeTarget: AgentTarget = {
       // always: write skill file too (for emit fallback + discoverability),
       // then register a SessionStart hook in settings.json.
       const skillPath = layout.auto!(name, scope, projectRoot);
+      installRoot = dirname(skillPath);
       await writeAtomic(skillPath, renderSkillFile(ctx));
+      files.push(relative(installRoot, skillPath));
+      await copySiblings(ctx.siblings, installRoot, files);
       const settingsPath = layout.always(scope, projectRoot);
       const settings = await readSettings(settingsPath);
       await writeSettings(settingsPath, addHook(settings, name));
-      installRoot = dirname(skillPath);
-      files.push(relative(installRoot, skillPath));
       insertions.push(settingsPath);
     }
 

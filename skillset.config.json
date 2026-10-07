@@ -1,5 +1,8 @@
 {
   "version": 1,
+  "siblings": {
+    "code-review": ["_helpers/review-range.mjs"]
+  },
   "installs": {
     "appsec-review": [
       {

@@ -185,6 +185,31 @@ state file and the disk:
 | `foreign` | on disk unrecorded and **not** ours | refuses to touch it, exits non-zero |
 | `undeclared` | recorded, no longer declared | reports it; `--prune` removes it |
 
+### Files that travel with a skill
+
+A skill that ships a helper, a template or a reference declares it under `siblings` — one relative
+path per file, never "whatever sits in the directory":
+
+```json
+{
+  "version": 1,
+  "siblings": { "code-review": ["_helpers/review-range.mjs"] },
+  "installs": { "code-review": [{ "agent": "pi", "mode": "auto" }] }
+}
+```
+
+Siblings are copied **verbatim** beside `SKILL.md` — never rendered, so a `config:` placeholder in
+one is a mistake rather than a substitution — recorded per relative path, and removed by
+`uninstall`. Only installs that write a per-skill directory carry them: `auto` mode on pi,
+claude-code and opencode, plus claude-code's `always`, which writes a skill file beside its settings
+hook. A `slash` prompt or a marker block installs a single file into a shared directory, so a
+declared sibling cannot travel there and both `install` and `sync` say so instead of dropping it
+silently.
+
+A declared path that is not a file in `src/skills/<skill>/` is a reported error (exit 2). Each
+sibling is classified through the same six statuses as the skill file: edited → `drifted` (rewritten
+from source, prior content reported), present, unrecorded and different → `foreign` (refused).
+
 ## Reinstall guard
 
 A different mode is a different install: `--mode auto` beside an existing `slash` install records

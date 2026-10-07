@@ -4,7 +4,7 @@ import { loadBundledSkill } from "../core/bundle.js";
 import { classifyInstall, declaredModes, loadDeclarations } from "../core/declarations.js";
 import { matchInstall, readState, upsertInstall, writeState } from "../core/state.js";
 import { applyConfigToSkill } from "../core/template.js";
-import type { AgentName, Mode, ParsedSkill, Scope } from "../core/types.js";
+import type { AgentName, InstallDeclaration, Mode, ParsedSkill, Scope } from "../core/types.js";
 import { AGENTS, MODES } from "../core/types.js";
 import { targetFor } from "../targets/index.js";
 
@@ -28,12 +28,12 @@ export interface InstallOptions {
  * without a flag, so it asks instead of guessing.
  */
 async function resolveMode(
+  declarations: readonly InstallDeclaration[],
   skill: string,
   agent: AgentName,
   opts: InstallOptions,
 ): Promise<Mode | null> {
   if (opts.mode) return opts.mode;
-  const { declarations } = await loadDeclarations();
   const modes = declaredModes(declarations, skill, agent, opts.scope);
   if (modes.length === 1) return modes[0] ?? null;
   if (modes.length === 0) {
@@ -96,11 +96,13 @@ export async function install(opts: InstallOptions): Promise<number> {
   let failures = 0;
 
   let state = await readState();
+  const { declarations, siblings } = await loadDeclarations();
   for (const skillName of opts.skills) {
     const raw = await loadBundledSkill(skillName);
     const skill = applyConfigToSkill(raw, opts.configOverrides);
+    const declaredSiblings = siblings[skillName] ?? [];
     for (const agent of opts.agents) {
-      const mode = await resolveMode(skillName, agent, opts);
+      const mode = await resolveMode(declarations, skillName, agent, opts);
       if (mode === null) continue;
       if (mode === "always") warnIfBodyLarge(skill.body, skillName);
       const target = targetFor(agent);
@@ -129,6 +131,7 @@ export async function install(opts: InstallOptions): Promise<number> {
             ...(projectPath ? { projectPath } : {}),
           },
           state,
+          siblings,
         );
         if (classified.status === "foreign") {
           failures += 1;
@@ -157,6 +160,7 @@ export async function install(opts: InstallOptions): Promise<number> {
         scope: opts.scope,
         mode,
         projectRoot,
+        siblings: declaredSiblings,
       });
       state = upsertInstall(state, record);
       console.log(
@@ -164,6 +168,18 @@ export async function install(opts: InstallOptions): Promise<number> {
         `${skillName} → ${agent}`,
         pc.dim(`(${mode}, ${opts.scope}) ${record.location}`),
       );
+      // A sibling is copied beside SKILL.md or not at all; slash prompts and
+      // marker blocks have no directory to put one in. Say so rather than
+      // leaving a declared helper silently absent.
+      if (
+        declaredSiblings.length > 0 &&
+        !declaredSiblings.some((sibling) => record.files.includes(sibling.rel))
+      ) {
+        console.error(
+          pc.yellow("note"),
+          `${skillName} → ${agent} (${mode}, ${opts.scope}) declares ${declaredSiblings.length} sibling file(s), which install only beside SKILL.md — none copied; install as \`auto\` to ship them`,
+        );
+      }
     }
   }
   await writeState(state);

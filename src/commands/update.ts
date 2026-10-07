@@ -1,7 +1,9 @@
 import { join } from "node:path";
 import pc from "picocolors";
 import { loadBundledSkill } from "../core/bundle.js";
+import { classifySiblings, loadDeclarations } from "../core/declarations.js";
 import { lineDiff } from "../core/diff.js";
+import { skillDirectoryFor } from "../core/locations.js";
 import { isInteractive, readlineAsker, resolveDivergence } from "../core/prompt.js";
 import { readState, upsertInstall, writeState } from "../core/state.js";
 import type { InstallContext } from "../core/target.js";
@@ -47,6 +49,9 @@ export async function update(opts: UpdateOptions = {}): Promise<void> {
   }
 
   const interactive = isInteractive();
+  // Declared sibling files are copied, not rendered, so `preview` cannot see
+  // them; a helper the user edited is divergence all the same.
+  const { siblings } = await loadDeclarations();
 
   for (const rec of [...state.installs]) {
     let skill: ParsedSkill;
@@ -58,23 +63,48 @@ export async function update(opts: UpdateOptions = {}): Promise<void> {
     }
 
     const target = targetFor(rec.agent);
+    const declared = siblings[rec.skill] ?? [];
     const ctx: InstallContext = {
       skill,
       scope: rec.scope,
       mode: rec.mode,
       projectRoot: rec.projectPath ?? process.cwd(),
+      siblings: declared,
     };
     const label = `${rec.skill} → ${rec.agent} (${rec.mode}, ${rec.scope})`;
 
+    const directory = skillDirectoryFor({
+      agent: rec.agent,
+      mode: rec.mode,
+      name: skill.frontmatter.name,
+      scope: rec.scope,
+      projectRoot: ctx.projectRoot,
+    });
+    const siblingStates =
+      directory && declared.length > 0
+        ? await classifySiblings(declared, directory, new Set(rec.files))
+        : [];
+    const siblingDrift = siblingStates.filter((state) => state.status === "drifted");
+
     const { current, next } = await target.preview(ctx, rec);
-    const diverged = current !== null && current !== next;
+    const primaryDiverged = current !== null && current !== next;
+    const diverged = primaryDiverged || siblingDrift.length > 0;
+    // What a prompt names: the primary artifact when it moved, otherwise the
+    // sibling files that did.
+    const divergedWhat = primaryDiverged
+      ? [displayPath(rec)]
+      : siblingDrift.map((state) => state.path);
 
     if (opts.dryRun) {
       if (!diverged) {
         console.log(pc.dim("up-to-date"), label);
       } else {
         const action = opts.force ? "overwrite" : "skip";
-        console.log(pc.yellow("diverged"), label, pc.dim(`${displayPath(rec)} — would ${action}`));
+        console.log(
+          pc.yellow("diverged"),
+          label,
+          pc.dim(`${divergedWhat.join(", ")} — would ${action}`),
+        );
       }
       continue;
     }
@@ -84,14 +114,25 @@ export async function update(opts: UpdateOptions = {}): Promise<void> {
         console.warn(
           pc.yellow("skip"),
           label,
-          pc.dim(`${displayPath(rec)} has local edits (use --force to overwrite)`),
+          pc.dim(`${divergedWhat.join(", ")} has local edits (use --force to overwrite)`),
         );
         continue;
       }
-      console.log(pc.yellow(`\n${label}`), pc.dim(`at ${displayPath(rec)}`), "has local edits.");
-      const decision = await resolveDivergence(readlineAsker, () =>
-        printDiff(current as string, next),
+      console.log(
+        pc.yellow(`\n${label}`),
+        pc.dim(`at ${divergedWhat.join(", ")}`),
+        "has local edits.",
       );
+      const decision = await resolveDivergence(readlineAsker, () => {
+        if (primaryDiverged) {
+          printDiff(current as string, next);
+          return;
+        }
+        const first = siblingDrift[0];
+        if (first?.currentBytes != null && first.nextBytes !== undefined) {
+          printDiff(first.currentBytes, first.nextBytes);
+        }
+      });
       if (decision === "abort") {
         console.log(pc.dim("aborted; remaining installs left untouched."));
         break;

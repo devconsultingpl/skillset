@@ -52,6 +52,20 @@ one JSON object per line in `.skillset/suggestions.jsonl`
 which the developer triages in a skillset session. See ADR 0006 and
 the `instruction-ownership` skill.
 
+## Skill payloads — declared siblings
+
+A skill with tools (helper scripts, templates, references) ships them as **declared siblings**: name
+each path in `skillset.config.json` under `siblings.<skill>`, relative to the skill directory.
+
+- Copied byte-for-byte into the install directory beside `SKILL.md`; never rendered, so a `config:`
+  placeholder in a sibling is a mistake, not a feature.
+- Declared, never inferred: shipping a 400-line helper is a deliberate, reviewable statement.
+- Recorded per relative path, so an edited helper is `drifted` and an unrecorded one is `foreign`.
+- Siblings need a per-skill directory (`auto` mode). A `slash` prompt or marker block has none, and
+  the gap is reported rather than left silent — say which install is supposed to carry the tools.
+- `assets/` keeps its distinct meaning: foreign-runtime artifacts read at install time by
+  `assetPath` and landing *outside* the skill directory (a plugin, an extension, a hook).
+
 ## Tests
 
 Vitest. Unit tests live next to source (`src/**/*.test.ts`). CLI end-to-end tests live under `test/`. Cover happy path + uninstall via markers for every target.

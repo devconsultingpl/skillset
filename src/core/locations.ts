@@ -119,6 +119,31 @@ export function artifactPath(opts: {
   }
 }
 
+/**
+ * The directory a skill's declared sibling files install into, or null when this
+ * (agent, mode) writes no per-skill directory: slash mode drops a single prompt
+ * file into a shared directory, and a marker block appends to a file the user
+ * owns. Siblings travel only where there is a skill directory to put them in.
+ *
+ * claude-code `always` is the one exception, and it is derived from what that
+ * target actually does: it writes a skill file beside the settings hook, so it
+ * has a directory to fill.
+ */
+export function skillDirectoryFor(opts: {
+  agent: AgentName;
+  mode: Mode;
+  name: string;
+  scope: Scope;
+  projectRoot: string;
+}): string | null {
+  const layout = layoutFor(opts.agent);
+  if (!layout.auto) return null;
+  const writesSkillDir =
+    opts.mode === "auto" || (opts.agent === "claude-code" && opts.mode === "always");
+  if (!writesSkillDir) return null;
+  return dirname(layout.auto(opts.name, opts.scope, opts.projectRoot));
+}
+
 /** Path of skillset's own state file (~/.skillset/state.json). */
 export function stateFilePath(): string {
   return join(homedir(), ".skillset", "state.json");

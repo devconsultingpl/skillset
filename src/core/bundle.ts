@@ -35,6 +35,13 @@ export function templatesRoot(skillName: string): string {
   return resolve(skillsRoot, skillName, "templates");
 }
 
+/** Absolute path of a file shipped beside a skill's `SKILL.md` (a declared
+ * sibling: helper, template, reference). Resolution only — nothing is read or
+ * copied here, so a missing file surfaces as a declaration-coverage problem. */
+export function skillSourcePath(skillName: string, rel: string): string {
+  return resolve(skillsRoot, skillName, rel);
+}
+
 /** Path to a bundled executable artifact shipped alongside a skill (e.g. the
  * opencode plugin / pi extension installed with `skillset-status`). */
 export function assetPath(skillName: string, file: string): string {

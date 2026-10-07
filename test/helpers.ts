@@ -9,6 +9,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 export const cliPath = resolve(here, "..", "dist", "cli.js");
 
+/** Repository root — for tests that compare an installed copy with its source. */
+export const repoRoot = resolve(here, "..");
+
 export async function exists(path: string): Promise<boolean> {
   try {
     await access(path, constants.F_OK);

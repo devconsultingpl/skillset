@@ -14,6 +14,22 @@ afterEach(async () => {
 });
 
 describe("copilot target", () => {
+  describe("sibling files", () => {
+    it("has no skill directory, so a declared sibling is reported, not copied", async () => {
+      const out = run(
+        ["install", "code-review", "--agent", "copilot", "--mode", "slash", "--global"],
+        sb.projectRoot,
+        sb.env,
+      );
+      expect(out.status).toBe(0);
+      expect(out.stderr).toContain("sibling file(s), which install only beside SKILL.md");
+      // Copilot has no auto mode and no per-skill directory: nothing to copy into.
+      expect(await exists(join(sb.home, ".skillset", "copilot", "prompts", "_helpers"))).toBe(
+        false,
+      );
+    });
+  });
+
   it("rejects auto mode with a helpful message", () => {
     const out = run(
       ["install", "confidence", "--agent", "copilot", "--mode", "auto", "--local"],

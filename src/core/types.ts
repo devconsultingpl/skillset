@@ -33,6 +33,21 @@ export interface TargetArtifact {
   contents: string;
 }
 
+/**
+ * A file a skill ships beside its `SKILL.md` — a helper script, a template, a
+ * reference — copied verbatim into the install directory rather than rendered.
+ * Declared per skill in `skillset.config.json`, because shipping a 439-line
+ * helper must be a deliberate, reviewable statement, not "whatever sits in the
+ * directory".
+ */
+export interface SiblingFile {
+  /** Path relative to the skill's source directory — and to the install
+   * directory it is copied into. */
+  rel: string;
+  /** Absolute path of the bundled source file. */
+  source: string;
+}
+
 export interface InstallRecord {
   skill: string;
   /** Slug used as the slash-command filename. May differ from `skill` (e.g. the
@@ -90,4 +105,6 @@ export interface InstallDeclaration {
 export interface Declarations {
   version: 1;
   installs: InstallDeclaration[];
+  /** Declared sibling files per skill, with their resolved bundle sources. */
+  siblings: Record<string, SiblingFile[]>;
 }

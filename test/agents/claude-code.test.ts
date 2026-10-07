@@ -51,6 +51,40 @@ describe("claude-code", () => {
     expect(await exists(settingsPath)).toBe(false);
   });
 
+  describe("sibling files", () => {
+    const helper = () =>
+      join(sb.home, ".claude", "skills", "code-review", "_helpers", "review-range.mjs");
+
+    it("auto: copies a declared sibling beside SKILL.md", async () => {
+      const out = run(
+        ["install", "code-review", "--agent", "claude-code", "--mode", "auto", "--global"],
+        sb.projectRoot,
+        sb.env,
+      );
+      expect(out.status).toBe(0);
+      expect(await exists(helper())).toBe(true);
+      expect(await readFile(helper(), "utf8")).toContain("review-range.mjs — scope resolution");
+
+      expect(run(["uninstall", "code-review", "--global"], sb.projectRoot, sb.env).status).toBe(0);
+      expect(await exists(join(sb.home, ".claude", "skills", "code-review"))).toBe(false);
+    });
+
+    it("always: writes the skill file too, so the sibling lands with it", async () => {
+      const out = run(
+        ["install", "code-review", "--agent", "claude-code", "--mode", "always", "--global"],
+        sb.projectRoot,
+        sb.env,
+      );
+      expect(out.status).toBe(0);
+      expect(await exists(helper())).toBe(true);
+      expect(await exists(join(sb.home, ".claude", "settings.json"))).toBe(true);
+
+      expect(run(["uninstall", "code-review", "--global"], sb.projectRoot, sb.env).status).toBe(0);
+      expect(await exists(helper())).toBe(false);
+      expect(await exists(join(sb.home, ".claude", "settings.json"))).toBe(false);
+    });
+  });
+
   it("set-mode swaps slash → always", async () => {
     run(
       ["install", "confidence", "--agent", "claude-code", "--mode", "slash", "--local"],

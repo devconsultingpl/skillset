@@ -17,12 +17,12 @@
  * record-shaped stand-in supplies the path its renderer needs; the bytes
  * themselves still come from the target, never from a second renderer here.
  */
-import { readFile } from "node:fs/promises";
-import { basename, dirname } from "node:path";
+import { readFile, stat } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, normalize } from "node:path";
 import { targetFor } from "../targets/index.js";
-import { listBundledSkills, loadBundledSkill } from "./bundle.js";
-import { readMaybe } from "./fs.js";
-import { artifactPath, declarationsFilePath } from "./locations.js";
+import { listBundledSkills, loadBundledSkill, skillSourcePath } from "./bundle.js";
+import { fileExists, readMaybe, readMaybeBytes } from "./fs.js";
+import { artifactPath, declarationsFilePath, skillDirectoryFor } from "./locations.js";
 import { MD, extract } from "./markers.js";
 import { applyConfigToSkill } from "./template.js";
 import type {
@@ -32,6 +32,7 @@ import type {
   Mode,
   ParsedSkill,
   Scope,
+  SiblingFile,
   SkillsetState,
 } from "./types.js";
 import { AGENTS, MODES } from "./types.js";
@@ -61,10 +62,41 @@ export interface ClassifiedInstall {
   currentBytes?: string | null;
   /** Present for `drifted`: what an install would write instead. */
   nextBytes?: string;
+  /** Per-file state of the skill's declared siblings, when this (agent, mode)
+   * has a skill directory to hold them. `status` above is the worst of these
+   * and the primary artifact's. */
+  siblings?: SiblingState[];
 }
+
+/** One declared sibling file, classified the same way a skill artifact is. */
+export interface SiblingState {
+  rel: string;
+  /** Absolute path the sibling occupies in the install directory. */
+  path: string;
+  status: InstallStatus;
+  /** Present when something is on disk: what an install would replace. */
+  currentBytes?: string;
+  /** Present for `drifted` and `foreign`: what an install would write instead. */
+  nextBytes?: string;
+}
+
+/**
+ * Report order — and therefore the rank a rolled-up install takes: a foreign
+ * sibling makes the whole install `foreign`, an in-sync one is invisible.
+ */
+export const STATUS_ORDER: readonly InstallStatus[] = [
+  "foreign",
+  "drifted",
+  "missing",
+  "adoptable",
+  "undeclared",
+  "in-sync",
+];
 
 export interface DeclarationParseResult {
   declarations: InstallDeclaration[];
+  /** Declared sibling files per skill, with absolute bundle source paths. */
+  siblings: Record<string, SiblingFile[]>;
   problems: string[];
 }
 
@@ -72,21 +104,82 @@ function isKnown<T extends string>(values: readonly T[], value: unknown): value 
   return typeof value === "string" && (values as readonly string[]).includes(value);
 }
 
+/**
+ * Parse the `siblings` block: which files a skill ships beside its `SKILL.md`.
+ * Pure shape rules only — whether the file exists is coverage's job — but the
+ * shape rules are the safety ones: a sibling is copied byte-for-byte into the
+ * install directory, so an absolute path or an escape would write outside it.
+ */
+function parseSiblings(raw: unknown, problems: string[]): Record<string, SiblingFile[]> {
+  const siblings: Record<string, SiblingFile[]> = {};
+  if (raw === undefined) return siblings;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    problems.push("`siblings` must be an object keyed by skill name");
+    return siblings;
+  }
+
+  for (const [skill, entries] of Object.entries(raw as Record<string, unknown>)) {
+    if (!Array.isArray(entries)) {
+      problems.push(`${skill}: sibling files must be an array of relative paths`);
+      continue;
+    }
+    const kept: SiblingFile[] = [];
+    const seen = new Set<string>();
+    for (const entry of entries) {
+      if (typeof entry !== "string" || entry.length === 0) {
+        problems.push(`${skill}: a sibling file must be a non-empty relative path`);
+        continue;
+      }
+      if (isAbsolute(entry)) {
+        problems.push(`${skill}: sibling file must be relative, not absolute: ${entry}`);
+        continue;
+      }
+      const rel = normalize(entry);
+      if (rel.startsWith("..")) {
+        problems.push(`${skill}: sibling file points outside the skill directory: ${entry}`);
+        continue;
+      }
+      if (rel === "SKILL.md") {
+        problems.push(`${skill}: SKILL.md is rendered, not copied — remove it from siblings`);
+        continue;
+      }
+      if (seen.has(rel)) {
+        problems.push(`${skill}: sibling file declared twice: ${rel}`);
+        continue;
+      }
+      seen.add(rel);
+      kept.push({ rel, source: skillSourcePath(skill, rel) });
+    }
+    if (kept.length > 0) siblings[skill] = kept;
+  }
+  return siblings;
+}
+
 /** Parse the declarations file. Pure, so the shape rules are unit-testable. */
 export function parseDeclarations(raw: unknown): DeclarationParseResult {
   const problems: string[] = [];
   const declarations: InstallDeclaration[] = [];
+  const empty: DeclarationParseResult = { declarations, siblings: {}, problems };
 
   if (typeof raw !== "object" || raw === null) {
-    return { declarations, problems: ["declarations file must contain a JSON object"] };
+    return { ...empty, problems: ["declarations file must contain a JSON object"] };
   }
-  const { version, installs } = raw as { version?: unknown; installs?: unknown };
+  const {
+    version,
+    installs,
+    siblings: siblingBlock,
+  } = raw as {
+    version?: unknown;
+    installs?: unknown;
+    siblings?: unknown;
+  };
+  const siblings = parseSiblings(siblingBlock, problems);
   if (version !== 1) {
     problems.push(`unsupported declarations version: ${String(version)}`);
   }
   if (typeof installs !== "object" || installs === null || Array.isArray(installs)) {
     problems.push("`installs` must be an object keyed by skill name");
-    return { declarations, problems };
+    return { declarations, siblings, problems };
   }
 
   for (const [skill, entries] of Object.entries(installs as Record<string, unknown>)) {
@@ -127,24 +220,25 @@ export function parseDeclarations(raw: unknown): DeclarationParseResult {
     }
   }
 
-  return { declarations, problems };
+  return { declarations, siblings, problems };
 }
 
 /** Read and parse `skillset.config.json`. */
 export async function loadDeclarations(
   path = declarationsFilePath(),
 ): Promise<DeclarationParseResult> {
+  const none: DeclarationParseResult = { declarations: [], siblings: {}, problems: [] };
   let raw: string;
   try {
     raw = await readFile(path, "utf8");
   } catch {
-    return { declarations: [], problems: [`no declarations file at ${path}`] };
+    return { ...none, problems: [`no declarations file at ${path}`] };
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch (err) {
-    return { declarations: [], problems: [`${path} is not valid JSON: ${(err as Error).message}`] };
+    return { ...none, problems: [`${path} is not valid JSON: ${(err as Error).message}`] };
   }
   return parseDeclarations(parsed);
 }
@@ -152,10 +246,14 @@ export async function loadDeclarations(
 /**
  * Cross-check declarations against the bundled skills in both directions: a
  * declared skill that does not exist is a typo or a rename, and a bundled skill
- * that declares nothing is a skill that silently never installs.
+ * that declares nothing is a skill that silently never installs. Declared
+ * sibling files get the same treatment: a path that is not a file in the bundle
+ * is a declaration that would install nothing (or throw), so it is reported
+ * before anything is written.
  */
 export async function declarationCoverage(
   declarations: readonly InstallDeclaration[],
+  siblings: Record<string, SiblingFile[]> = {},
 ): Promise<string[]> {
   const problems: string[] = [];
   const bundled = new Set(await listBundledSkills());
@@ -170,7 +268,49 @@ export async function declarationCoverage(
       problems.push(`${skill}: bundled but declares no install`);
     }
   }
+  for (const [skill, files] of Object.entries(siblings)) {
+    if (!declared.has(skill)) {
+      problems.push(`${skill}: declares sibling files but no install`);
+    }
+    const config = bundled.has(skill)
+      ? (await loadBundledSkill(skill)).frontmatter.config
+      : undefined;
+    const keys = config ? Object.keys(config) : [];
+    for (const file of files) {
+      if (!(await isFile(file.source))) {
+        problems.push(`${skill}: declared sibling ${file.rel} is not in src/skills/${skill}/`);
+        continue;
+      }
+      if (keys.length === 0) continue;
+      const bytes = await readFile(file.source, "utf8");
+      for (const key of configPlaceholdersIn(bytes, keys)) {
+        problems.push(
+          `${skill}: sibling ${file.rel} contains {{${key}}} — siblings are copied verbatim, not substituted`,
+        );
+      }
+    }
+  }
   return problems;
+}
+
+async function isFile(path: string): Promise<boolean> {
+  if (!(await fileExists(path))) return false;
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Config placeholders a verbatim copy cannot substitute. Siblings are copied,
+ * not rendered, so a `{{key}}` naming one of the skill's own config keys would
+ * ship unsubstituted — a helper that is broken at the point of use. Report it
+ * here instead. Keys the skill does not declare are left alone: a template may
+ * legitimately carry braces of its own.
+ */
+export function configPlaceholdersIn(bytes: string, keys: readonly string[]): string[] {
+  return keys.filter((key) => bytes.includes(`{{${key}}}`));
 }
 
 export function findRecord(
@@ -223,28 +363,100 @@ function standInRecord(
   };
 }
 
+/**
+ * Classify one skill's declared sibling files against the install directory and
+ * the record. Same rule as the primary artifact, per file: a recorded file that
+ * diverges is ours to repair (`drifted`), an unrecorded one that diverges is
+ * not (`foreign`), an unrecorded one that matches is `adoptable`, and a declared
+ * file that is absent is `missing`.
+ */
+export async function classifySiblings(
+  siblings: readonly SiblingFile[],
+  directory: string,
+  recorded: ReadonlySet<string>,
+): Promise<SiblingState[]> {
+  const states: SiblingState[] = [];
+  for (const sibling of siblings) {
+    const path = join(directory, sibling.rel);
+    const [current, next] = await Promise.all([readMaybeBytes(path), readFile(sibling.source)]);
+    const ours = recorded.has(sibling.rel);
+    if (current === null) {
+      states.push({ rel: sibling.rel, path, status: "missing" });
+      continue;
+    }
+    if (current.equals(next)) {
+      states.push({
+        rel: sibling.rel,
+        path,
+        status: ours ? "in-sync" : "adoptable",
+        currentBytes: current.toString("utf8"),
+      });
+      continue;
+    }
+    states.push({
+      rel: sibling.rel,
+      path,
+      status: ours ? "drifted" : "foreign",
+      currentBytes: current.toString("utf8"),
+      nextBytes: next.toString("utf8"),
+    });
+  }
+  return states;
+}
+
+/** A rolled-up install takes the most urgent of its files' statuses. */
+function worstStatus(statuses: readonly InstallStatus[]): InstallStatus {
+  return statuses.reduce((worst, status) =>
+    STATUS_ORDER.indexOf(status) < STATUS_ORDER.indexOf(worst) ? status : worst,
+  );
+}
+
 /** Classify one declaration against state and disk. */
 export async function classifyInstall(
   declaration: InstallDeclaration,
   state: SkillsetState,
+  siblings: Record<string, SiblingFile[]> = {},
 ): Promise<ClassifiedInstall> {
   // Render through the same path an install takes: a skill whose frontmatter
   // carries `config:` placeholders must compare against its *substituted* bytes,
   // or a correctly configured file reports as drifted and gets "repaired" back
   // to its placeholders.
   const skill = applyConfigToSkill(await loadBundledSkill(declaration.skill));
-  const target = targetFor(declaration.agent);
   const record = findRecord(state, declaration);
   const path = primaryPath(declaration, skill);
+  const primary = await classifyPrimary(declaration, skill, record, path);
 
+  // Siblings only travel where the mode writes a per-skill directory, so a
+  // slash prompt or a marker block has none to classify.
+  const directory = skillDirectoryFor({
+    agent: declaration.agent,
+    mode: declaration.mode,
+    name: skill.frontmatter.name,
+    scope: declaration.scope,
+    projectRoot: declaration.projectPath ?? process.cwd(),
+  });
+  const declared = siblings[declaration.skill] ?? [];
+  if (!directory || declared.length === 0) return primary;
+
+  const states = await classifySiblings(declared, directory, new Set(record?.files ?? []));
+  return {
+    ...primary,
+    status: worstStatus([primary.status, ...states.map((s) => s.status)]),
+    siblings: states,
+  };
+}
+
+/** The primary artifact's status — the whole install before siblings existed. */
+async function classifyPrimary(
+  declaration: InstallDeclaration,
+  skill: ParsedSkill,
+  record: InstallRecord | undefined,
+  path: string,
+): Promise<ClassifiedInstall> {
+  const { agent, scope, mode } = declaration;
   if (record) {
-    const { current, next } = await target.preview(
-      {
-        skill,
-        scope: declaration.scope,
-        mode: declaration.mode,
-        projectRoot: declaration.projectPath ?? process.cwd(),
-      },
+    const { current, next } = await targetFor(agent).preview(
+      { skill, scope, mode, projectRoot: declaration.projectPath ?? process.cwd() },
       record,
     );
     if (current === null) {
@@ -271,13 +483,8 @@ export async function classifyInstall(
   if (current === null) {
     return { declaration, status: "missing", path };
   }
-  const { next } = await target.preview(
-    {
-      skill,
-      scope: declaration.scope,
-      mode: declaration.mode,
-      projectRoot: declaration.projectPath ?? process.cwd(),
-    },
+  const { next } = await targetFor(agent).preview(
+    { skill, scope, mode, projectRoot: declaration.projectPath ?? process.cwd() },
     standInRecord(declaration, skill, path),
   );
   return current === next
@@ -289,10 +496,11 @@ export async function classifyInstall(
 export async function classifyAll(
   declarations: readonly InstallDeclaration[],
   state: SkillsetState,
+  siblings: Record<string, SiblingFile[]> = {},
 ): Promise<ClassifiedInstall[]> {
   const classified: ClassifiedInstall[] = [];
   for (const declaration of declarations) {
-    classified.push(await classifyInstall(declaration, state));
+    classified.push(await classifyInstall(declaration, state, siblings));
   }
   for (const record of state.installs) {
     const stillDeclared = declarations.some(

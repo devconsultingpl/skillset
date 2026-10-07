@@ -1,6 +1,7 @@
 import pc from "picocolors";
 import { alwaysWarnLines, bodyLineCount } from "../core/body-size.js";
 import { loadBundledSkill } from "../core/bundle.js";
+import { loadDeclarations } from "../core/declarations.js";
 import { readState, removeInstall, upsertInstall, writeState } from "../core/state.js";
 import { applyConfigToSkill } from "../core/template.js";
 import type { AgentName, Mode, Scope } from "../core/types.js";
@@ -31,6 +32,10 @@ export async function setMode(opts: SetModeOptions): Promise<void> {
   }
 
   const skill = applyConfigToSkill(await loadBundledSkill(opts.skill));
+  // A mode switch re-installs the whole skill, siblings included, or switching
+  // to `auto` would leave the helpers behind.
+  const { siblings } = await loadDeclarations();
+  const declaredSiblings = siblings[opts.skill] ?? [];
 
   if (opts.mode === "always") {
     const lines = bodyLineCount(skill.body);
@@ -64,6 +69,7 @@ export async function setMode(opts: SetModeOptions): Promise<void> {
       scope: rec.scope,
       mode: opts.mode,
       projectRoot: rec.projectPath ?? projectRoot,
+      siblings: declaredSiblings,
     });
     state = upsertInstall(state, next);
     console.log(

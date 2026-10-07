@@ -14,6 +14,25 @@ afterEach(async () => {
 });
 
 describe("opencode target", () => {
+  describe("sibling files", () => {
+    it("auto: copies a declared sibling beside SKILL.md and removes it on uninstall", async () => {
+      const out = run(
+        ["install", "code-review", "--agent", "opencode", "--mode", "auto", "--global"],
+        sb.projectRoot,
+        sb.env,
+      );
+      expect(out.status).toBe(0);
+      const dir = join(sb.home, ".config", "opencode", "skills", "code-review");
+      const helper = join(dir, "_helpers", "review-range.mjs");
+      expect(await exists(helper)).toBe(true);
+      expect(await readFile(helper, "utf8")).toContain("review-range.mjs — scope resolution");
+
+      expect(run(["uninstall", "code-review", "--global"], sb.projectRoot, sb.env).status).toBe(0);
+      expect(await exists(helper)).toBe(false);
+      expect(await exists(dir)).toBe(false);
+    });
+  });
+
   describe("slash mode", () => {
     it("local: writes a command file and uninstall removes it", async () => {
       const out = run(

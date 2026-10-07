@@ -136,6 +136,70 @@ describe("sync — drift", () => {
   });
 });
 
+describe("sync — sibling files", () => {
+  const helper = () =>
+    join(sb.home, ".pi", "agent", "skills", "code-review", "_helpers", "review-range.mjs");
+  const autoInstall = () =>
+    run(
+      ["install", "code-review", "--agent", "pi", "--mode", "auto", "--global"],
+      sb.projectRoot,
+      sb.env,
+    );
+  const dropRecord = async (mode: string) => {
+    const state = JSON.parse(await readFile(statePath(), "utf8"));
+    state.installs = state.installs.filter(
+      (i: { skill: string; agent: string; mode: string }) =>
+        !(i.skill === "code-review" && i.agent === "pi" && i.mode === mode),
+    );
+    await writeFile(statePath(), JSON.stringify(state, null, 2), "utf8");
+  };
+
+  it("reports a declared sibling that no declared install can carry", async () => {
+    // code-review declares a helper but installs as a slash prompt, which is one
+    // file in a shared directory. The declaration promises tools; say so once,
+    // rather than leaving them silently absent until the mode changes.
+    const out = run(["sync", "--dry-run"], sb.projectRoot, sb.env);
+    expect(out.status).toBe(0);
+    expect(out.stderr).toContain("declared sibling file(s), but no declared install");
+  });
+
+  it("refuses a foreign sibling at an owned skill path, exit non-zero", async () => {
+    autoInstall();
+    await dropRecord("auto");
+    await writeFile(helper(), "someone else's helper\n", "utf8");
+
+    // The primary artifact still matches, so only the sibling is foreign —
+    // which makes the whole install foreign and refuses the write.
+    const out = run(
+      ["install", "code-review", "--agent", "pi", "--mode", "auto", "--global"],
+      sb.projectRoot,
+      sb.env,
+    );
+    expect(out.status).toBe(1);
+    expect(out.stderr).toContain("refusing");
+    expect(await readFile(helper(), "utf8")).toBe("someone else's helper\n");
+  });
+
+  it("reports a sibling the user edited as divergence, skips it, and repairs it on --force", async () => {
+    autoInstall();
+    await writeFile(helper(), "// locally edited\n", "utf8");
+
+    const reported = run(["update", "--dry-run"], sb.projectRoot, sb.env);
+    expect(reported.stdout).toMatch(/diverged/);
+    expect(reported.stdout).toContain("review-range.mjs");
+
+    // Non-interactive: a copy is not overwritten in silence.
+    const skipped = run(["update"], sb.projectRoot, sb.env);
+    expect(skipped.status).toBe(0);
+    expect(skipped.stderr).toContain("has local edits");
+    expect(await readFile(helper(), "utf8")).toContain("locally edited");
+
+    const forced = run(["update", "--force"], sb.projectRoot, sb.env);
+    expect(forced.status).toBe(0);
+    expect(await readFile(helper(), "utf8")).not.toContain("locally edited");
+  });
+});
+
 describe("sync — undeclared installs", () => {
   it("reports a recorded install the declarations do not mention, and prunes it on request", async () => {
     // opencode is declared only for ponytail, so this is a deliberate extra.

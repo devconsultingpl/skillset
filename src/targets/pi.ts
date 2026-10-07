@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { assetPath } from "../core/bundle.js";
 import { compose } from "../core/frontmatter.js";
-import { readMaybe, writeAtomic } from "../core/fs.js";
+import { copySiblings, readMaybe, writeAtomic } from "../core/fs.js";
 import { layoutFor } from "../core/locations.js";
 import { MD, extract, remove, upsert } from "../core/markers.js";
 import type { AgentTarget, InstallContext } from "../core/target.js";
@@ -58,6 +58,9 @@ export const piTarget: AgentTarget = {
       installRoot = dirname(path);
       await writeAtomic(path, renderSkillFile(ctx));
       files.push(relative(installRoot, path));
+      // Declared sibling files land beside SKILL.md, verbatim (2a). The skill
+      // directory is the destination a harness resolves relative paths against.
+      await copySiblings(ctx.siblings, installRoot, files);
     } else if (mode === "slash") {
       const path = layout.slash(slug, scope, projectRoot);
       installRoot = dirname(path);
