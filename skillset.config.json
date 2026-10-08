@@ -286,6 +286,12 @@
         "agent": "pi",
         "mode": "slash"
       }
+    ],
+    "standing-rules": [
+      {
+        "agent": "pi",
+        "mode": "always"
+      }
     ]
   }
 }

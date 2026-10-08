@@ -58,7 +58,7 @@ describe("agents as an artifact kind", () => {
 
     const third = run(["sync", "--dry-run"], sb.projectRoot, sb.env);
     expect(third.status).toBe(0);
-    expect(third.stdout).toMatch(/checked in-sync 62/);
+    expect(third.stdout).toMatch(/checked in-sync 63/);
   });
 
   it("keeps `undeclared` and `in-sync` honest across the kinds", async () => {

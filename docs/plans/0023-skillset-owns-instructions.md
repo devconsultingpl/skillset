@@ -1663,25 +1663,360 @@ Why the estimate was low, stated rather than rounded away: the merge is four bra
 
 **Not yet done.** ~~Nothing is committed. Three files are dirty in this repository: the two source files and this plan.~~ **Committed — `90610ef`**, all three files, after the gates were green and the installed copies verified (`in-sync 32`, nothing drifted). Nothing about (b) is pending.
 
+### Corrected outside both repositories — 2026-10-08
+
+`~/.pi/agent/AGENTS.md` was rewritten by hand, at the developer's explicit go and with the change shown before it was applied (their standing condition). This is decisions-asserted item 5 being executed a little early: the file is still the developer's, and its hand-written text had drifted from the program it describes.
+
+**Four statements were false, each measured before the edit:**
+
+| the file said | measured |
+|---|---|
+| propagate the auto set with `node scripts/sync-pi-auto.mjs` | the script was deleted in slice 1 |
+| agents are hash-tracked in `~/.pi/agent/agents/.flow-managed.json` | deleted in 3a |
+| agent sources are `packages/flow/agents/*.md` — "edit the FLOW source" | that directory was deleted in 3a; this repository installs the roster |
+| "Two names currently exist in both places, `code-review` and `remediate`" | false since 2b — FLOW ships `flow-remediate` only |
+
+Also retired: the frame "they are two owners, not one" (there is one owner now) and the enumerated auto set (`architect`, `caveman`, `ponytail`, `commit-suggestion` — short by `code-review` since 2b). The rewrite points at the declarations instead of enumerating their result, which is what stopped the old text drifting in the first place.
+
+Result: **39 → 35 lines, 2,470 → 2,277 bytes**; the commit rule byte-identical; `grep` for all four stale strings returns nothing. It binds from the next session, since the file is loaded at session start. The file keeps the **map** (sources, propagate, where they land, the extension asset); under 3b the **rules** leave it for the always channel.
+
+### 3b — scoped and awaiting go: the standing rules move into the channel that exists — 2026-10-08
+
+#### Goal
+
+Two rules a session must obey *before* it acts have no rendered home. "Commits carry no trailers" lives in `~/.pi/agent/AGENTS.md`, hand-written; "code carries no comments" lives only in a completed plan (`docs/plans/completed/0012-skill-architect.md:143,145`) that no session loads. **3b renders both into pi's always channel** — the one channel this repository already writes, whose load into the system prompt slice 1 verified live — and moves the rule-shaped ownership text out of the hand-written file, so every rule has exactly one copy.
+
+Scope settled by the developer 2026-10-08: **rules into the existing channel; `AGENTS.md` keeps the map and stays hand-owned until 3c renders the context file**, where project scope gives that channel a consumer. **No new mode, no new artifact kind, no second anchor, no runtime code.**
+
+#### What is true today — measured 2026-10-08
+
+- `~/.pi/agent/APPEND_SYSTEM.md` holds one marker block, `instruction-ownership`, `always` on pi: 213 words ≈ **277 estTokens** by this repository's published estimator (words × 1.3, `pi-extensions/packages/flow-test-utils/token-surface.ts`).
+- **Two blocks coexist in one file, and the machinery already targets them individually** — executed against the built bundle, not read:
+
+```sh
+$ node -e "upsert two skill names into one file; extract each; remove one"
+after two upserts  both blocks, in order, surrounding user text intact
+extract('instruction-ownership') → "RULE A"   extract('standing-rules') → "RULE B"
+after removing one  the other block survives; the user's text survives
+```
+
+  `src/bridges/pi/index.ts:111-115` upserts by skill name, `:144-151` removes by skill name and deletes the file only when it is empty, and `markers.test.ts:58` already pins "extract targets only the named block among several".
+- **Reach does not change.** The commit rule is read by pi alone: `~/.claude/CLAUDE.md` and opencode's global `AGENTS.md` do not exist on this machine, and claude-code never reads `~/.pi/agent/**`. pi-only before, pi-only after.
+- **The comment rule is single-copy and unloaded.** `grep -rni "comment" src/skills/*/SKILL.md docs/*.md` finds no policy; `grep -rni "self-documenting\|never comment" src/ docs/` finds only `completed/0012:143,145`.
+- **This plan's own retro finding is overstated, and this entry is the correction.** It predicted `src/skills/retro/SKILL.md:33` "will keep generating that mistake". Measured: line 33 lists *both* channels and line 36 already tells the reader to find the managing project before editing anything under a global agent dir. **retro needs no edit.**
+- **Cost, measured per file.** `AGENTS.md` is 295 words ≈ 384 estTokens today; the commit rule (43 words ≈ 56) and the one-provider rule (86 words ≈ 112) leave it, and the always block gains those two plus the new comment rule (≈ 91). **Net +91 estTokens of default-loaded surface**, and that is exactly the one new rule.
+
+#### Acceptance criteria
+
+1. `~/.pi/agent/APPEND_SYSTEM.md` carries **two** marker blocks after a real `sync`, and each removes on its own `uninstall` leaving the other intact — proved end to end, not by the marker unit test alone.
+2. Each rule exists in **exactly one repository artifact** — the rendered body — and is absent from `AGENTS.md`: `grep -c "Co-Authored-By" ~/.pi/agent/AGENTS.md` is 0 while the same string is in `src/skills/standing-rules/SKILL.md`.
+3. **The rules bind in a live session, by slice 1's method**: a fresh `pi --print` process run from `/tmp`, with no skillset context, reproduces text that exists only in the installed block. Transcript in the plan.
+4. The text that leaves `AGENTS.md` — the commit rule and the one-provider paragraph — arrives in the rendered bodies **without paraphrase**, so the developer's own wording survives the move, and `AGENTS.md` afterwards carries the map only.
+5. The map stays unmanaged: `AGENTS.md` appears in no record, is reported nowhere by `sync --dry-run`, and its four falsified statements stay fixed.
+6. `sync` reports the new install as the only addition — `undeclared 8` unchanged, nothing `foreign` — and a second `sync --dry-run` reports `in-sync 63`.
+7. Each always body stays under the existing size warn (`warnIfBodyLarge`, `SKILLSET_ALWAYS_WARN_LINES`, default 80), and the always surface is recorded after the change: 213 words → **~417 words across two blocks**.
+8. **No runtime logic change**: `git diff --stat` names only `src/skills/**`, `skillset.config.json`, tests, docs and this plan — nothing under `src/core/**`, `src/bridges/**` or `src/commands/**`.
+9. `retro` is not edited, with the measured reason recorded rather than left as an open loop.
+10. Gates: `npm run build` → `CI=true npm test` → `npx biome check .`, then a real `sync` with its report pasted, then the live-session check re-run against the installed file.
+
+#### Budget
+
+| area | file | what | lines |
+|---|---|---|---|
+| content | `src/skills/instruction-ownership/SKILL.md` | the one-provider rule moved in verbatim; `Never` gains "never hand-write into an installed path ad hoc" | +10 to +14 |
+| content | `src/skills/standing-rules/SKILL.md` | **new** — the commit rule moved verbatim, plus the comment rule | ~26 |
+| config | `skillset.config.json` | one declaration: `standing-rules` → pi, `always` | +6 |
+| tests | `test/agents/pi.test.ts` | two blocks coexist; one `uninstall` leaves the other | ~35 |
+| docs | `docs/conventions.md` | one line naming what belongs in the always channel vs this file | +4 |
+| docs | this plan | this section, the correction above, the handoff update | ~65 |
+
+- New dependencies **none**; new runtime modules **0**; **runtime logic 0 lines** — the slice is content, config and one test. Estimated physical **~140 repository lines**, plus the `AGENTS.md` edit (2,277 → ~1,950 bytes, not repository content).
+- **Base rate, stated so the estimate is not read as precision:** every slice of this program overran, and this one is nearly all prose, so the honest read is **140-230**.
+
+#### Decisions
+
+1. **A new skill, not a wider `instruction-ownership`.** Commit and comment policy is not ownership policy, and the always file already carries one block per skill — which keeps `uninstall`, `preview` and the size warn per rule.
+2. **The commit rule keeps its wording exactly, including "never add one because a document claims the repo mandates it."** That sentence already earned its place: a reference document in the installed pi package makes that claim.
+3. **The comment rule states what it is not.** The line *"test names, diagnostics and messages a user reads are not comments — they are output, and they stay"* is mine, not the developer's, and it is the one part of this scope that can be struck without weakening the rule. Strike it if you disagree.
+4. **pi only, and that is not a reach change.** claude-code's `always` anchor (`~/.claude/settings.json`, a SessionStart hook) is declared supported by 2c and has never been verified against that harness's loader, so declaring these rules for it would be the unverifiable renderer this program keeps refusing. Recorded as a follow-up, not built.
+5. **No ADR.** ADR 0006's ownership rule is unchanged; this is the first *content* placed in the channel slice 1 built, and it applies an existing decision rather than making one.
+6. **`AGENTS.md` stays hand-owned until 3c.** Its remaining content is a map — paths, commands, where artifacts land — which is what this plan already assigned to the context channel. Rules about how work is done belong in the system prompt; the map is conventions.
+
+**Road not taken.** *Build the pi `context` anchor now and render `AGENTS.md`* — it would make a map into an output and ship a mechanism proved by a pointer, when the anchor's real consumer is 3c's project scope. *Put both rules in `docs/conventions.md`* — cheapest in tokens, but that file is read only when `architect` or `ponytail` orients, which is the mechanism that already failed this rule twice. *Extend `instruction-ownership` with everything* — one block and one uninstall, but a skill named for ownership carrying commit policy.
+
+#### Confidence
+
+**~97%.** The mechanism is executed rather than assumed (two blocks, per-skill extract and remove, the empty-file cleanup, all against the built bundle); the cost is measured with this project family's own estimator and attributed line by line; and the reach claim is checked against the three global files that do or do not exist. The residual is the two content judgments above, plus one thing this machine cannot show yet: that the block still reaches the system prompt once a **second** skill joins the file — slice 1 proved the load for one block, and AC-3 re-proves it rather than inheriting the claim.
+
+Nothing is authorised. The go is a separate step.
+
+### Implemented — 3b, the standing rules in the always channel — 2026-10-08 (Review log)
+
+The developer gave **go** on the scope above, then reshaped one line of it mid-build: the map does not belong in `AGENTS.md` at all. That is recorded as the supersession it is, below, rather than folded in silently.
+
+**What landed.** `src/skills/standing-rules/SKILL.md` (pi, `always`) carrying the commit rule and the comment rule; `instruction-ownership` gained the one-provider rule (moved verbatim) and a `Never` entry for ad-hoc writes to any installed path; one config declaration; one end-to-end test; and a new `## Rules every session loads` section plus a new `## Where each artifact lands` table in `docs/conventions.md`. No file under `src/core/**`, `src/bridges/**` or `src/commands/**` was touched.
+
+**Criteria as built.**
+
+1. Holds — two blocks in one file, and each removes alone. The new test installs both by **declaration** (no `--mode`), removes one, and asserts the other survives and the file stays:
+
+```sh
+$ grep -n "skillset:begin\|skillset:end" ~/.pi/agent/APPEND_SYSTEM.md
+2:<!-- skillset:begin instruction-ownership -->   33:<!-- skillset:end instruction-ownership -->
+35:<!-- skillset:begin standing-rules -->          47:<!-- skillset:end standing-rules -->
+```
+
+2. Holds — `grep -c` in `~/.pi/agent/AGENTS.md`: `Co-Authored-By` **0**, `two providers of one name` **0**, `hand-write anything into an installed path` **0**; each present once in the repository sources.
+3. Holds, by the slice-1 method — a **fresh** `pi --print` process run from `/tmp`, no skillset context, answering from what it loaded:
+
+```
+1. PRESENT
+2. One provider per name
+3. Test names, diagnostics and messages a user reads are not comments — they are output, and they stay.
+4. Never two providers of one name in one harness — not "never a colliding name".
+```
+
+4. Holds with **one deviation**: the rule text is character-identical across `AGENTS.md` → source → installed block (checked by normalising and comparing all three), except that the commit rule's sentence-ending `— ever.**` became the heading `— ever`, which the heading form requires. **The second half of the criterion is superseded** — see *Superseded* below.
+5. Holds — `AGENTS.md` appears in no record and in no `sync` report, and the four falsified statements stay fixed.
+6. Holds exactly as predicted — `reconciled drifted 1 · missing 1 · undeclared 8 · in-sync 61 · 2 written`, then `checked undeclared 8 · in-sync 63`. The `drifted 1` was `instruction-ownership`'s own source change, and its message read *"edited locally"* although the source moved — the recorded diagnosis defect, observed again rather than fixed.
+7. Holds — bodies are 30 and 13 lines against the 80-line warn, and the measured always surface is **433 words ≈ 563 estTokens** in two blocks (predicted ~417 words / ~536).
+8. Holds — `git diff --stat` names `docs/conventions.md`, `skillset.config.json`, `src/skills/**`, `test/**` and this plan; nothing in `src/core/**`, `src/bridges/**` or `src/commands/**`.
+9. Holds — `retro` untouched, with the measured reason recorded above.
+10. Holds — `npm run build` · `npx biome check .` (78 files) · `CI=true npm test` → **31 files / 317 tests** (was 316; +1 case).
+
+**One existing test was amended, and it is a file 3b's budget did not list.** `test/agents-kind.test.ts:61` pinned `checked in-sync 62`; the new declaration makes it 63. One line, and the reason is AC-6's own arithmetic rather than a regression. Nothing else moved: `undeclared 8` is unchanged.
+
+**Superseded mid-slice — the map leaves `AGENTS.md`.** After the build, the developer's read was that the file should carry the *most important rules* and not the inventory of where things live; asked to choose, they took the shrink. So AC-4's clause "`AGENTS.md` afterwards carries the map only" does not describe the result, and neither does AC-5's frame:
+
+- `AGENTS.md` is now **13 lines / 76 words ≈ 99 estTokens** — a pointer at this repository's `docs/conventions.md` and the always skill bodies, plus the two facts no doc carried. It was 35 lines / 384 estTokens at the start of the session and 22 / 207 after the correction. **285 estTokens/session less than where this session found it.**
+- **The map moved into `docs/conventions.md`**, not out of existence: a new `## Where each artifact lands` table gives the global path per (mode, harness) for all four, the local-scope exceptions, and the two pi paths that are not install records. `~/.skillset/state.json` is named there too.
+- **This corrects a claim the scoping got wrong.** The question put to the developer said conventions.md "already teaches … the target paths per mode"; it does not — `grep -c 'prompts/sk-' docs/conventions.md` was **0** before this slice. The shrink therefore needed the paths *added*, not just pointed at, which is why `docs/conventions.md` came in at **+20 lines against a +4 budget**. The estimate's premise was wrong, not the file's size.
+- The pointer's own sentence "never edit an installed copy" was **cut on the first pass and the file re-cut**: it is a rule, it already lives in the always block, and a pointer that restates a rule is the second copy this program removes.
+
+**Amended after review — the branch, and the queue's home (2026-10-08).** The developer's objection was that a sentence in the installed pointer — *"Change the source and run `skillset sync`; never edit an installed copy"* — is wrong advice for a session in another project: **only a session running in this repository may edit content and sync**, because one project's request can be locally sensible and wrong in the wider view. Every other session's whole answer is to file a suggestion and stop. Measured first: that sentence was **already absent** from `AGENTS.md` (12 lines; `grep` returns nothing), cut in the shrink's second pass — so the objection landed on the always block, which is the file that binds. Its `## Instead` was three numbered steps that opened with the skillset-repo instruction and mentioned "in another project" as a trailing caveat. It now branches **first**, in two scopes, and the second scope's entire answer is the suggestion. Verified in the installed copy: the old wording greps **0**, the branch and the queue path are both present.
+
+Then the queue's location changed, because the branch made its missing reader obvious. It was `.skillset/suggestions.jsonl` in the **filing project** — no queue file existed anywhere, and a session in this repository can neither see another project's queue nor know which projects to look in, so "a future skillset session picks it up" had no mechanism. It is now **this repository's** `.skillset/suggestions.jsonl` (gitignored; one queue for every project), read and cleared by a session working here, which decides what is real. ADR 0006 is **appended to** rather than edited — it records the move and why — and `docs/conventions.md` and the skill body carry the path. No `suggestions` verb is built: `cat` reads the queue, editing the file clears it, and that is the ladder's answer until the queue is big enough to want more.
+
+**Measured against the budget.**
+
+| area | budget | measured | verdict |
+|---|---|---|---|
+| `instruction-ownership/SKILL.md` | +10 to +14 | **+5** | under |
+| `src/skills/standing-rules/SKILL.md` | ~26 | **18** | under |
+| `skillset.config.json` | +6 | **+6** | met |
+| `test/agents/pi.test.ts` | ~35 | **+19** | under |
+| `docs/conventions.md` | +4 | **+20** | **over by 16** — the wrong premise above, not drift |
+| `test/agents-kind.test.ts` | not budgeted | **1 line** | beyond the list, forced by AC-6 |
+| `.gitignore` | not budgeted | **+1** | the queue's new home is not repository content |
+| `docs/decisions/0006-*.md` | not budgeted | **+2** | an appended amendment, not an edit |
+| this plan | ~65 | over | it carries the whole record |
+| runtime logic | 0 | **0** | met |
+| dependencies / runtime modules | none / 0 | none / 0 | met |
+| `AGENTS.md` | 2,277 → ~1,950 B | **642 B** | outside the repository; the developer's call changed the target |
+
+**Findings recorded, not fixed.**
+
+- **The suggestion queue now has a writer and a reader, and its command arm is closed by 3b-ii.** The location is `~/.skillset/suggestions.jsonl` (beside `state.json`); `skillset suggest "…"` appends from any project, `retro` carries the step for sessions that do not think of it, and a session working here reads and clears it. Listing and clearing remain `cat` and an edit — deliberately, until the queue is worth a flag.
+- **The README's `## Bundled skills` list omits `instruction-ownership` and now `standing-rules`.** Adding rows is a doc change outside this budget.
+- **claude-code's `always` anchor remains unverified against its loader.** The same two rules would reach claude-code sessions through it, but 2c declared that mode from documentation and nothing has exercised it — declaring them there would be the unverifiable renderer this program keeps refusing.
+
+**Commit — drafted, never run.** ~~This slice adds a file, so `git add -A`, never `git commit -am`.~~ **Superseded**: 3b and 3b-ii are uncommitted in one tree, so the pair's draft is under *Implemented — 3b-ii* below. The original single-slice text is kept here only as a record of what was drafted at the time.
+
+```sh
+git add -A && git commit -F - <<'MSG'
+skillset: the standing rules reach the channel that binds (0023 slice 3b)
+
+Two rules a session must obey before it acts had no rendered home: commits carry
+no trailers lived in the hand-written ~/.pi/agent/AGENTS.md, and code carries no
+comments lived only in a completed plan. Both are now a skill body rendered into
+APPEND_SYSTEM.md as its own marker block, so each rule has exactly one copy.
+
+instruction-ownership gains the one-provider rule and a Never entry for ad-hoc
+writes to any installed path; standing-rules is new. No runtime code changes —
+the slice is content, one declaration, one end-to-end test and two docs sections.
+
+AGENTS.md shrinks to a pointer plus the two facts no doc carried, and the map of
+where each artifact lands moves into docs/conventions.md, where it is read on
+demand rather than paid every session (384 -> 99 estTokens).
+
+The ownership rule now branches first: a session running in this repository edits
+the source and syncs, and every other project files a suggestion and stops. The
+queue moves into this repository (`.skillset/suggestions.jsonl`, gitignored, one
+for every project) because a project-local file had no reader.
+
+Gates: build, biome clean, CI=true 31 files / 317 tests. sync: in-sync 63.
+MSG
+```
+
+### 3b-ii — scoped and awaiting go: `skillset suggest` — 2026-10-08
+
+#### Goal
+
+The rule the always block now carries — a session outside this repository files a suggestion and stops — is **advertised but not executable**: it named a path no other project could discover, and no such file existed anywhere. `skillset suggest "<text>"` makes it one bash call from any harness in any project, and removes the last path from an always-loaded file.
+
+#### What is true today — measured 2026-10-08
+
+- **`skillset` is already on PATH everywhere and always current**: the global bin is a symlink into this repository's build — `readlink -f $(which skillset)` → `/Users/joozik/source/priv/skillset/dist/cli.js`. No per-project install, no stale copy.
+- **`~/.skillset/` is the existing global state directory** (`state.json`, `active/`, `copilot/`), so the queue joins a location a skillset session already knows rather than inventing a second one.
+- The CLI's verbs are install, sync, uninstall, list, update, set-mode, init, emit, track, scan-prompt, status, reset — **no `suggest`**, which is why slice 1's criterion 9 has only ever been half-met.
+- **This supersedes the queue location 3b set an hour earlier** (this repository's `.skillset/`): the `.gitignore` line reverts, because nothing writes into the working tree any more.
+
+#### Acceptance criteria
+
+1. `skillset suggest "<text>"` appends exactly one JSON line to `~/.skillset/suggestions.jsonl` and exits 0 **from any cwd** — proved by a test that runs it from a sandboxed foreign directory.
+2. The line is `{"at","cwd","session","suggestion"}`: `at` ISO-8601 UTC, `cwd` the invoking project's absolute path, `session` the environment session key when one exists and omitted otherwise.
+3. The file is created on first use, and a second call appends without rewriting the first line.
+4. `skillset --help` lists `suggest`; **no path appears in any always-loaded file** — the rendered rule names the command and nothing else.
+5. An empty or whitespace-only message is refused: non-zero exit, nothing written.
+6. Only `src/cli.ts`, a new `src/commands/suggest.ts`, its new test, `src/skills/instruction-ownership/SKILL.md`, `docs/conventions.md`, ADR 0006 and this plan change. No new dependency.
+7. `.gitignore` no longer carries `.skillset/`.
+8. **`retro` carries the suggestion step** (developer's call, 2026-10-08), so a retrospective session knows a finding about content it does not own becomes a `skillset suggest` call rather than an edit — and says so where the finding's destination is decided, not in a footnote. Its existing "check who owns it" paragraph stops saying "propose the edit there" and names the command. Only a session working **in** the owning repository edits the source and syncs.
+9. Gates: `npm run build` → `npx biome check .` → `CI=true npm test`, then a real `sync` with its report, then the installed block re-read to confirm the path is gone and the command is named.
+
+#### Budget
+
+| area | file | lines |
+|---|---|---|
+| runtime | `src/commands/suggest.ts` (**new**) | ~35 logic |
+| runtime | `src/cli.ts` | +6 |
+| tests | `src/commands/suggest.test.ts` (**new**) | ~40 |
+| content | `src/skills/instruction-ownership/SKILL.md` | −3 (path → command) |
+| content | `src/skills/retro/SKILL.md` | +8 to +12 (the suggestion step, where a finding's destination is decided) |
+| docs | `docs/conventions.md` | ±4 |
+| docs | `docs/decisions/0006-*.md` | +2 (appended) |
+| config | `.gitignore` | −1 |
+| docs | this plan | ~45 |
+
+- New dependencies **none**. Estimated implementation logic **~40 lines**; base rate for this programme is 30-77% over, so the honest read is **40-70**.
+- Listing is deliberately not built: the file is the interface — `cat` reads it, an edit clears it. A `--list` flag is three lines the moment it is wanted.
+
+#### Decisions
+
+1. **`~/.skillset/`, beside `state.json`** (developer's call, 2026-10-08). One fixed location for global state, no write into a working tree, and the command never has to locate the repository — which is what makes it work from an installation that is not this checkout.
+2. **Four fields, not six.** The documented shape was `target`/`change`/`why`/`evidence`/`session`/`timestamp`, which a one-line call cannot fill. `cwd` is what replaces the structure: it tells triage **which project** asked, the one thing a project-local file gave away free.
+3. **No `--list`** — ladder discipline, above.
+4. **The suggestion step lives in `retro`, not in every skill body.** retro is the skill that already decides where a session's knowledge goes and already warns that a global agent dir may be generated; it is also the session-end moment where this class of finding surfaces. Duplicating the instruction into the coding skills would be the same rule in several places, which is what this programme removes.
+5. **No ADR.** This completes slice 1's criterion 9 instead of making a new ownership decision; ADR 0006 takes an appended amendment recording the location.
+
+**Road not taken.** *Keep the path in the rule* — it is what failed: an agent in another project cannot discover a path it was never told, and putting another project's paths in every session's context is the tax this programme removes. *Self-locate the repository from the binary* — breaks the moment skillset is installed anywhere but this checkout, and buys nothing over `~/.skillset/`.
+
+#### Confidence
+
+**~97%.** The mechanism is one append into a directory that already exists, the invocation is **measured** (symlinked global bin, current build), and every criterion is checkable by running the command from a foreign cwd. Residual: `session` resolution for a caller outside pi — the key is bridge-supplied — which AC-2 pins by requiring it omitted when absent rather than invented.
+
+Nothing is built. The go is a separate step, per this programme's rule.
+
+### Implemented — 3b-ii, `skillset suggest` — 2026-10-08 (Review log)
+
+The developer gave **go**, mid-conversation, having proposed the command themselves — *"maybe even I would think of creating a command like `skillset suggest "something to suggest"` that any project can invoke in bash … we should not put paths to other projects in the agents.md that are loaded every session"* — and settled the queue's home as `~/.skillset/`, beside `state.json`.
+
+**What landed.** `src/core/locations.ts` gained `suggestionsFilePath()`; `src/commands/suggest.ts` is new; `suggest` is registered in `src/cli.ts`; `test/suggest.test.ts` is new; `instruction-ownership`'s rule lost its path and names the command; `retro` gained the suggestion step and its ownership paragraph stopped saying "propose the edit there"; `docs/conventions.md` and ADR 0006 carry the new location; `.gitignore` is back to where it started.
+
+**Criteria as built.**
+
+1. Holds, **with the real binary rather than `node dist/cli.js`** — run from another project on this machine, sandboxed `HOME`:
+
+```sh
+$ cd ~/source/priv/devconsulting.pl && HOME=$T skillset suggest "the review skill should ship a fixture for the tree strategy"
+suggested $T/.skillset/suggestions.jsonl
+{"at":"2026-10-08T20:24:14.245Z","cwd":"/Users/joozik/source/priv/devconsulting.pl","suggestion":"the review skill should ship a fixture for the tree strategy"}
+```
+
+2. Holds — the line carries `at`, `cwd` (the invoking project), no `session` in a plain shell, and `session` when the environment supplies one (pinned by a test that sets `CLAUDE_CODE_SESSION_ID`).
+3. Holds — first call creates the file; a second appends to a two-line file; the empty call left the count at 2.
+4. Holds — `skillset --help` lists `suggest <message...>`, and **no path survives in any always-loaded file**: `grep -c suggestions.jsonl` is 0 in both `~/.pi/agent/APPEND_SYSTEM.md` and `~/.pi/agent/AGENTS.md`, and `grep -c '\.skillset/'` is 0 in both.
+5. Holds — `skillset suggest ""` exits 1, prints the refusal, writes nothing.
+6. **Amended — a third changed file.** `suggestionsFilePath()` went into `src/core/locations.ts`, beside `stateFilePath()`, because that file's stated purpose is "where **skillset itself** keeps things" and a second module holding one path would be the kind of split this programme removes. `src/commands/suggest.ts` and `test/suggest.test.ts` are the two others; the file list is one longer than scoped, not wider.
+7. Holds — `.gitignore` shows no diff at all (`git status --porcelain .gitignore` empty), since the location it ignored no longer exists.
+8. Holds — `retro` carries the step in **both** installed harnesses (`~/.pi/agent/prompts/sk-retro.md` and `~/.claude/commands/sk-retro.md`, `skillset suggest` twice in each: the new block and the tightened ownership paragraph).
+9. Holds — `npm run build` · `npx biome check .` (80 files) · `CI=true npm test` → **32 files / 321 tests** (was 317; +4 cases); `sync`: `reconciled drifted 3 · undeclared 8 · in-sync 60 · 3 written`, then `checked undeclared 8 · in-sync 63`. The three were `instruction-ownership` (always) and `retro` (pi slash, claude-code slash) — exactly the changed skills, and nothing else moved.
+
+**Two defects of mine, both caught by the gates rather than by review.** The first pass had a line biome wanted wrapped, and the new test asserted `toHaveLength(1)` on the **function** instead of its awaited array — the failure was `expected [AsyncFunction entries] to have a length of 1 but got +0`, which is a test bug, not a code bug. Both fixed before the gates ran green.
+
+**One platform artifact, recorded because it looks like a defect and is not.** The `cwd` assertion failed on the first green-ish run: `mkdtemp` returns `/var/folders/…` while the child's `process.cwd()` resolves `/private/var/folders/…`. The code is right — recording the physical path is more useful than the symlinked alias — so the **test** normalises with `realpathSync`.
+
+**ADR 0006 was edited, not appended a second time.** Its first amendment (an hour earlier in this same session, uncommitted) named a location this slice replaces. Two contradictory amendments inside one hour, neither committed, would be noise rather than history — the append-only rule protects decision history, and there was none yet. The amendment now records the final location and the command, in one paragraph. Flagged here because it is an exception to a rule this plan has otherwise kept.
+
+**Measured against the budget.**
+
+| area | budget | measured | verdict |
+|---|---|---|---|
+| `src/commands/suggest.ts` | ~35 logic | **29 lines total, ~24 logic** | under |
+| `src/cli.ts` | +6 | **+9** | over by 3 |
+| `src/core/locations.ts` | **not budgeted** | **+9** (1 logic line, 8 of docstring) | beyond the list — AC-6 amended above |
+| `test/suggest.test.ts` | ~40 | **63** (4 cases) | **over by 23** — exact assertions, not `toContain` |
+| `src/skills/retro/SKILL.md` | +8 to +12 | **+9 / −1** | met |
+| `src/skills/instruction-ownership/SKILL.md` | −3 | **+12 / −7** (net +5, carrying 3b's rewrite too) | met in effect |
+| `docs/conventions.md` | ±4 | **+23 / −3** (both slices) | over — it carries 3b's artifact table as well |
+| `.gitignore` | −1 | **0** | met |
+| implementation logic, total | ~40 | **~42** across the three runtime files | **met** |
+| dependencies / runtime modules | none / 0 | none / 0 | met |
+
+**Findings recorded, not fixed.**
+
+- **A suggestion written from *this* repository is indistinguishable from one written elsewhere** except by its `cwd`. Not a defect, but the triage session's first question — "did this come from a session that could have edited the source?" — is answered only by looking at that field.
+- **No `--list` flag** (the decision above). The queue is `cat`-read and cleared by editing; when it has more than a handful of lines that trade-off should be revisited rather than assumed.
+- **`session` is omitted, never invented**, when no harness supplies one — so a suggestion filed from a bare shell reports the project but not the conversation it came from.
+
+**Commit — drafted, never run.** One message, because **3b and 3b-ii are uncommitted in one tree** and they share three files (`instruction-ownership`, `docs/conventions.md`, this plan) — a clean two-commit split is a `git add -p` exercise, available if wanted, not the default. This slice adds files, so `git add -A`, never `git commit -am`.
+
+```sh
+git add -A && git commit -F - <<'MSG'
+skillset: the rules that bind every session, and a door for suggestions (0023 3b + 3b-ii)
+
+Two rules a session must obey before it acts had no rendered home: commits carry
+no trailers lived in the hand-written ~/.pi/agent/AGENTS.md, and code carries no
+comments lived only in a completed plan. Both are now a skill body rendered into
+APPEND_SYSTEM.md as its own marker block, so each rule has exactly one copy, and
+instruction-ownership gains the one-provider rule plus a Never entry for ad-hoc
+writes to any installed path.
+
+The ownership rule now branches first: a session running in this repository edits
+the source and syncs, and every other project files a suggestion and stops.
+
+That suggestion had no door — the rule named a path no project could discover and
+no file existed. `skillset suggest "<what should change, and why>"` is it: one
+JSON line appended to ~/.skillset/suggestions.jsonl beside state.json, carrying
+at, cwd, the session key when there is one, and the message. It reaches every
+project because the global bin is a symlink into this repository's build, and it
+never has to locate the repository. retro carries the step where it decides a
+finding's destination, and the always-loaded rule names the command, not a path.
+
+AGENTS.md shrinks to a pointer plus the two facts no doc carried, and the map of
+where each artifact lands moves into docs/conventions.md, read on demand instead
+of paid every session (384 -> 99 estTokens).
+
+Gates: build, biome clean, CI=true 32 files / 321 tests, sync in-sync 63.
+MSG
+```
+
+### Sign-off — 3b and 3b-ii — 2026-10-08
+
+The developer signed both off. **The plan stays in `docs/plans/` rather than `completed/`**, for the reason the earlier sign-offs recorded: this document carries 3c–3f, which are not done, so moving it would claim otherwise. It moves when the programme does.
+
+**State at sign-off, verified by `git log`/`git status` rather than by this file's prose:** skillset's tree is **still dirty** — 10 modified, 3 new (`src/commands/suggest.ts`, `src/skills/standing-rules/`, `test/suggest.test.ts`) — so the commit has **not** been run, and the pair's drafted message above is the one to run. `pi-extensions` is clean at `f67d744` and untouched by this slice. Gates on the signed-off tree: `npm run build`, `npx biome check .` (80 files), `CI=true npm test` → **32 files / 321 tests**, `sync --dry-run` → `checked undeclared 8 · in-sync 63`, with `instruction-ownership` and `retro` rendered into three installed artifacts and `retro` carrying the suggestion step in both harnesses.
+
+**What the pair leaves behind for the next session:** the suggestion queue has a writer (`skillset suggest`, from any project, on PATH everywhere) and a stated reader (a session working here), which closes slice 1's criterion 9; the always-loaded surface carries a command instead of a path, and `AGENTS.md` is a 99-estToken pointer where it was 384. Still unbuilt and unauthorised: `--list`, the `install.ts` duplication (e), the harness env-var paths (g), and 3c–3f.
+
 ## Handoff — prompt for the next session
 
 Paste this into a skillset session to continue. It assumes nothing that is not written above.
 
 > Continue the skillset instruction-ownership program. Read `docs/plans/0023-skillset-owns-instructions.md` in full first — it is the spec. Do not re-derive anything marked verified; it was checked by execution and the transcripts are in the plan. **Start with `git log` and `git status` in both repositories, never with this file's prose** — it has claimed "not committed" twice after the fact.
 >
-> **State — verified 2026-10-08, by `git log`/`git status`.** skillset: slices 1 (`880fdfe`), 2a (`7e65d1a`), 2c (`c8cc22d`), 2b (`7eb7f75` here, `4b66b55` in `pi-extensions`), 2d (`cea2963`), (b) (`90610ef`), 2e (`4852681` + `c174158`), 3a (`c917d4e`), **(d) the claude-code agent renderer (`748d318`)** and **the CI fix (`2069691`)** are committed, working tree clean. **`2069691` was 1 commit ahead of `origin/main` when this was written — push it and re-run CI before anything else**; it fixes every CI failure this plan recorded. pi-extensions: 3a is committed and pushed (`f67d744`), tree clean, 41 files / +136 −4,856, `pnpm -r run test` exit 0.
+> **State — verified 2026-10-08, by `git log`/`git status`.** skillset: slices 1 (`880fdfe`), 2a (`7e65d1a`), 2c (`c8cc22d`), 2b (`7eb7f75` here, `4b66b55` in `pi-extensions`), 2d (`cea2963`), (b) (`90610ef`), 2e (`4852681` + `c174158`), 3a (`c917d4e`), **(d) the claude-code agent renderer (`748d318`)** and **the CI fix (`2069691`)** are committed, working tree clean and **pushed**: `origin/main` is `bcb1e60` and `git rev-list --left-right --count origin/main...main` is `0 0`, re-verified 2026-10-08 — the earlier "1 commit ahead, push it first" note is retired. **The CI runs on that push are not readable from this machine** (`gh` is installed but unauthenticated, no `GH_TOKEN`), so greenness rests on the local equivalent of what CI runs — `CI=true npm test` → 31 files / 316 tests, `npm run build` and `npx biome check .` clean — not on a run log. pi-extensions: 3a is committed and pushed (`f67d744`), tree clean, 41 files / +136 −4,856, `pnpm -r run test` exit 0.
 >
 > **Two labels to know about.** `748d318` reads `(0023 slice 3d)`, but **3d in this plan is the FLOW skill triage** — this was item **(d)**, the harness agent renderers, and the two share nothing but a letter. It is pushed, so the label stands unless you amend; the plan carries the correction. The pi-extensions 3a commit is correctly labelled.
 >
 > **What (d) landed.** `src/agents/<name>.md` is installed for **claude-code as well as pi**: the claude-code bridge implements `agents` (`expresses` = the 16 fields its loader reads; `path`; `install`/`uninstall`/`preview`), all 15 sources declare `targets.claude-code.tools` in Claude Code's own names (`Read, Grep, Glob` ×9, `Grep, Glob` ×3, `+Bash` ×2, `+WebSearch, WebFetch` ×1), and `AGENT_BRIDGE_NAMES` derived the change with **no registry edit**. `AgentCapability.required` is new: an agent that leaves a required field undeclared is **refused** (install writes nothing, `sync` exits 2), because Claude Code reads a missing `tools:` line as *every* tool and an unrecognised name as *no* tool — both silent. Verified against the loader after a real sync: `claude --agent zzz-sentinel -p "hi"` lists all 15; with the tools block deleted from the built bundle, install exits 1 and creates no directory.
 >
-> **Go state — nothing is authorised.** Next, in order: **(e)** `install.ts`'s skill/agent duplication (the lever if 3a's +191 and (d)'s +71 logic overruns are not acceptable); **(f)** slice 3 proper — 3b (the guidance channel, which is also where the *comment rule binds nobody* finding gets resolved), 3c (project scaffolds), 3d (the FLOW skill triage), 3e (workflow declarations), 3f (prompts and commands); **(g)** the `CLAUDE_CONFIG_DIR` / `PI_CODING_AGENT_DIR` question — both loaders prefer those variables over `$HOME`, this repository's bridges know neither, so on such a machine `sync` writes where the harness never looks (it affects the skill installs identically; the fix is per-bridge, never a core one). Each needs its own go.
+> **Go state — nothing is authorised.** Next, in order: **(e)** `install.ts`'s skill/agent duplication (the lever if 3a's +191 and (d)'s +71 logic overruns are not acceptable); **(f)** slice 3 proper — **3b and 3b-ii are signed off** (2026-10-08); the commit is drafted in *Implemented — 3b-ii* and **was not yet run when this was written — check `git log`, the tree may still be dirty**. They landed: the standing rules render into the `always` channel, `AGENTS.md` shrank to a pointer with the map moved into `docs/conventions.md`, and `skillset suggest` gives the suggestion queue a door, closing slice 1's criterion 9; then 3c (project scaffolds), 3d (the FLOW skill triage), 3e (workflow declarations), 3f (prompts and commands); **(g)** the `CLAUDE_CONFIG_DIR` / `PI_CODING_AGENT_DIR` question — both loaders prefer those variables over `$HOME`, this repository's bridges know neither, so on such a machine `sync` writes where the harness never looks (it affects the skill installs identically; the fix is per-bridge, never a core one). Each needs its own go.
 >
-> **Recorded findings, not fixed** — do not fold them into another slice silently: the copilot target writes `mode: agent` where VS Code documents `agent:`; the classifier's drifted message says "edited locally" when it was the *source* that moved; `requires` in `skillset.config.json` is skill-keyed, so an agent name there is a coverage problem (this is why the required-`tools` rule lives in the bridge); and `expresses` for claude-code agents comes from the field vocabulary, of which only `name`/`description`/`tools` are the ones this slice exercises.
+> **Recorded findings, not fixed** — do not fold them into another slice silently: the copilot target writes `mode: agent` where VS Code documents `agent:`; the classifier's drifted message says "edited locally" when it was the *source* that moved; `requires` in `skillset.config.json` is skill-keyed, so an agent name there is a coverage problem (this is why the required-`tools` rule lives in the bridge); and `expresses` for claude-code agents comes from the field vocabulary, of which only `name`/`description`/`tools` are the ones this slice exercises. **Two added by 3b:** the suggestion queue is advertised in the `always` block with no `suggestions` verb and no queue file anywhere (slice 1's criterion 9 is half-met); and the README's `## Bundled skills` list omits `instruction-ownership` and `standing-rules`.
 >
 > **Not verifiable on this machine, so not built:** opencode (arm64 binary `invalid signature`, SIGKILLed) and Copilot CLI (installed nowhere) keep **no** agent renderer. A renderer that cannot be checked against its own loader is the failure mode 2c recorded — say so rather than guessing.
 >
-> **No comments. This is a standing instruction, not a preference.** Code explains itself; if you need a comment you already wrote the wrong code. The rule still binds nobody mechanically — it lives only in `docs/plans/completed/0012-skill-architect.md:143,145`, no skill body carries it and every coding skill installs as `slash`/`auto` — so it is binding here by agreement until 3b lands it in the `always` channel: no explanatory blocks, no "why" essays above functions, no invented section banners. Name things so the code reads.
+> **No comments. This is a standing instruction, not a preference.** Code explains itself; if you need a comment you already wrote the wrong code. **As of 3b this binds mechanically** — it is rendered from `src/skills/standing-rules/SKILL.md` into `APPEND_SYSTEM.md`, so a session that invokes no skill still carries it: no explanatory blocks, no "why" essays above functions, no invented section banners. Name things so the code reads.
 >
 > **Rules that are not negotiable.** Gates — skillset: `npm run build` *before* `npm test` (tests spawn `dist/cli.js`), then `npx biome check .`, **and `CI=true npm test`** — that variable is what CI runs in, and a red CI hid behind two slices of green local gates because `picocolors` colours output under `CI` and on `win32`; pi-extensions: `pnpm -r run test` from the workspace root (there is no root `npm test`). Commit messages are drafted, never run, carry no trailers of any kind, and a slice that adds files uses `git add -A`, never `git commit -am`. **Never use `rm -rf`** — the permission policy blocks it and the blocked call takes the rest of the command with it, which cost a turn on 2026-10-08; use a unique `mktemp -d` scratch and plain `rm <file>`. Never hand-write into `~/.pi/agent/**`, `~/.claude/**`, `~/.config/opencode/**` or an installed copy: change the source, run `skillset sync`, paste its report. **A slice that changes `src/skills/` or `src/agents/` is not finished until `sync` has run** — a commit is not a propagation. Keep the plan's criteria and budget current, and report overruns honestly.
 >

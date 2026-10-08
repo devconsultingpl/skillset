@@ -10,6 +10,7 @@ import { resetCmd } from "./commands/reset.js";
 import { scanPromptCmd } from "./commands/scan-prompt.js";
 import { setMode } from "./commands/set-mode.js";
 import { statusCmd } from "./commands/status.js";
+import { suggest } from "./commands/suggest.js";
 import { sync } from "./commands/sync.js";
 import { trackCmd } from "./commands/track.js";
 import { uninstall } from "./commands/uninstall.js";
@@ -185,6 +186,14 @@ program
   .option("--stdin-json", "read session_id from a JSON hook payload on stdin")
   .action(async (opts) => {
     await resetCmd({ session: opts.session, stdinJson: Boolean(opts.stdinJson) });
+  });
+
+program
+  .command("suggest")
+  .description("Record a suggestion for the repository that owns installed content.")
+  .argument("<message...>", "what should change, and why")
+  .action(async (message: string[]) => {
+    if ((await suggest(message.join(" "))) > 0) process.exitCode = 1;
   });
 
 program.parseAsync(process.argv).catch((err) => {

@@ -33,7 +33,7 @@ You may be running under any of the supported harnesses. Each keeps its standing
 | **pi** | `AGENTS.md` (or `CLAUDE.md`), `~/.pi/agent/AGENTS.md` (global, every project), `APPEND_SYSTEM.md` | `AGENTS.md` / `CLAUDE.md` / `APPEND_SYSTEM.md` | `.pi/skills/`, `.pi/prompts/`, `.pi/extensions/`; global `~/.pi/agent/skills/` (`auto`) and `~/.pi/agent/prompts/sk-*.md` (`slash`) |
 | **Copilot** | `.github/copilot-instructions.md`, `~/.copilot/settings.json` | `copilot-instructions.md` (no separate store) | `.github/prompts/*.prompt.md` |
 
-**Before proposing an edit anywhere under a global agent dir, check who owns it.** Files under `~/.pi/agent/**` (and the equivalents for other harnesses) are often *generated*: a skills/agents manager project owns the canonical source and rewrites the installed copy, so a hand-edit is silently lost on the next sync. Look for a project that manages them (a `skillset`-style repo, a sync script, or an instruction file that says so) and propose the edit there, then let its install/sync step propagate it.
+**Before proposing an edit anywhere under a global agent dir, check who owns it.** Files under `~/.pi/agent/**` (and the equivalents for other harnesses) are often *generated*: a skills/agents manager project owns the canonical source and rewrites the installed copy, so a hand-edit is silently lost on the next sync. **Owned content is not edited from here — file it with `skillset suggest`** (see *What each finding becomes*) and let the owning repository decide, apply and propagate it.
 
 Also check both scopes: **project-local** files (travel with the repo) and **global/user** files (`~/...`) — a finding can belong to either. When in doubt about a path, look before you write.
 
@@ -61,6 +61,14 @@ Independently of this session's events, inspect what every future session will l
 ## What each finding becomes (be concrete)
 
 Every finding must name the exact artifact and where it lands — not "consider documenting this":
+
+**First, check who owns the artifact.** One rule outranks each destination below: you may only edit what this project owns. A skill, agent, prompt, rule or instruction file that another repository installs and rewrites is **not yours to change from here** — your edit is silently lost at its next sync, and a project's request can be locally right and globally wrong. Send it across instead:
+
+```sh
+skillset suggest "<what should change, and why>"
+```
+
+That appends one line to the owner's queue; its next session decides whether the finding is real, applies it, and removes it. **Worth filing:** something important and not specific to this project — a rule, a skill body, a gap any session would hit. **Not worth filing:** a preference of this project's, a one-off, or anything the queue's reader cannot act on. If you are already working *inside* the owning repository, edit the source and run its sync — that is the only place the edit belongs.
 
 - **Recurring fact / preference / correction** → a memory entry (one fact each; corrections/preferences carry the *why* and how to apply). On harnesses with no separate store, a tight line in the instruction file instead. Update any index. If no memory store exists, don't create one for one-off facts — durable rules belong in the project's existing instruction or conventions files.
 - **A rule the user clearly holds but isn't written** → add it to the conventions doc / instruction file.

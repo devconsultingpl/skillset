@@ -24,6 +24,10 @@ Every bundled skill's `slug:` **must** start with `sk-`. The slug becomes the sl
 
 When creating a new skill, set the slug explicitly in frontmatter even if it equals `sk-<name>` — making the convention visible at the top of every SKILL.md.
 
+## Rules every session loads
+
+A rule that must bind *before* an agent acts — rather than when it chooses to read something — belongs in the `always` channel: `src/skills/<name>/`, declared `"mode": "always"`, rendered as its own marker block in `APPEND_SYSTEM.md`. This file carries how *this repository* is built; the always channel carries what any session obeys. Everything there is paid on every request, so it holds rules, never explanations.
+
 ## Propagating skill edits
 
 Canonical source is `src/skills/<name>/SKILL.md`; every agent install renders from it. Which skills
@@ -35,6 +39,7 @@ skill's name.
    unrecorded artifact whose bytes already match, repairs a locally edited artifact (reporting
    the prior content), and **refuses** a file at an owned destination that skillset never wrote.
    It exits non-zero when it refuses something. `skillset sync --dry-run` reports without writing.
+   What it wrote is recorded per file — path, mode, scope, kind — in `~/.skillset/state.json`.
 3. A recorded install the declarations no longer mention is reported as `undeclared`;
    `skillset sync --prune` removes it.
 4. Skill identity is `(skill, agent, scope, mode)`. A skill may hold several modes at once — the
@@ -47,10 +52,25 @@ skill's name.
 Installed content is an output. Never hand-edit `~/.pi/agent/**`, `~/.claude/**`,
 `~/.config/opencode/**`, a project-local equivalent, or a settings file: change the source and run
 `skillset sync`. A project agent that wants a change to owned content files a suggestion instead —
-one JSON object per line in `.skillset/suggestions.jsonl`
-(`{"target":"skills/<name>","change":"…","why":"…","evidence":"…","session":"…","at":"…"}`),
-which the developer triages in a skillset session. See ADR 0006 and
+`skillset suggest "<what should change, and why>"`, which appends one line to the single queue at
+`~/.skillset/suggestions.jsonl` (beside `state.json`, never one queue per project), read and cleared
+by a session working here. See ADR 0006 and the `instruction-ownership` skill.
 the `instruction-ownership` skill.
+
+## Where each artifact lands
+
+One path per (mode, scope), resolved by each bridge in `src/bridges/<harness>/paths.ts` — the core never learns a harness's layout. Global scope:
+
+| mode | pi | claude-code | opencode | copilot |
+|---|---|---|---|---|
+| `slash` | `~/.pi/agent/prompts/<slug>.md` | `~/.claude/commands/<slug>.md` | `~/.config/opencode/commands/<slug>.md` | `~/.skillset/copilot/prompts/<slug>.prompt.md` |
+| `auto` | `~/.pi/agent/skills/<name>/SKILL.md` | `~/.claude/skills/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` | — (degrades to `always`) |
+| `always` | `~/.pi/agent/APPEND_SYSTEM.md` | `~/.claude/settings.json` | `~/.config/opencode/AGENTS.md` | `~/.skillset/copilot/copilot-instructions.md` |
+| agent | `~/.pi/agent/agents/<name>.md` | `~/.claude/agents/<name>.md` | — | — |
+
+Local scope mirrors under the project (`<root>/.pi`, `<root>/.claude`, `<root>/.opencode`, `<root>/.github`) with two exceptions: opencode's and copilot's `always` anchors are `<root>/AGENTS.md` and `<root>/.github/copilot-instructions.md`, and copilot has no user-global prompt location documented, so its global `slash` mirrors under `~/.skillset/copilot/` for the user to copy or symlink.
+
+Two pi paths are not install records. `~/.pi/agent/extensions/skillset.ts` ships from the `skillset-status` skill's `assets/pi-extension.ts`, and `flow` ships its own skills from its package (`packages/flow/skills/`, declared as `pi.skills`) — those are never copied into `~/.pi/agent/skills`.
 
 ## Skill payloads — declared siblings
 

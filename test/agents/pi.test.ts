@@ -130,6 +130,25 @@ describe("pi target", () => {
       expect(run(["uninstall", "confidence", "--global"], sb.projectRoot, sb.env).status).toBe(0);
       expect(await exists(anchor)).toBe(false);
     });
+
+    it("two always skills share the anchor, and uninstalling one leaves the other", async () => {
+      const anchor = join(sb.home, ".pi", "agent", "APPEND_SYSTEM.md");
+      for (const name of ["instruction-ownership", "standing-rules"]) {
+        const out = run(["install", name, "--agent", "pi", "--global"], sb.projectRoot, sb.env);
+        expect(out.status).toBe(0);
+      }
+
+      const both = await readFile(anchor, "utf8");
+      expect(both).toContain("<!-- skillset:begin instruction-ownership -->");
+      expect(both).toContain("<!-- skillset:begin standing-rules -->");
+
+      const off = run(["uninstall", "standing-rules", "--global"], sb.projectRoot, sb.env);
+      expect(off.status).toBe(0);
+      const remaining = await readFile(anchor, "utf8");
+      expect(remaining).toContain("<!-- skillset:begin instruction-ownership -->");
+      expect(remaining).not.toContain("standing-rules");
+      expect(await exists(anchor)).toBe(true);
+    });
   });
 
   describe("sibling files", () => {

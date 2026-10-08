@@ -16,6 +16,15 @@ export function stateFilePath(): string {
 }
 
 /**
+ * Path of the suggestion queue (~/.skillset/suggestions.jsonl). One file for
+ * every project: a session outside this repository appends through
+ * `skillset suggest`, and a session working here reads and clears it.
+ */
+export function suggestionsFilePath(): string {
+  return join(homedir(), ".skillset", "suggestions.jsonl");
+}
+
+/**
  * Path of the repository-level install declarations (`skillset.config.json`).
  * Resolved next to the bundle root, so it is the package root in both `src/`
  * (dev) and `dist/` (installed).
