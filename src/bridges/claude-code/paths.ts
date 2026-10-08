@@ -1,6 +1,10 @@
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import type { ArtifactPathOptions, SkillDirectoryOptions } from "../../core/bridge.js";
+import type {
+  AgentArtifactOptions,
+  ArtifactPathOptions,
+  SkillDirectoryOptions,
+} from "../../core/bridge.js";
 import type { Scope } from "../../core/types.js";
 import type { Layout } from "../_shared/paths.js";
 import { resolveArtifactPath, resolveSkillDirectory } from "../_shared/paths.js";
@@ -35,4 +39,8 @@ export function skillDirectory(opts: SkillDirectoryOptions): string | null {
   if (opts.mode !== "auto" && opts.mode !== "always") return null;
   if (!layout.auto) return null;
   return dirname(layout.auto(opts.name, opts.scope, opts.projectRoot));
+}
+
+export function agentPath(opts: AgentArtifactOptions): string {
+  return join(base(opts.scope, opts.projectRoot), "agents", `${opts.name}.md`);
 }

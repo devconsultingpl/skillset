@@ -72,6 +72,7 @@ export interface AgentInstallContext {
 export interface AgentCapability {
   readonly expresses: readonly string[];
   readonly consequence?: Readonly<Record<string, string>>;
+  readonly required?: readonly string[];
   path(opts: AgentArtifactOptions): string;
   install(ctx: AgentInstallContext): Promise<InstallRecord>;
   uninstall(record: InstallRecord): Promise<void>;

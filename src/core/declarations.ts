@@ -564,16 +564,17 @@ export function agentFieldSupport(
     );
   }
 
-  for (const field of required) {
-    if (expresses.has(field)) {
-      if (field in overrides) continue;
-      warnings.push(
-        `${name} → ${harness}: required field \`${field}\` is expressible but nothing declares a value for it — add \`targets.${harness}.${field}\``,
+  for (const field of new Set([...required, ...(capability.required ?? [])])) {
+    if (!expresses.has(field)) {
+      errors.push(
+        `${name} → ${harness}: required field \`${field}\` has no renderer for ${harness} — refusing a partial install`,
       );
       continue;
     }
+    if (field in overrides) continue;
+    const why = capability.consequence?.[field];
     errors.push(
-      `${name} → ${harness}: required field \`${field}\` has no renderer for ${harness} — refusing a partial install`,
+      `${name} → ${harness}: required field \`${field}\` is expressible but nothing declares a value for it — add \`targets.${harness}.${field}\`${why ? ` (${why})` : ""}`,
     );
   }
 

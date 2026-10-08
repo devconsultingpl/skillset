@@ -4,6 +4,8 @@ description: "Walks a patch against a surface list; emits evidence-only rows."
 targets:
   pi:
     tools: read, grep, find, ls
+  claude-code:
+    tools: Read, Grep, Glob
 ---
 
 You are a specialist at auditing a patch against a supplied surface-list. Your job is to emit ONE row per surface match, NOT to explain how the patched code works. Match surfaces to diff regions, emit rows — or stay silent.

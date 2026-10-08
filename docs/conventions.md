@@ -11,7 +11,7 @@ Executable artifacts under `src/skills/<skill>/assets/` (opencode plugin, pi ext
 ## Naming
 
 - Source: kebab-case files, camelCase exports.
-- Tests: colocated `*.test.ts` next to source under `src/core` and `src/targets`; end-to-end tests under `test/`.
+- Tests: colocated `*.test.ts` next to source under `src/core` and `src/bridges`; end-to-end tests under `test/`.
 - Branches: short topical name (e.g. `step-8-agent-integration-tests`).
 
 ## Skill slugs — `sk-` prefix is mandatory
@@ -102,8 +102,12 @@ harness's roster. The portable shape, first used by `code-review`:
 - **Say what did not run.** A specialist with no equivalent, a skipped pass, a check that
   could not execute — each is reported as not run, with the reason.
 
-The roster itself (FLOW's 15 agents) stays FLOW's until skillset can render agent definitions
-per harness; see `docs/plans/0023-skillset-owns-instructions.md`, slice 3a.
+The roster lives in `src/agents/<name>.md`, rendered per harness for pi and claude-code (see
+*Agent definitions* in `README.md`). A body that names a pi-only tool or calls a FLOW `_shared/`
+script is not portable, and each target's tool set is declared per harness under
+`targets.<agent>.tools` — a claude-code agent with no `tools` declaration is refused, because
+Claude Code reads that absence as *every* tool. See
+`docs/plans/0023-skillset-owns-instructions.md`, slice 3.
 
 ## Tests
 

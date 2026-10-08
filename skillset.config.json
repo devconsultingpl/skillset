@@ -4,76 +4,121 @@
     "artifact-code-reviewer": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "artifact-coverage-reviewer": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "artifacts-analyzer": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "artifacts-locator": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "claim-verifier": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "codebase-analyzer": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "codebase-locator": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "codebase-pattern-finder": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "diff-auditor": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "integration-scanner": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "peer-comparator": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "precedent-locator": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "scope-tracer": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "slice-verifier": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ],
     "web-search-researcher": [
       {
         "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
       }
     ]
   },

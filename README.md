@@ -244,6 +244,30 @@ built-in list (Claude Code's bundled skills and the `/review` alias, opencode's 
 One install can serve two harnesses: opencode also reads `.claude/skills/`. Declare such a skill for
 one of them, not both.
 
+## Agent definitions
+
+`src/agents/<name>.md` holds a subagent definition: the body becomes the child's system prompt,
+the frontmatter its configuration. Two harnesses take one today, each declared in
+`skillset.config.json` under `agents`:
+
+| target | where it lands | what its loader reads |
+|---|---|---|
+| pi | `~/.pi/agent/agents/<name>.md` | `display_name`, `description`, `tools`, `model`, `thinking`, `max_turns`, `prompt_mode`, `inherit_context`, `run_in_background`, `enabled`. The agent's name comes from the **filename** — frontmatter `name` is ignored |
+| claude-code | `~/.claude/agents/<name>.md` | `name` and `description` (both required; `name` wins over the filename), `tools`, `disallowedTools`, `model`, `effort`, `permissionMode`, `mcpServers`, `hooks`, `maxTurns`, `skills`, `initialPrompt`, `memory`, `background`, `isolation`, `color` |
+
+`tools` is not portable: pi names `read`, `grep`, `find`, `ls`, `bash` and its `ext:` selectors,
+while Claude Code names `Read`, `Grep`, `Glob`, `Bash`, `WebSearch`, `WebFetch`. It is per-target
+data, so it travels under `targets.<agent>.tools`, and both loaders ignore the other's names.
+
+**A claude-code agent must declare `tools`, and the declaration is an error to omit.** Claude Code
+reads an agent with no `tools:` line as *every* tool — a locating specialist would silently gain
+`Bash`, `Edit` and `Write` — and an agent whose tool names it does not recognise as *no* tools at
+all. Both are silent, and both are the wrong artifact, so a missing `tools` for claude-code refuses
+the install (`install` writes nothing, `sync` exits 2 before its first write). pi has no such rule.
+
+An agent has one delivery shape per harness, so it takes no `--mode`: passing one is refused rather
+than guessed.
+
 ## Reinstall guard
 
 A different mode is a different install: `--mode auto` beside an existing `slash` install records

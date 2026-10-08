@@ -221,8 +221,14 @@ describe("frontmatter capability matrix", () => {
     // file is addressed by its name, so a name that collides with a harness
     // built-in would make the built-in unreachable.
     const { declarations } = await loadDeclarations();
-    const agentNames = declarations.filter((d) => d.kind === "agent").map((d) => d.skill);
+    const agentDeclarations = declarations.filter((d) => d.kind === "agent");
+    const agentNames = [...new Set(agentDeclarations.map((d) => d.skill))];
     expect(agentNames.length).toBe(15);
+    for (const declaration of agentDeclarations) {
+      expect(AGENT_BRIDGE_NAMES, `${declaration.skill} on ${declaration.agent}`).toContain(
+        declaration.agent,
+      );
+    }
     for (const target of targets) {
       for (const native of target.frontmatter.native ?? []) {
         expect(

@@ -1,12 +1,12 @@
 import { rm } from "node:fs/promises";
-import { dirname, join, relative } from "node:path";
-import type { Bridge, InstallContext } from "../../core/bridge.js";
+import { basename, dirname, join, relative } from "node:path";
+import type { AgentInstallContext, Bridge, InstallContext } from "../../core/bridge.js";
 import { compose } from "../../core/frontmatter.js";
 import { copySiblings, readMaybe, writeAtomic } from "../../core/fs.js";
 import { MD, remove, upsert } from "../../core/markers.js";
 import type { InstallRecord } from "../../core/types.js";
 import { STATUSLINE_COMMAND, addStatusLine, dropStatusLine } from "../_shared/settings.js";
-import { artifactPath, layout, skillDirectory } from "./paths.js";
+import { agentPath, artifactPath, layout, skillDirectory } from "./paths.js";
 
 const HOOK_TAG = "# skillset:";
 
@@ -29,6 +29,12 @@ function renderSkillFile(ctx: InstallContext): string {
   const { name, description } = ctx.skill.frontmatter;
   const overrides = targetOverrides(ctx.skill);
   return compose({ name, description, ...overrides }, ctx.skill.body);
+}
+
+function renderAgentFile(ctx: AgentInstallContext): string {
+  const { name, description } = ctx.agent.frontmatter;
+  const overrides = ctx.agent.frontmatter.targets?.["claude-code"] ?? {};
+  return compose({ name, description, ...overrides }, ctx.agent.body);
 }
 
 /** Write-on-invoke trailer for a slash command: invoking the skill records its
@@ -334,6 +340,68 @@ export const claudeCodeBridge: Bridge = {
 
   artifactPath,
   skillDirectory,
+
+  agents: {
+    expresses: [
+      "name",
+      "description",
+      "tools",
+      "disallowedTools",
+      "model",
+      "effort",
+      "permissionMode",
+      "mcpServers",
+      "hooks",
+      "maxTurns",
+      "skills",
+      "initialPrompt",
+      "memory",
+      "background",
+      "isolation",
+      "color",
+    ],
+    consequence: {
+      tools: "an agent artifact with no `tools` line resolves to every tool",
+    },
+    required: ["tools"],
+
+    path: agentPath,
+
+    async install(ctx) {
+      const name = ctx.agent.frontmatter.name;
+      const path = agentPath({
+        name,
+        scope: ctx.scope,
+        projectRoot: ctx.projectRoot,
+      });
+      await writeAtomic(path, renderAgentFile(ctx));
+      return {
+        skill: name,
+        kind: "agent",
+        version: "",
+        agent: "claude-code",
+        scope: ctx.scope,
+        mode: "auto",
+        location: dirname(path),
+        files: [basename(path)],
+        projectPath: ctx.scope === "local" ? ctx.projectRoot : undefined,
+        installedAt: new Date().toISOString(),
+      } satisfies InstallRecord;
+    },
+
+    async uninstall(record) {
+      for (const rel of record.files) {
+        await rm(join(record.location, rel), { force: true });
+      }
+    },
+
+    async preview(ctx, record) {
+      const next = renderAgentFile(ctx);
+      const filePath = record.files[0] ? join(record.location, record.files[0]) : null;
+      const current = filePath ? await readMaybe(filePath) : null;
+      return { current, next };
+    },
+  },
   /** This harness hands a session id to its hook children through the
    * environment; the variable's name is this bridge's business, so the core asks
    * instead of reading the environment itself. */

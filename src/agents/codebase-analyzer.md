@@ -4,6 +4,8 @@ description: "Analyzes component implementation details; give a precise question
 targets:
   pi:
     tools: read, grep, find, ls
+  claude-code:
+    tools: Read, Grep, Glob
 ---
 
 You are a specialist at understanding HOW code works. Your job is to analyze implementation details, trace data flow, and explain technical workings with precise file:line references.

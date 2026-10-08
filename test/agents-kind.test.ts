@@ -47,7 +47,8 @@ describe("agents as an artifact kind", () => {
     expect(first.stdout).not.toMatch(/foreign/);
 
     const agentRecords = (await installs()).filter((i) => i.kind === "agent");
-    expect(agentRecords).toHaveLength(15);
+    expect(agentRecords.filter((i) => i.agent === "pi")).toHaveLength(15);
+    expect(agentRecords.filter((i) => i.agent === "claude-code")).toHaveLength(15);
 
     const second = run(["sync"], sb.projectRoot, sb.env);
     expect(second.status).toBe(0);
@@ -57,7 +58,7 @@ describe("agents as an artifact kind", () => {
 
     const third = run(["sync", "--dry-run"], sb.projectRoot, sb.env);
     expect(third.status).toBe(0);
-    expect(third.stdout).toMatch(/checked in-sync 47/);
+    expect(third.stdout).toMatch(/checked in-sync 62/);
   });
 
   it("keeps `undeclared` and `in-sync` honest across the kinds", async () => {
@@ -133,7 +134,7 @@ describe("agents as an artifact kind", () => {
       configPath,
       JSON.stringify({
         version: 1,
-        agents: { "diff-auditor": [{ agent: "claude-code" }] },
+        agents: { "diff-auditor": [{ agent: "opencode" }] },
         installs: {},
       }),
     );
@@ -143,9 +144,33 @@ describe("agents as an artifact kind", () => {
     });
     expect(out.status).toBe(2);
     expect(out.stderr).toMatch(/cannot install agent definitions/);
-    expect(out.stderr).toMatch(/harnesses that can: pi/);
+    expect(out.stderr).toMatch(/harnesses that can: claude-code, pi/);
     expect(await exists(agentFile("diff-auditor"))).toBe(false);
     expect(await exists(join(sb.home, ".claude", "agents"))).toBe(false);
+    expect(await exists(join(sb.home, ".config", "opencode"))).toBe(false);
+  });
+
+  it("refuses a claude-code agent destination it did not write, and adopts it on request", async () => {
+    const path = join(sb.home, ".claude", "agents", "diff-auditor.md");
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, "---\nname: diff-auditor\n---\nsomebody else wrote this\n");
+
+    const out = run(
+      ["install", "diff-auditor", "--agent", "claude-code", "--global"],
+      sb.projectRoot,
+      sb.env,
+    );
+    expect(out.status).toBe(1);
+    expect(out.stderr).toMatch(/refusing/);
+    expect(await readFile(path, "utf8")).toContain("somebody else wrote this");
+
+    const forced = run(
+      ["install", "diff-auditor", "--agent", "claude-code", "--global", "--force"],
+      sb.projectRoot,
+      sb.env,
+    );
+    expect(forced.status).toBe(0);
+    expect(await readFile(path, "utf8")).toContain("evidence-only rows");
   });
 
   it("reports an agent declaration with no bundled definition", async () => {

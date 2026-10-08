@@ -13,7 +13,6 @@ import {
   AGENT_BRIDGE_NAMES,
   BRIDGE_NAMES,
   bridgeFor,
-  claudeCodeBridge,
   copilotBridge,
   opencodeBridge,
   piBridge,
@@ -71,8 +70,8 @@ describe("agent parsing", () => {
 describe("pi bridge — the agent half", () => {
   it("declares the capability, and the registry knows which bridges do", () => {
     expect(piBridge.agents).toBeDefined();
-    expect(AGENT_BRIDGE_NAMES).toEqual(["pi"]);
-    for (const bridge of [claudeCodeBridge, copilotBridge, opencodeBridge]) {
+    expect(AGENT_BRIDGE_NAMES).toEqual(["claude-code", "pi"]);
+    for (const bridge of [copilotBridge, opencodeBridge]) {
       expect(bridge.agents).toBeUndefined();
     }
   });
@@ -156,7 +155,7 @@ describe("agent capability report", () => {
 
   it("errors when the harness has no agent capability at all", () => {
     const agent = parseAgent(AGENT_SRC);
-    const { errors } = agentFieldSupport(agent, claudeCodeBridge);
+    const { errors } = agentFieldSupport(agent, opencodeBridge);
     expect(errors.join("\n")).toMatch(/cannot install agent definitions/);
   });
 
@@ -259,9 +258,9 @@ describe("the kind in the state and the classifier", () => {
   });
 
   it("has no agent capability to ask for on a bridge that lacks one", () => {
-    const withoutAgents: Bridge = claudeCodeBridge;
-    expect(withoutAgents.name).toBe("claude-code");
-    expect(bridgeFor("claude-code")?.agents).toBeUndefined();
-    expect(BRIDGE_NAMES).toContain("claude-code");
+    const withoutAgents: Bridge = opencodeBridge;
+    expect(withoutAgents.name).toBe("opencode");
+    expect(bridgeFor("opencode")?.agents).toBeUndefined();
+    expect(BRIDGE_NAMES).toContain("opencode");
   });
 });
