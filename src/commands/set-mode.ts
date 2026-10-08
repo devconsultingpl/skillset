@@ -6,6 +6,7 @@ import { loadDeclarations } from "../core/declarations.js";
 import { readState, removeInstall, upsertInstall, writeState } from "../core/state.js";
 import { applyConfigToSkill } from "../core/template.js";
 import type { BridgeName, Mode, Scope } from "../core/types.js";
+import { isAnchorMode } from "../core/types.js";
 
 export interface SetModeOptions {
   skill: string;
@@ -34,16 +35,16 @@ export async function setMode(opts: SetModeOptions): Promise<void> {
   const skill = applyConfigToSkill(await loadBundledSkill(opts.skill));
   // A mode switch re-installs the whole skill, siblings included, or switching
   // to `auto` would leave the helpers behind.
-  const { siblings } = await loadDeclarations();
+  const { siblings } = await loadDeclarations(projectRoot);
   const declaredSiblings = siblings[opts.skill] ?? [];
 
-  if (opts.mode === "always") {
+  if (isAnchorMode(opts.mode)) {
     const lines = bodyLineCount(skill.body);
     const limit = alwaysWarnLines();
     if (lines > limit) {
       console.error(
         pc.yellow(
-          `warning: ${opts.skill} body is ${lines} lines (>${limit}); always-mode artifacts load every session. Consider slash/auto, or trim the body.`,
+          `warning: ${opts.skill} body is ${lines} lines (>${limit}); anchor-mode artifacts (always, context) load every session. Consider slash/auto, or trim the body.`,
         ),
       );
     }

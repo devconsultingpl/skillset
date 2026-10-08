@@ -1817,7 +1817,7 @@ Then the queue's location changed, because the branch made its missing reader ob
 **Findings recorded, not fixed.**
 
 - **The suggestion queue now has a writer and a reader, and its command arm is closed by 3b-ii.** The location is `~/.skillset/suggestions.jsonl` (beside `state.json`); `skillset suggest "…"` appends from any project, `retro` carries the step for sessions that do not think of it, and a session working here reads and clears it. Listing and clearing remain `cat` and an edit — deliberately, until the queue is worth a flag.
-- **The README's `## Bundled skills` list omits `instruction-ownership` and now `standing-rules`.** Adding rows is a doc change outside this budget.
+- **The README's `## Bundled skills` list omits `instruction-ownership` and now `standing-rules`.** Adding rows is a doc change outside this budget. *(Fixed 2026-10-08, with `context-pointer` as well — all 16 bundled skills are catalogued and a `comm` against `src/skills/` is empty; see the note under *Amended — the standing-rules block learns what a blocked command means*.)*
 - **claude-code's `always` anchor remains unverified against its loader.** The same two rules would reach claude-code sessions through it, but 2c declared that mode from documentation and nothing has exercised it — declaring them there would be the unverifiable renderer this program keeps refusing.
 
 **Commit — drafted, never run.** ~~This slice adds a file, so `git add -A`, never `git commit -am`.~~ **Superseded**: 3b and 3b-ii are uncommitted in one tree, so the pair's draft is under *Implemented — 3b-ii* below. The original single-slice text is kept here only as a record of what was drafted at the time.
@@ -1998,28 +1998,265 @@ The developer signed both off. **The plan stays in `docs/plans/` rather than `co
 
 **What the pair leaves behind for the next session:** the suggestion queue has a writer (`skillset suggest`, from any project, on PATH everywhere) and a stated reader (a session working here), which closes slice 1's criterion 9; the always-loaded surface carries a command instead of a path, and `AGENTS.md` is a 99-estToken pointer where it was 384. Still unbuilt and unauthorised: `--list`, the `install.ts` duplication (e), the harness env-var paths (g), and 3c–3f.
 
+### 3c — scoped and awaiting go: the `context` channel and project declarations — 2026-10-08
+
+#### Goal
+
+The context file — the instruction file a harness loads besides the system prompt — is the one surface this programme still writes by hand, and local scope has no declarative home: a project's installs are either hand-run `install --local` calls or the eight *undeclared* records this repository already carries. 3c adds a fourth mode that renders marker blocks into that file (pi: local `<root>/AGENTS.md`, global `~/.pi/agent/AGENTS.md`), reads a **project declarations file** — `<root>/.skillset/config.json`, local entries only — so a project can declare and therefore override its own installs, and gives both a door: `skillset init project`. Nothing hand-edited into a project, nothing declared without being reconciled.
+
+#### What was verified by execution — 2026-10-08
+
+```sh
+$ (cd $T1 && pi --no-session --print "Which probe token appears in your instructions? …")   # $T1/AGENTS.md
+ZZZ-CONTEXT-PROBE-4711
+$ (cd $T2 && pi --no-session --print "Which probe token appears in your instructions? …")   # $T2/.pi/AGENTS.md, no root file
+NONE
+```
+
+- **The project's root `AGENTS.md` reaches pi's prompt; `<root>/.pi/AGENTS.md` does not.** pi's project `.pi/` table has no `AGENTS.md` row, and context files are loaded from the agent directory, the working directory and its parents (`docs/configuration.md:30-45`). So the project context file is the root one, and a `.pi/AGENTS.md` write would be dead content.
+- **The hazard that shapes the scaffold:** pi's project `.pi/APPEND_SYSTEM.md` **replaces** the agent-directory one — *"the trusted project file takes precedence over the corresponding agent-directory file. Files with the same name are not combined"* (`docs/configuration.md:36`). A project that hand-writes that file **silences** the global `instruction-ownership` and `standing-rules` blocks inside itself. The scaffold must never write it, and the docs must name it.
+- **One rendered project `AGENTS.md` serves pi and claude-code.** claude-code 2.1.286's own strings carry the switch — `instructionFiles` = `"claude-md"` | `"claude-md-or-agents-md"` (**default**) | `"claude-md-and-agents-md"`, described in the build as *"AGENTS.md as project instructions: by default loaded where the project has no CLAUDE.md; by its instructionFiles option, loaded beside CLAUDE.md, left out, or with the project instructions dropped"*. The documented exception travels with it: a project carrying its **own** `CLAUDE.md` gets that file instead, and our block is then invisible to claude-code.
+- **What is not verifiable here, and is therefore not built:** claude-code's *loader* does not report memory files. A 204-line `--debug-file` run (auth absent) logs the skill loader (`Loaded 0 unique skills (…)`) and then ends — no `CLAUDE.md`/`AGENTS.md` line appears anywhere in it. So claude-code's context reading rests on the build's own **strings**, not on its loader: the weaker evidence class this plan has recorded before, stated rather than smoothed. Consequence: **no claude-code `context` renderer for its global file** (`~/.claude/CLAUDE.md`) in this slice.
+- The marker machinery is mode-agnostic and already proven for two blocks in one file (`core/markers.ts`; `test/agents/pi.test.ts`), and local scope already resolves per bridge (`<root>/.pi`, `<root>/.claude`) with `projectPath` recorded on the record.
+- **The literal `"always"` is how twelve non-test sites recognise an anchor** — `src/bridges/{pi,claude-code,opencode,copilot}/index.ts` (two each), `src/core/declarations.ts:648,825`, `src/commands/install.ts:260`, `src/commands/set-mode.ts:40`. A second anchor mode is therefore *one predicate*, not twelve edits — and leaving it as twelve literals is what would make the second mode dangerous.
+
+#### The shape 3c builds
+
+1. `Mode` gains `context`. `always` and `context` are **anchor** modes behind one predicate, so the twelve sites read the same way and a third anchor would join by name.
+2. pi declares `context`: local `<root>/AGENTS.md`, global `~/.pi/agent/AGENTS.md`, marker-wrapped, created when absent, and removed by `uninstall` leaving other blocks and the surrounding text intact — the same shape `always` has, and the same no-frontmatter rule (`expresses.context: []`).
+3. claude-code, opencode and copilot declare **no** `context` support, so the existing unsupported-mode report fires for them and nothing is written — never a silent skip.
+4. The **project declarations file** — `<root>/.skillset/config.json`, the schema the repository file already uses — is read when skillset runs in that project and merged with the repository's declarations. **Local entries only:** `projectPath` is derived from the working directory and never authored, and a `scope: "global"` entry in a project file is a declaration problem that names the file. That one rule is what stops a cloned repository from writing into somebody's home.
+5. The escape hatch, documented and tested: a project overrides by **declaring its own local install** of the same skill. The override stays visible — the project's install reconciles as declared while the global one still reports `in-sync` — and the harness is what picks between the two.
+6. `skillset init project` writes the skeleton once and never overwrites it (`init`'s existing idempotence), and the docs carry the worked example. **No directory is scaffolded**: local installs create what they need, and an empty `.pi/` is cruft rather than a scaffold.
+7. The global context file flips to rendered content — the consumer 3b deferred. The hand-written 13-line `~/.pi/agent/AGENTS.md` becomes a skill body installed as pi `context` global. Its per-request cost does not change (that file is loaded whether hand-written or rendered), and it must stay a pointer.
+
+#### Acceptance criteria
+
+1. `Mode` is `slash | auto | always | context`, and `grep -rn '"always"' src/core src/bridges src/commands --glob '!*.test.ts'` returns only `supportedModes` declarations and the predicate's defining table — the twelve recognition sites are gone.
+2. pi `context` renders at both scopes — local `<root>/AGENTS.md`, global `~/.pi/agent/AGENTS.md`, marker-wrapped — and `uninstall` removes only its own block, deleting the file only when that block was the last content, exactly as `always` does.
+3. **The channel is observable and the blocks do not displace each other:** a fresh `pi --print` process run from a temp project reproduces text that exists only in the rendered `<root>/AGENTS.md`, while both `APPEND_SYSTEM.md` blocks are still installed; the negative run — the same probe from a project that declares no `context` install — reproduces nothing. Transcript in the plan.
+4. Only pi declares `context`; asking another bridge for it is reported by the existing unsupported-mode path and writes nothing, pinned per bridge.
+5. A project file at `<root>/.skillset/config.json` is honoured in that project and only there: `sync --dry-run` run from the project lists the declared local install; run from the repository root the same entry does not appear.
+6. A `scope: "global"` entry in a project file is a problem naming that file; a malformed or unreadable project file is the same class of problem — never a silent fallback to the repository file alone.
+7. The escape hatch holds: a project declaring a local install of a globally installed skill reconciles the local one **and** leaves the global one `in-sync`, both in one report.
+8. `skillset init project` is idempotent (second run creates nothing, reports present) and the file it writes parses — a `sync` in that project reports no declaration problem.
+9. **Nothing else moves:** from the repository root `sync --dry-run` reports `undeclared 8` and the skill/agent installs unchanged apart from the one new global `context` install, with nothing drifted, missing or foreign; `~/.claude/`, `~/.config/opencode/` and `~/.skillset/copilot/` are byte-unchanged.
+10. Gates and standing rules: `npm run build` → `npx biome check .` → `CI=true npm test`; **no new dependency, no new runtime module**; no comments added; `src/bridges/boundaries.test.ts` green (no harness name under `src/core/**` or `src/commands/**`).
+
+#### Budget
+
+| area | file | what | est. logic |
+|---|---|---|---|
+| runtime | `src/core/types.ts` | `context` in `Mode`/`MODES`, `isAnchorMode` | ~8 |
+| runtime | `src/bridges/pi/{paths,index}.ts` | layout entry, install/uninstall/preview for anchor modes, `expresses.context: []` | ~25 |
+| runtime | the twelve literal sites | route through the predicate | ~15 |
+| runtime | `src/core/locations.ts` | `projectDeclarationsPath(root)` | ~8 |
+| runtime | `src/core/declarations.ts` | project-file load, merge, local-only validation, problem text naming the file | ~60 |
+| runtime | `src/commands/sync.ts` (+`list`/`status` if they surface it) | reconcile project declarations beside the repository's | ~20 |
+| runtime | `src/commands/init.ts`, `src/cli.ts` | `init project` skeleton | ~40 |
+| content | `src/skills/<pointer>/SKILL.md` (**new**) | the global context file's body, moved from the hand-written file | ~20 |
+| config | `skillset.config.json` | the `context` global declaration | +6 physical |
+| tests | — | context render/uninstall, coexistence probe, project-file merge, the global-entry refusal, malformed file, escape hatch, init idempotence, CLI round trip | ~220 |
+| docs | `README.md`, `docs/conventions.md`, `docs/architecture.md`, ADR 0008 | the fourth mode, the project declarations file and its local-only rule, `AGENTS.md` serving two harnesses with the `CLAUDE.md` exception, the `APPEND_SYSTEM.md` replacement hazard | ~120 physical |
+
+- New dependencies **none**; new runtime modules **0**; new test files **1-2**.
+- Estimated implementation logic: **~175 added**. This programme's base rate is +30-77% over, so the honest read is **175-300 logic lines**; physical **620-930** including tests, docs and the moved body.
+
+#### Decisions
+
+1. **A fourth mode, not a second meaning for `always`.** Reusing `always` with a per-bridge anchor choice would make one mode mean two different files and lose the ability to declare one channel without the other — and the two channels are independently useful (rules in the system prompt, the map in the context file).
+2. **`isAnchorMode`, not twelve literals.** The sweep is mechanical and it is the reason a second anchor mode is cheap; the predicate keeps the *rule* in one place, which is what the literals got wrong the moment there was a second anchor.
+3. **Local entries only in a project file.** *Strike this if you disagree:* the alternative is letting a project declare global installs, which means any clone can write into a home.
+4. **`<root>/.skillset/config.json`.** Hidden, project-local, and the same schema as the repository file so `parseDeclarations` is reused rather than forked. *Strike if you want `skillset.config.json` at the project root* — that is the repository's own file name, which is either consistent or confusing, and I chose unambiguous.
+5. **`skillset init project` — a reserved argument, not a new verb.** `init` already means "scaffold into the project", and the bundle ships no skill named `project` (pinned by a test) so the reserved word cannot collide.
+6. **The scaffold writes one file and creates no directory.** A committed empty `.pi/` is not a scaffold; the first local install creates the directory it needs.
+7. **The global context file flips to rendered now, because this is the slice that gives the channel its consumer.** Its hand-written content moves into the body verbatim; the developer deletes the hand text after `sync` — it is their file, and one sync window of duplication is visible rather than silent.
+8. **claude-code gets no `context` renderer, and the reason is evidence rather than caution** — strings, not its loader. The slice's answer on that harness is a *shared file* instead: its default `instructionFiles` reads the project `AGENTS.md` we render for pi.
+9. **ADR 0008, filed as `docs/decisions/0008-project-declarations-and-the-context-channel.md`.** A second declaration root, a fourth mode and a rule about what a project may declare change the configuration surface this repository promises; that outlives the plan.
+
+#### Road not taken
+
+- **Scaffolding `.pi/` and a `.gitkeep`** — empty directories are cruft, and local installs create their own parents.
+- **Rendering a project `CLAUDE.md` for claude-code** — its global memory file cannot be verified here (no loader evidence), and the project file it reads by default is the very `AGENTS.md` we already render; a second file would be a second copy with no reader this machine can prove.
+- **A project file that may declare global installs** — one cloned repository writing into a home, silently, which is the failure this repository's whole ownership story exists to prevent.
+- **`.pi/skillset.config.json`** — the file is not a harness artifact; it is skillset's own config, and `.skillset/` is where skillset's own files live (global scope already uses `~/.skillset/`).
+
+#### Confidence
+
+**~94%.** Retired by execution: pi's project-context load and the dead `.pi/AGENTS.md` (both probes), the marker machinery's multi-block safety, local scope's existing per-bridge resolution, the twelve-site literal count, and claude-code's `instructionFiles` switch from the build's own strings. The residual is two things and neither is hidden: claude-code's context read is **strings-level** — if its loader in fact ignores `AGENTS.md`, the project block is invisible to claude sessions, so the docs state it as a dependency rather than a guarantee; and `init project`'s shape (reserved argument, one file) is a taste call made here rather than measured.
+
+#### Not in this slice
+
+- claude-code's global context file, and `context` at any scope for opencode and copilot.
+- Any FLOW content move (3d-3f).
+- The three separately-recorded items stay where they are: `install.ts`'s skill/agent duplication (e), the `CLAUDE_CONFIG_DIR` / `PI_CODING_AGENT_DIR` question (g), and the suggestion queue's missing `--list`.
+
+### Implemented — 3c, the context channel and project declarations — 2026-10-08 (Review log)
+
+The developer gave **go** on the scope above, with the three forks answered up front: a `context` mode plus `skillset init project`, the **project declarations file** as the documented local-override escape hatch (not a project-scope install, not documentation-only), and **pi + claude-code** reach for the scaffold.
+
+**What landed.** `Mode` gained `context`; `isAnchorMode` in `src/core/types.ts` is now the single place that decides what an anchor mode is, and the recognition sites read through it. pi declares the mode (`expresses.context: []`, layout `<root>/AGENTS.md` local / `~/.pi/agent/AGENTS.md` global) and installs/uninstalls/previews it through the existing marker machinery. `loadDeclarations` reads a repository file **and** the project's own `<root>/.skillset/config.json`, merged additively; `parseProjectDeclarations` accepts `installs` only, local only, with `projectPath` derived. `skillset init project` writes that file's skeleton once. `src/skills/context-pointer/` is new and declares pi `context` global, so `~/.pi/agent/AGENTS.md` is rendered content now rather than a hand-written file.
+
+**Criteria as built.**
+
+1. Holds, with **one correction to the count**: the literal `"always"` was the anchor predicate in **eleven** sites, not twelve — the twelfth (`claude-code`'s `record.mode === "auto" || record.mode === "always"`, which removes an emptied skill directory, and its twin in `claude-code/paths.ts:39`) recognises a *skill-directory* rule that happens to name a mode, and it is not an anchor test. All eleven route through `isAnchorMode`; the two skill-directory mentions stay as they are, and `claude-code` supports no `context` mode for them to be wrong about. AC-1 is amended here rather than the code being bent to fit it: `grep -rn '"always"' src/core src/bridges src/commands --glob '!*.test.ts'` now returns the mode table and predicate, four `supportedModes` declarations, the layout switch case, and those two skill-directory mentions — nothing else.
+2. Holds — pi `context` writes a marker block at both scopes and `uninstall` removes only its own block, deleting the file only when that block was the last content (pinned by test, both directions).
+3. Holds, by execution — the probe pair is in *Evidence* below: a fresh `pi --print` from `/tmp` reproduces a marker string that exists only in the rendered global block, and a temp project with a local `context` install makes pi name that project's `AGENTS.md` as its context source, while the same question from a project with no context file answers `NONE`.
+4. Holds — a registry-level test pins `supportedModes` containing `context` to `["pi"]`, `artifactPath` throws for the other three, and a claude-code CLI test pins the unsupported-mode report with neither `AGENTS.md` nor `CLAUDE.md` written.
+5. Holds — the project file is honoured inside its project and nowhere else, in one test that runs the same home from two working directories.
+6. Holds — a `scope: "global"` entry exits 2 with a problem naming the file and nothing written; a malformed file is refused against its own path (`not valid JSON`) rather than falling back to the repository file alone.
+7. Holds — the escape hatch is visible: after a real `sync`, the state holds `confidence` at both `global` and `local`, and the dry run reports both `in-sync` in one pass.
+8. Holds — `init project` is idempotent, an edited file survives a second run untouched, the skeleton parses, and no skill named `project` exists in the bundle (pinned).
+9. Holds, by hash — `~/.claude` (4,304 files), `~/.config/opencode` (744) and `~/.skillset/copilot` (1) are byte-identical before and after; the only changed files under `~/.pi/agent` are `AGENTS.md` (this slice's write) plus the permission-system log and this session's own transcript.
+10. Holds — build, biome, `CI=true npm test`; no new dependency, no new runtime module, no harness name under `src/core/**` or `src/commands/**`; no comments added beyond the house-style one-liners.
+
+**Measured against the budget — the first slice of this programme to come in under.**
+
+| area | budget | measured | verdict |
+|---|---|---|---|
+| runtime logic | ~175 added (honest read 175-300) | **+163 / −30 = +133 net** | **under** |
+| runtime physical | — | 14 files, +208 / −31 | reported |
+| tests | ~220 | **+284 / −3**, 19 new cases (321 → 340) | over by ~64, exact-bytes assertions |
+| docs | ~120 | **+61 / −4** tracked + ADR 0008 (47 new) | under |
+| content | ~20 | `src/skills/context-pointer/SKILL.md` **19 lines** | met |
+| config | +6 | **+7** | met |
+| new runtime modules / dependencies / test files | 0 / none / 1-2 | 0 / none / **0** (added to existing files) | met |
+
+The runtime total is dominated by `src/core/declarations.ts` (+100 logic), which is the project-file parser and the loader's second source — the estimate's largest single line and the one that came in as predicted. The overrun-free result is not a rounding: the mode itself was cheap because the predicate sweep made it so, and the scaffold is one file.
+
+**Deviations, each deliberate.**
+
+- **The new skill needs an `sk-` slug.** `src/bridges/bridges.test.ts:265` requires every bundled skill to declare one; `context-pointer` gained `slug: sk-context-pointer`. The invariant is unchanged and still global — a context block never becomes a slash file, but the rule that every bundled skill is addressable stays true for free.
+- **Two existing tests were amended.** `test/agents-kind.test.ts:61` pinned `checked in-sync 63` and now pins **64** (the one new declaration — AC-9's arithmetic), and `test/cli.test.ts:387` pinned the body-size warning's wording `always-mode`, which now reads `anchor-mode artifacts (always, context)` in both `install` and `set-mode` so the message stays true for the mode we just added.
+- **`loadDeclarations`'s signature changed** from `(path = declarationsFilePath())` to `(projectRoot = process.cwd())`. The path parameter had no caller — every call site used the default, tests included — and the project root is what the second source needs. Callers pass it: `sync` (both call sites), `install`, `set-mode`; `update` keeps the default because a project file cannot declare siblings.
+- **The project file refuses more than the config schema does:** `siblings`, `requires` and `agents` by name, `projectPath` (derived), and `kind` (agent installs are the repository's). Refusing beats ignoring, which is the failure class this programme removes.
+- **One mistake, recorded because it cost a turn.** Cleanup after the probes used `rm -rf`, which the permission policy blocks — and the blocked call took the whole compound command with it, so the uninstall and the state check never ran. Redone with plain `rm`/`rmdir`, and the plan already carries the rule that says so.
+
+**Evidence, in the order it ran.**
+
+```sh
+npm run build                   # tsc + copy-skills + copy-agents, clean
+npx biome check .               # 80 files clean
+CI=true npm test                # 32 files / 340 tests  (was 321)
+node dist/cli.js sync           # reconciled missing 1 · undeclared 8 · in-sync 63 · 1 written
+node dist/cli.js sync --dry-run  # checked undeclared 8 · in-sync 64
+```
+
+The one written artifact is `~/.pi/agent/AGENTS.md`, and the block landed **beside** the hand-written text rather than replacing it:
+
+```
+# Global agent notes (all projects)
+… (hand-written, 13 lines, unchanged) …
+<!-- skillset:begin context-pointer -->
+# Global agent notes (all projects)
+… (rendered) …
+<!-- skillset:end context-pointer -->
+```
+
+That window is deliberate (decision 7) and the developer closed it the same session, at their word: the hand-written copy above the block was deleted, leaving a 14-line file that is the rendered block and nothing else. `sync --dry-run` after the edit still reports `in-sync 64` — the block itself was untouched, so classification never moved.
+
+**The probes — three, because the first pair was confounded and saying so is the point.**
+
+```
+1. from /tmp, fresh pi:  "skillset:begin context-pointer"      → reproduced
+   (that marker exists only in the rendered block; the hand text above it carries no markers)
+2. from a temp project with a local `context` install of standing-rules:
+   pi's own answer named the source — "…/tmp.2QNhf1sgda/AGENTS.md (a project-local AGENTS.md in a
+   temp directory, injected as project context)"
+3. from a temp project with no context file:                 → NONE
+```
+
+Probe 2 as first written asked the temp project to reproduce the string `skillset:begin standing-rules` — which also exists in the **global** `APPEND_SYSTEM.md`, so the "negative" run answered with it too. The probe was wrong, not the code: questions about a string that is installed globally cannot distinguish a project block from a global one, so probes 2 and 3 now ask for a token that exists only in the project's own file. Cleanup afterwards: `uninstall` removed the block and left the file standing (the temp project's own token was still in it, so deleting it would have been the bug), the state file carries **0** records for temp projects, and the temp directories are gone.
+
+**Not yet done.** Nothing is committed. The commit below is drafted, never run, and this slice adds files — so `git add -A`, never `git commit -am`.
+
+```sh
+git add -A && git commit -F - <<'MSG'
+skillset: a project declares its own installs, and the context file is rendered (0023 slice 3c)
+
+Local scope had no declarative home: eight records on this machine were undeclared forever, and
+the only way to deviate from the global set was a hand-run install command. <root>/.skillset/
+config.json is now a second declaration root, read additively whenever skillset runs in that
+project — local entries only (a global one exits 2, because a clone must not write a home),
+projectPath derived from the working directory, and siblings/requires/agents refused by name
+rather than ignored. `skillset init project` writes it once. An override stays visible: the
+global declarations reconcile alongside the project's, so both installs report in one run.
+
+Mode gains `context` — the second anchor mode. always writes the system prompt, context the file
+a harness loads besides it; `isAnchorMode` is now the one place that says which modes those are,
+where the literal "always" used to stand in eleven sites. Only pi declares it: local
+<root>/AGENTS.md, global ~/.pi/agent/AGENTS.md. Not <root>/.pi/AGENTS.md — measured against pi's
+loader, which reads the context file from the working directory and its parents, so that write
+would be dead content. claude-code reads that same project file (its instructionFiles default is
+claude-md-or-agents-md), which is why it needs no renderer of its own; a project with its own
+CLAUDE.md gets that file instead, and the docs say so.
+
+~/.pi/agent/AGENTS.md becomes rendered content: src/skills/context-pointer/ carries what was
+hand-written there, installed as pi context global. The hand-written copy above the new block was
+deleted in the same session, so the file is the rendered block alone.
+
+sync: missing 1 · undeclared 8 · in-sync 63 · 1 written, then in-sync 64. ~/.claude,
+~/.config/opencode and ~/.skillset/copilot byte-identical (hash diff, 5,049 files).
+
+standing-rules gains its third rule — a blocked command is a decision point, not a stop: read the
+reason the denial printed, take the path that respects it, never re-issue the denied command or the
+same intent under a different spelling, and never stall the task on the blocked step — do the rest,
+then report it and ask. Written after a denied `rm -rf` swallowed a whole compound command and cost
+a turn; the rule is in the installed APPEND_SYSTEM.md and reproduces in a fresh session.
+
+The README's bundled-skill catalogue gains the three rules it never listed (instruction-ownership,
+standing-rules, context-pointer) — a comm against src/skills/ is now empty — and docs/conventions.md
+states what the anchor modes do not deliver: no frontmatter at all, so the body is the artifact and a
+description is `skillset list` metadata there. Docs-only; nothing propagated, in-sync still 64.
+
+Gates: build, biome 80 files clean, CI=true 32 files / 340 tests. No new dependency, no new
+runtime module, no harness name in core or commands.
+MSG
+```
+
+### Amended — the standing-rules block learns what a blocked command means — 2026-10-08
+
+Added after this session, at the developer's word, and it earns its place by the failure that prompted it: during 3c's cleanup a `bash` call containing `rm -rf` was denied by the permission policy, the denial took the whole compound command with it — uninstall and state check included — and the turn ended instead of the reason in that message being read and acted on. The block now carries a third rule, `## A blocked command is a decision point, not a stop`:
+
+> A denied or failed command prints the reason it was refused — the rule it matched, and often the sanctioned alternative. Read it, name what it objected to, and take the next action that reaches the same goal **without** it: the alternative the message or these rules name, another route if there is one, and if there is none, leave that step out.
+>
+> Never re-issue a denied command, and never re-issue the same intent through a different string to get around the rule that just fired. Never stall the task on the blocked step either: do the rest, then report it with its reason and propose or ask — including asking the developer to run a command the policy reserves for them.
+>
+> All of it in the same turn. Going quiet is not one of the options.
+
+The middle paragraph is the one the developer corrected me on: my first draft said *correct it and re-run it*, which is the retry instinct the rule exists to kill. The rule is not "find another spelling of the denied action" — it is "read the violation, decide what the goal needs now, and take a path that respects the rule", with the blocked step either deferred to the report or handed to the developer.
+
+Body 13 → **26 lines**, well under the 80-line anchor warn; no other file touched, no runtime change. Propagated and verified as the block requires: `sync` → `reconciled drifted 1 · undeclared 8 · in-sync 63 · 1 written`, then `in-sync 64`; both marker blocks intact in the installed `~/.pi/agent/APPEND_SYSTEM.md` (`instruction-ownership` lines 2-33, `standing-rules` 35-55); and a **fresh `pi --print` from `/tmp`** reproduced the new rule's final sentence verbatim — *"Going quiet is not one of the options."* — so the rule is in the prompt a session actually carries, not merely committed. Gates unchanged: build, biome 80 files, `CI=true npm test` 32 files / 340 tests.
+
+**Both findings it recorded are now fixed, in the same session and at the developer's word.**
+
+- **The README's `## Bundled skills` catalogue omitted every rule added by this programme** — not two skills but three: `instruction-ownership`, `standing-rules` and `context-pointer`. All three now have rows in the list, so a `comm` of `src/skills/*/` against the catalogue returns nothing. Their rows say what they are rather than recommending a posture: these are the rules, and they belong in an anchor channel (`always` for the two rules, `context` for the pointer).
+- **The anchor modes' silence about frontmatter is now stated, not inferred.** `expresses.always` and `expresses.context` are empty because a marker block has no YAML to read, so a skill's `description` is `skillset list` metadata in those modes rather than text the harness sees. `docs/conventions.md` says so where the field matrix is documented. No warning was added for it and that is deliberate: nothing is lost — for a mode with no model-side selection there is nothing for a description to select — and a warning would fire on all three anchor installs this repository declares to report a non-problem.
+
+Docs-only, so nothing propagated: `sync --dry-run` still reports `in-sync 64`, and the gates are unchanged (build, biome 80 files, `CI=true npm test` 32 files / 340 tests).
+
 ## Handoff — prompt for the next session
 
 Paste this into a skillset session to continue. It assumes nothing that is not written above.
 
-> Continue the skillset instruction-ownership program. Read `docs/plans/0023-skillset-owns-instructions.md` in full first — it is the spec. Do not re-derive anything marked verified; it was checked by execution and the transcripts are in the plan. **Start with `git log` and `git status` in both repositories, never with this file's prose** — it has claimed "not committed" twice after the fact.
+> Continue the skillset instruction-ownership programme. Read `docs/plans/0023-skillset-owns-instructions.md` in full first — it is the spec. Do not re-derive anything marked verified; it was checked by execution and the transcripts are in the plan. **Start with `git log` and `git status` in both repositories, never with this file's prose** — the prose has claimed "not committed" twice after the fact, and the 3b-ii entry says in as many words that its commit was still unrun when it was written.
 >
-> **State — verified 2026-10-08, by `git log`/`git status`.** skillset: slices 1 (`880fdfe`), 2a (`7e65d1a`), 2c (`c8cc22d`), 2b (`7eb7f75` here, `4b66b55` in `pi-extensions`), 2d (`cea2963`), (b) (`90610ef`), 2e (`4852681` + `c174158`), 3a (`c917d4e`), **(d) the claude-code agent renderer (`748d318`)** and **the CI fix (`2069691`)** are committed, working tree clean and **pushed**: `origin/main` is `bcb1e60` and `git rev-list --left-right --count origin/main...main` is `0 0`, re-verified 2026-10-08 — the earlier "1 commit ahead, push it first" note is retired. **The CI runs on that push are not readable from this machine** (`gh` is installed but unauthenticated, no `GH_TOKEN`), so greenness rests on the local equivalent of what CI runs — `CI=true npm test` → 31 files / 316 tests, `npm run build` and `npx biome check .` clean — not on a run log. pi-extensions: 3a is committed and pushed (`f67d744`), tree clean, 41 files / +136 −4,856, `pnpm -r run test` exit 0.
+> **State — 2026-10-08, re-verified with `git log` and `git status` rather than with this file's prose.** skillset: slices 1 (`880fdfe`), 2a (`7e65d1a`), 2c (`c8cc22d`), 2b (`7eb7f75` here, `4b66b55` in `pi-extensions`), 2d (`cea2963`), (b) (`90610ef`), 2e (`4852681` + `c174158`), 3a (`c917d4e`), (d) the claude-code agent renderer (`748d318`), the CI fix (`2069691`) and **3b + 3b-ii (`d9f8c7d`, committed but not pushed at the time 3c started — check `git status -sb`)** are committed. **3c is implemented and awaiting sign-off**: the tree is dirty with **27 modified files** (this plan among them — 26 others) and **2 new paths** (`docs/decisions/0008-…md`, `src/skills/context-pointer/`), its commit is drafted in *Implemented — 3c*. `pi-extensions` is clean at `f67d744`, untouched since 3a. Counts on the 3c tree: `npm run build` clean, biome **80 files clean**, `CI=true npm test` **32 files / 340 tests**, `sync --dry-run` → `checked undeclared 8 · in-sync 64`.
 >
-> **Two labels to know about.** `748d318` reads `(0023 slice 3d)`, but **3d in this plan is the FLOW skill triage** — this was item **(d)**, the harness agent renderers, and the two share nothing but a letter. It is pushed, so the label stands unless you amend; the plan carries the correction. The pi-extensions 3a commit is correctly labelled.
+> **One label to know about.** `748d318` reads `(0023 slice 3d)`, but **3d in this plan is the FLOW skill triage** — that commit is item **(d)**, the harness agent renderers, and the two share nothing but a letter. It is pushed, so the label stands unless you amend; the plan carries the correction.
 >
-> **What (d) landed.** `src/agents/<name>.md` is installed for **claude-code as well as pi**: the claude-code bridge implements `agents` (`expresses` = the 16 fields its loader reads; `path`; `install`/`uninstall`/`preview`), all 15 sources declare `targets.claude-code.tools` in Claude Code's own names (`Read, Grep, Glob` ×9, `Grep, Glob` ×3, `+Bash` ×2, `+WebSearch, WebFetch` ×1), and `AGENT_BRIDGE_NAMES` derived the change with **no registry edit**. `AgentCapability.required` is new: an agent that leaves a required field undeclared is **refused** (install writes nothing, `sync` exits 2), because Claude Code reads a missing `tools:` line as *every* tool and an unrecognised name as *no* tool — both silent. Verified against the loader after a real sync: `claude --agent zzz-sentinel -p "hi"` lists all 15; with the tools block deleted from the built bundle, install exits 1 and creates no directory.
+> **What is built.** `src/agents/<name>.md` installs for pi **and** claude-code — `claude --agent zzz-sentinel -p "hi"` lists all 15 from the loader's own registry. `APPEND_SYSTEM.md` carries **two** marker blocks: `instruction-ownership` (the ownership rule; the one-provider rule; and the branch — in this repository edit the source and run `sync`, in any other project `skillset suggest "…"` and stop) and `standing-rules` (commits carry no trailers; code carries no comments; **a blocked command is a decision point, not a stop** — read the reason the denial printed, take the path that respects it, never re-issue the denied command or the same intent under another spelling, and never stall the task on the blocked step: do the rest, report it, ask). **`skillset suggest "<what should change, and why>"`** appends one JSON line (`at`, `cwd`, `session` when the environment supplies one) to `~/.skillset/suggestions.jsonl`; it works from any project because the global bin is a symlink into this repository's `dist/cli.js`. `retro` carries the suggestion step where it decides a finding's destination. `AGENTS.md` is a 99-estToken pointer; the artifact map lives in `docs/conventions.md` and the rules in the always blocks.
 >
-> **Go state — nothing is authorised.** Next, in order: **(e)** `install.ts`'s skill/agent duplication (the lever if 3a's +191 and (d)'s +71 logic overruns are not acceptable); **(f)** slice 3 proper — **3b and 3b-ii are signed off** (2026-10-08); the commit is drafted in *Implemented — 3b-ii* and **was not yet run when this was written — check `git log`, the tree may still be dirty**. They landed: the standing rules render into the `always` channel, `AGENTS.md` shrank to a pointer with the map moved into `docs/conventions.md`, and `skillset suggest` gives the suggestion queue a door, closing slice 1's criterion 9; then 3c (project scaffolds), 3d (the FLOW skill triage), 3e (workflow declarations), 3f (prompts and commands); **(g)** the `CLAUDE_CONFIG_DIR` / `PI_CODING_AGENT_DIR` question — both loaders prefer those variables over `$HOME`, this repository's bridges know neither, so on such a machine `sync` writes where the harness never looks (it affects the skill installs identically; the fix is per-bridge, never a core one). Each needs its own go.
+> **Go state — nothing is authorised, and each item needs its own go.** **3c is implemented and awaiting sign-off** (see *Implemented — 3c*; its commit is drafted there and not run). What it built: `Mode` gains `context`, the second anchor mode (pi local `<root>/AGENTS.md`, global `~/.pi/agent/AGENTS.md` — **not** `<root>/.pi/AGENTS.md`, measured dead); `<root>/.skillset/config.json` is a second declaration root read additively, **local entries only**, with `projectPath` derived and `siblings`/`requires`/`agents` refused by name; `skillset init project` writes that skeleton once; and `~/.pi/agent/AGENTS.md` is now rendered from `src/skills/context-pointer/`. Two consequences a next session must know: the hand-written text above the new block was **deleted the same session** (`~/.pi/agent/AGENTS.md` is now the rendered block alone, 14 lines, still `in-sync 64`), and claude-code reads that same project `AGENTS.md` only where the project has no `CLAUDE.md` of its own — strings-level evidence, not loader-level. Next, in the plan's order: **3d** the FLOW skill triage — 31 skills, the largest remaining chunk, per-skill judgment about what is portable and a rename for what stays; **3e** workflow declarations (`built-in-workflows.ts` is a declaration over skill names, and opencode and copilot have no comparable engine, so the per-harness story is the hard half); **3f** prompts and commands (largely covered by `slash` mode already). Separately: **(e)** `install.ts`'s skill/agent duplication — the lever if 3a's +191 and (d)'s +71 logic overruns are not acceptable; **(g)** the `CLAUDE_CONFIG_DIR` / `PI_CODING_AGENT_DIR` question — both loaders prefer those variables over `$HOME` and this repository's bridges know neither, so on such a machine `sync` writes where the harness never looks. **Neither variable is set on this machine**, so (g) can only be verified with a temp dir, and moving recorded locations needs a migration story.
 >
-> **Recorded findings, not fixed** — do not fold them into another slice silently: the copilot target writes `mode: agent` where VS Code documents `agent:`; the classifier's drifted message says "edited locally" when it was the *source* that moved; `requires` in `skillset.config.json` is skill-keyed, so an agent name there is a coverage problem (this is why the required-`tools` rule lives in the bridge); and `expresses` for claude-code agents comes from the field vocabulary, of which only `name`/`description`/`tools` are the ones this slice exercises. **Two added by 3b:** the suggestion queue is advertised in the `always` block with no `suggestions` verb and no queue file anywhere (slice 1's criterion 9 is half-met); and the README's `## Bundled skills` list omits `instruction-ownership` and `standing-rules`.
+> **Recorded findings, not fixed** — do not fold them into another slice silently: the copilot target writes `mode: agent` where VS Code documents `agent:`; the classifier's drifted message says "edited locally" when it was the *source* that moved (seen again during 3b); `requires` in `skillset.config.json` is skill-keyed, so an agent name there is a coverage problem rather than a rule; `expresses` for claude-code agents comes from the field vocabulary, of which only `name`/`description`/`tools` are exercised; `skillset suggest` has no `--list` flag (the file is the interface until the queue argues otherwise); and a suggestion filed from *this* repository is distinguishable from one filed elsewhere only by its `cwd`.
 >
-> **Not verifiable on this machine, so not built:** opencode (arm64 binary `invalid signature`, SIGKILLed) and Copilot CLI (installed nowhere) keep **no** agent renderer. A renderer that cannot be checked against its own loader is the failure mode 2c recorded — say so rather than guessing.
+> **Not verifiable on this machine, so not built:** opencode (arm64 binary `invalid signature`, SIGKILLed) and Copilot CLI (installed nowhere) keep **no** agent renderer. A renderer that cannot be checked against its own loader is the failure mode 2c recorded — say so rather than guessing. claude-code's `always` anchor (`~/.claude/settings.json`, a SessionStart hook) is declared by 2c and has never been exercised against that harness's loader either.
 >
-> **No comments. This is a standing instruction, not a preference.** Code explains itself; if you need a comment you already wrote the wrong code. **As of 3b this binds mechanically** — it is rendered from `src/skills/standing-rules/SKILL.md` into `APPEND_SYSTEM.md`, so a session that invokes no skill still carries it: no explanatory blocks, no "why" essays above functions, no invented section banners. Name things so the code reads.
+> **No comments. This is a standing instruction, and as of 3b it binds mechanically** — it is rendered from `src/skills/standing-rules/SKILL.md` into `APPEND_SYSTEM.md`, so it is in the block you are already carrying: no explanatory blocks, no "why" essays above functions, no invented section banners. Name things so the code reads.
 >
-> **Rules that are not negotiable.** Gates — skillset: `npm run build` *before* `npm test` (tests spawn `dist/cli.js`), then `npx biome check .`, **and `CI=true npm test`** — that variable is what CI runs in, and a red CI hid behind two slices of green local gates because `picocolors` colours output under `CI` and on `win32`; pi-extensions: `pnpm -r run test` from the workspace root (there is no root `npm test`). Commit messages are drafted, never run, carry no trailers of any kind, and a slice that adds files uses `git add -A`, never `git commit -am`. **Never use `rm -rf`** — the permission policy blocks it and the blocked call takes the rest of the command with it, which cost a turn on 2026-10-08; use a unique `mktemp -d` scratch and plain `rm <file>`. Never hand-write into `~/.pi/agent/**`, `~/.claude/**`, `~/.config/opencode/**` or an installed copy: change the source, run `skillset sync`, paste its report. **A slice that changes `src/skills/` or `src/agents/` is not finished until `sync` has run** — a commit is not a propagation. Keep the plan's criteria and budget current, and report overruns honestly.
+> **Rules that are not negotiable.** Gates — skillset: `npm run build` *before* `npm test` (tests spawn `dist/cli.js`), then `npx biome check .`, **and `CI=true npm test`** — that variable is what CI runs in, and a red CI hid behind two slices of green local gates because `picocolors` colours output under `CI` and on `win32`; pi-extensions: `pnpm -r run test` from the workspace root (there is no root `npm test`). Commit messages are drafted, never run, carry no trailers of any kind, and a slice that adds files uses `git add -A`, never `git commit -am`. **Never use `rm -rf`** — the permission policy blocks it and the blocked call takes the rest of the command with it; use a unique `mktemp -d` scratch and a plain `rm <file>`. Never hand-write into `~/.pi/agent/**`, `~/.claude/**`, `~/.config/opencode/**` or an installed copy: change the source, run `skillset sync`, paste its report. **A slice that changes `src/skills/` or `src/agents/` is not finished until `sync` has run** — a commit is not a propagation. Keep the plan's criteria and budget current, and report overruns honestly.
 >
-> **Verification methods — use them rather than reading.** **Claude Code's agent loader is the registry probe**: install into `<temp>/.claude/agents/`, then `HOME=<temp> claude --agent zzz-sentinel -p "hi"` — the unknown name makes it print `Available agents: …`. (`claude agents --json` is *not* that probe on 2.1.286; there the subcommand means background sessions.) **pi's agent parser** is the authority for an agent artifact: from `packages/flow`, jiti-import `pi-subagents/src/config/custom-agents.ts` and call `loadCustomAgents(cwd)` with `PI_CODING_AGENT_DIR` pointed at a directory — run it twice to compare parsed fields. **FLOW's contract harvester** the same way (`buildUserSkillContracts()`). **claude-code's skill loader** via `HOME=<temp> claude --debug-file … -p "…"` and its `Loaded N unique skills (… user: N, …, legacy commands: N)` line; auth failing is irrelevant, no model call means the log is the loader's. **A byte-neutral move is proved by hashing the destination directories before and after** (`find <dir> -type f | sort | xargs shasum` then `diff`), never by a test count — and name any file that changed for a reason outside the change (a live session's own log and transcript did, on 2026-10-08). **An unrecorded artifact at an owned path whose bytes differ from the render is `foreign`** — expect a refusal, not an adoption; reach for `install --force` deliberately. **A port's residue is measured, not argued**: `git show <sha>:<path>`, normalise line-by-line, keep the lines with no near-match (difflib, 0.75). **Verify the installed copy, not the committed one** — grep the changed markers under `~/.pi/agent/` and `~/.claude/` after `sync`.
+> **Verification methods — use them rather than reading.** **The always channel and the context file are observable**: run a **fresh** `pi --print` process from `/tmp` and have it reproduce text that exists only in the installed file. Slices 1 and 3b both used this; it proves a block reaches the system prompt and that a second block did not displace the first, and it is the check for anything rendered into `APPEND_SYSTEM.md` or `AGENTS.md`. **Claude Code's agent loader is the registry probe**: install into `<temp>/.claude/agents/`, then `HOME=<temp> claude --agent zzz-sentinel -p "hi"` — the unknown name makes it print `Available agents: …` (`claude agents --json` is *not* that probe on 2.1.286; there the subcommand means background sessions). **pi's agent parser** is the authority for an agent artifact: from `packages/flow`, jiti-import `pi-subagents/src/config/custom-agents.ts` and call `loadCustomAgents(cwd)` with `PI_CODING_AGENT_DIR` pointed at a directory — run it twice to compare parsed fields. **FLOW's contract harvester** the same way (`buildUserSkillContracts()`). **claude-code's skill loader** via `HOME=<temp> claude --debug-file … -p "…"` and its `Loaded N unique skills (… user: N, …, legacy commands: N)` line; auth failing is irrelevant, no model call means the log is the loader's. **A byte-neutral move is proved by hashing the destination directories before and after** (`find <dir> -type f | sort | xargs shasum` then `diff`), never by a test count — and name any file that changed for a reason outside the change (a live session's own log and transcript did, on 2026-10-08). **An unrecorded artifact at an owned path whose bytes differ from the render is `foreign`** — expect a refusal, not an adoption; reach for `install --force` deliberately. **Verify the installed copy, not the committed one**: grep the changed markers under `~/.pi/agent/` and `~/.claude/` after `sync`. **Claude Code's tool and field names come from the build, not from memory** — `strings` the installed binary for the name before declaring it.
 >
 > **Parallel workstream (separate session, `pi-extensions`) — step 1 done, step 2 not authorised.** `docs/plans/0017-context-economy-load-on-demand.md` carries `## Step 1 — measured 2026-10-07`: 1,483 estTokens across the 13 tool-declaring packages against the 1,412 baseline, every surface classified, 27 activation claims checked (8 Falsified), and a step-2 budget F1–F8. Two facts to carry: the `pi-subagents` pin is **not hermetic** (it renders `~/.pi/agent/agents` into its own tool schema — ≈243 bytes of it the 15 agent descriptions, which 3a moved but did not change) and ≈234 estTokens/request of per-turn surface is pinned by nothing. **Nothing there is authorised — ask.**

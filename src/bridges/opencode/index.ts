@@ -7,6 +7,7 @@ import { compose } from "../../core/frontmatter.js";
 import { copySiblings, readMaybe, writeAtomic } from "../../core/fs.js";
 import { MD, extract, remove, upsert } from "../../core/markers.js";
 import type { InstallRecord, Scope } from "../../core/types.js";
+import { isAnchorMode } from "../../core/types.js";
 import { artifactPath, layout, skillDirectory } from "./paths.js";
 
 function targetOverrides(skill: InstallContext["skill"]): Record<string, unknown> {
@@ -128,7 +129,7 @@ export const opencodeBridge: Bridge = {
     if (record.mode === "auto") {
       await rm(record.location, { force: true, recursive: true });
     }
-    if (record.mode === "always" && record.insertions) {
+    if (isAnchorMode(record.mode) && record.insertions) {
       for (const anchor of record.insertions) {
         const existing = (await readMaybe(anchor)) ?? "";
         const next = remove(existing, record.skill, MD).trimEnd();
@@ -142,7 +143,7 @@ export const opencodeBridge: Bridge = {
   },
 
   async preview(ctx, record) {
-    if (ctx.mode === "always") {
+    if (isAnchorMode(ctx.mode)) {
       // Marker interior in AGENTS.md; user content outside is invisible.
       const anchor = record.insertions?.[0];
       const existing = anchor ? await readMaybe(anchor) : null;

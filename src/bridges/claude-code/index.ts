@@ -5,6 +5,7 @@ import { compose } from "../../core/frontmatter.js";
 import { copySiblings, readMaybe, writeAtomic } from "../../core/fs.js";
 import { MD, remove, upsert } from "../../core/markers.js";
 import type { InstallRecord } from "../../core/types.js";
+import { isAnchorMode } from "../../core/types.js";
 import { STATUSLINE_COMMAND, addStatusLine, dropStatusLine } from "../_shared/settings.js";
 import { agentPath, artifactPath, layout, skillDirectory } from "./paths.js";
 
@@ -304,8 +305,8 @@ export const claudeCodeBridge: Bridge = {
     if (record.mode === "auto" || record.mode === "always") {
       await rm(record.location, { force: true, recursive: true });
     }
-    // Strip our hook entry from settings.json for always mode.
-    if (record.mode === "always" && record.insertions) {
+    // Strip our hook entry from settings.json for anchor modes.
+    if (isAnchorMode(record.mode) && record.insertions) {
       for (const settingsPath of record.insertions) {
         const settings = await readSettings(settingsPath);
         const next = dropHook(settings, record.skill);

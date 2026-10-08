@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { listBundledSkills } from "../core/bundle.js";
 import { fileExists } from "../core/fs.js";
 import { init } from "./init.js";
 
@@ -127,5 +128,30 @@ describe("init convention — monorepo", () => {
     await expect(init({ skill: "nope", projectRoot: root })).rejects.toThrow(
       'skill "nope" has no templates to init',
     );
+  });
+});
+
+describe("init project — the project's own declarations", () => {
+  it("writes the skeleton and scaffolds no directory", async () => {
+    const root = await makePlain();
+    await init({ skill: "project", projectRoot: root });
+
+    const path = join(root, ".skillset", "config.json");
+    expect(JSON.parse(await readFile(path, "utf8"))).toEqual({ version: 1, installs: {} });
+    // A local install creates the directories it needs; an empty `.pi/` is cruft.
+    expect(await fileExists(join(root, ".pi"))).toBe(false);
+  });
+
+  it("never overwrites, and `project` is not a bundled skill", async () => {
+    const root = await makePlain();
+    await init({ skill: "project", projectRoot: root });
+
+    const path = join(root, ".skillset", "config.json");
+    const declared = '{"version":1,"installs":{"confidence":[{"agent":"pi","mode":"slash"}]}}';
+    await writeFile(path, declared);
+    await init({ skill: "project", projectRoot: root });
+
+    expect(await readFile(path, "utf8")).toBe(declared);
+    expect(await listBundledSkills()).not.toContain("project");
   });
 });

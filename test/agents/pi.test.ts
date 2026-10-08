@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type Sandbox, exists, makeSandbox, repoRoot, run } from "../helpers.js";
@@ -148,6 +148,71 @@ describe("pi target", () => {
       expect(remaining).toContain("<!-- skillset:begin instruction-ownership -->");
       expect(remaining).not.toContain("standing-rules");
       expect(await exists(anchor)).toBe(true);
+    });
+  });
+
+  describe("context mode", () => {
+    it("local: writes the project's root AGENTS.md, never one inside .pi/", async () => {
+      const out = run(
+        ["install", "confidence", "--agent", "pi", "--mode", "context", "--local"],
+        sb.projectRoot,
+        sb.env,
+      );
+      expect(out.status).toBe(0);
+      const anchor = join(sb.projectRoot, "AGENTS.md");
+      const body = await readFile(anchor, "utf8");
+      expect(body).toContain("<!-- skillset:begin confidence -->");
+      expect(body).toContain("# confidence");
+      // pi loads the context file from the working directory, not from `.pi/`.
+      expect(await exists(join(sb.projectRoot, ".pi", "AGENTS.md"))).toBe(false);
+
+      expect(run(["uninstall", "confidence", "--local"], sb.projectRoot, sb.env).status).toBe(0);
+      expect(await exists(anchor)).toBe(false);
+    });
+
+    it("global: writes $HOME/.pi/agent/AGENTS.md, separate from the system-prompt anchor", async () => {
+      const out = run(
+        ["install", "context-pointer", "--agent", "pi", "--global"],
+        sb.projectRoot,
+        sb.env,
+      );
+      expect(out.status).toBe(0);
+      const anchor = join(sb.home, ".pi", "agent", "AGENTS.md");
+      expect(await readFile(anchor, "utf8")).toContain("skillset:begin context-pointer");
+      // The declaration decides the mode, and `context` is not `always`.
+      expect(await exists(join(sb.home, ".pi", "agent", "APPEND_SYSTEM.md"))).toBe(false);
+
+      expect(run(["uninstall", "context-pointer", "--global"], sb.projectRoot, sb.env).status).toBe(
+        0,
+      );
+      expect(await exists(anchor)).toBe(false);
+    });
+
+    it("keeps the user's own text, and two blocks in one file remove one at a time", async () => {
+      const anchor = join(sb.home, ".pi", "agent", "AGENTS.md");
+      await mkdir(join(sb.home, ".pi", "agent"), { recursive: true });
+      await writeFile(anchor, "# My notes\n\nKeep this.\n");
+
+      for (const name of ["context-pointer", "standing-rules"]) {
+        const out = run(
+          ["install", name, "--agent", "pi", "--mode", "context", "--global"],
+          sb.projectRoot,
+          sb.env,
+        );
+        expect(out.status).toBe(0);
+      }
+
+      const both = await readFile(anchor, "utf8");
+      expect(both).toContain("Keep this.");
+      expect(both).toContain("<!-- skillset:begin context-pointer -->");
+      expect(both).toContain("<!-- skillset:begin standing-rules -->");
+
+      const off = run(["uninstall", "standing-rules", "--global"], sb.projectRoot, sb.env);
+      expect(off.status).toBe(0);
+      const remaining = await readFile(anchor, "utf8");
+      expect(remaining).toContain("Keep this.");
+      expect(remaining).toContain("<!-- skillset:begin context-pointer -->");
+      expect(remaining).not.toContain("standing-rules");
     });
   });
 

@@ -51,6 +51,18 @@ describe("claude-code", () => {
     expect(await exists(settingsPath)).toBe(false);
   });
 
+  it("reports the context anchor as unsupported and writes nothing", async () => {
+    const out = run(
+      ["install", "confidence", "--agent", "claude-code", "--mode", "context", "--local"],
+      sb.projectRoot,
+      sb.env,
+    );
+    expect(out.stderr).toContain("not supported");
+    expect(out.stderr).toContain('mode "context" not supported');
+    expect(await exists(join(sb.projectRoot, "AGENTS.md"))).toBe(false);
+    expect(await exists(join(sb.projectRoot, ".claude", "CLAUDE.md"))).toBe(false);
+  });
+
   describe("sibling files", () => {
     const helper = () =>
       join(sb.home, ".claude", "skills", "code-review", "_helpers", "review-range.mjs");

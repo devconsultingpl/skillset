@@ -2,7 +2,8 @@ import { cp, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import pc from "picocolors";
 import { templatesRoot } from "../core/bundle.js";
-import { fileExists } from "../core/fs.js";
+import { fileExists, writeAtomic } from "../core/fs.js";
+import { projectDeclarationsPath } from "../core/locations.js";
 import {
   type Asker,
   type ChoiceOption,
@@ -71,6 +72,23 @@ function printReport(label: string, dir: string, report: ScaffoldReport): void {
   }
 }
 
+/**
+ * The one reserved argument: a project's own declarations file, which is how a
+ * project declares — and so overrides — installs for itself. Written once and
+ * never overwritten; editing it afterwards is the point of it.
+ */
+async function initProject(projectRoot: string): Promise<void> {
+  const path = projectDeclarationsPath(projectRoot);
+  if (await fileExists(path)) {
+    console.log(pc.green("init"), "project", pc.dim(`→ ${path}`));
+    console.log(pc.dim("  nothing to create — file present, untouched"));
+    return;
+  }
+  await writeAtomic(path, `${JSON.stringify({ version: 1, installs: {} }, null, 2)}\n`);
+  console.log(pc.green("init"), "project", pc.dim(`→ ${path}`));
+  console.log(pc.dim("  created 1 file(s)"), pc.dim("(declare local installs under `installs`)"));
+}
+
 /** Copy a skill's bundled `templates/` subtree into the project. Idempotent —
  * existing files are never overwritten. Monorepo-aware for `convention`: with
  * apps detected it asks (interactive TTY) how to scaffold — default every app
@@ -78,6 +96,10 @@ function printReport(label: string, dir: string, report: ScaffoldReport): void {
  * edited; reported when present. */
 export async function init(opts: InitOptions): Promise<void> {
   const projectRoot = opts.projectRoot ?? process.cwd();
+  if (opts.skill === "project") {
+    await initProject(projectRoot);
+    return;
+  }
   const src = templatesRoot(opts.skill);
   if (!(await fileExists(src))) {
     throw new Error(`skill "${opts.skill}" has no templates to init`);

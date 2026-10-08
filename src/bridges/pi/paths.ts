@@ -24,6 +24,11 @@ export const layout: Layout = {
   always(scope, root) {
     return join(base(scope, root), "APPEND_SYSTEM.md");
   },
+  // The context file is not a `.pi/` file: pi loads `AGENTS.md` from the working
+  // directory and its parents, so the local one sits in the project root.
+  context(scope, root) {
+    return scope === "global" ? join(base("global", root), "AGENTS.md") : join(root, "AGENTS.md");
+  },
 };
 
 export const artifactPath = (opts: ArtifactPathOptions): string =>

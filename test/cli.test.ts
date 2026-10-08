@@ -384,7 +384,7 @@ describe("cli — always-mode body-size warning", () => {
     expect(out.status).toBe(0);
     expect(out.stderr).toContain("warning: confidence body is");
     expect(out.stderr).toContain("lines (>5)");
-    expect(out.stderr).toContain("always-mode");
+    expect(out.stderr).toContain("anchor-mode");
   });
 
   it("stays quiet on install below threshold", () => {

@@ -1,5 +1,6 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { listBundledSkills, loadBundledSkill } from "../core/bundle.js";
@@ -204,6 +205,24 @@ describe("frontmatter capability matrix", () => {
       for (const mode of target.supportedModes) {
         expect(target.frontmatter.expresses[mode], `${target.name} ${mode}`).toBeDefined();
       }
+    }
+  });
+
+  it("declares the context anchor for pi alone, at the paths pi actually loads", () => {
+    const declaring = targets.filter((target) => target.supportedModes.includes("context"));
+    expect(declaring.map((target) => target.name)).toEqual(["pi"]);
+
+    const artifact = { mode: "context" as const, slug: "sk-probe", name: "probe" };
+    expect(piBridge.artifactPath({ ...artifact, scope: "local", projectRoot: "/proj" })).toBe(
+      "/proj/AGENTS.md",
+    );
+    expect(piBridge.artifactPath({ ...artifact, scope: "global", projectRoot: "/proj" })).toBe(
+      join(homedir(), ".pi", "agent", "AGENTS.md"),
+    );
+    for (const target of targets.filter((t) => t.name !== "pi")) {
+      expect(() =>
+        target.artifactPath({ ...artifact, scope: "global", projectRoot: "/proj" }),
+      ).toThrow();
     }
   });
 

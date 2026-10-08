@@ -6,6 +6,7 @@ import { compose } from "../../core/frontmatter.js";
 import { copySiblings, readMaybe, writeAtomic } from "../../core/fs.js";
 import { MD, extract, remove, upsert } from "../../core/markers.js";
 import type { InstallRecord, Scope } from "../../core/types.js";
+import { isAnchorMode } from "../../core/types.js";
 import { agentPath, artifactPath, extensionPath, layout, skillDirectory } from "./paths.js";
 
 function targetOverrides(skill: InstallContext["skill"]): Record<string, unknown> {
@@ -39,7 +40,7 @@ function renderAgentFile(ctx: AgentInstallContext): string {
 
 export const piBridge: Bridge = {
   name: "pi",
-  supportedModes: ["slash", "auto", "always"],
+  supportedModes: ["slash", "auto", "always", "context"],
 
   // What pi can carry, from the installed package's own docs (docs/skills.md,
   // docs/prompt-templates.md) and from what its loader returns. `contract` is
@@ -62,6 +63,8 @@ export const piBridge: Bridge = {
       ],
       // `always` writes a marker block into APPEND_SYSTEM.md: no frontmatter.
       always: [],
+      // `context` writes a marker block into AGENTS.md: no frontmatter either.
+      context: [],
     },
     native: [
       // pi's built-in slash commands (docs/slash-commands.md in the installed
@@ -107,8 +110,8 @@ export const piBridge: Bridge = {
         assets.push(dest);
       }
     } else {
-      // always: marker-wrapped append to APPEND_SYSTEM.md (no separate skill file).
-      const anchor = layout.always(scope, projectRoot);
+      // always / context: marker-wrapped block in a file the user also owns.
+      const anchor = artifactPath({ mode, scope, slug, name, projectRoot });
       const existing = (await readMaybe(anchor)) ?? "";
       await writeAtomic(anchor, upsert(existing, name, ctx.skill.body, MD));
       installRoot = dirname(anchor);
@@ -141,7 +144,7 @@ export const piBridge: Bridge = {
     if (record.mode === "auto") {
       await rm(record.location, { force: true, recursive: true });
     }
-    if (record.mode === "always" && record.insertions) {
+    if (isAnchorMode(record.mode) && record.insertions) {
       for (const anchor of record.insertions) {
         const existing = (await readMaybe(anchor)) ?? "";
         const next = remove(existing, record.skill, MD).trimEnd();
@@ -155,8 +158,8 @@ export const piBridge: Bridge = {
   },
 
   async preview(ctx, record) {
-    if (ctx.mode === "always") {
-      // Marker interior in APPEND_SYSTEM.md; user content outside is invisible.
+    if (isAnchorMode(ctx.mode)) {
+      // Marker interior in the anchor file; user content outside is invisible.
       const anchor = record.insertions?.[0];
       const existing = anchor ? await readMaybe(anchor) : null;
       const current = existing ? extract(existing, record.skill, MD) : null;

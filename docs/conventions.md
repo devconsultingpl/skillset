@@ -66,11 +66,33 @@ One path per (mode, scope), resolved by each bridge in `src/bridges/<harness>/pa
 | `slash` | `~/.pi/agent/prompts/<slug>.md` | `~/.claude/commands/<slug>.md` | `~/.config/opencode/commands/<slug>.md` | `~/.skillset/copilot/prompts/<slug>.prompt.md` |
 | `auto` | `~/.pi/agent/skills/<name>/SKILL.md` | `~/.claude/skills/<name>/SKILL.md` | `~/.config/opencode/skills/<name>/SKILL.md` | — (degrades to `always`) |
 | `always` | `~/.pi/agent/APPEND_SYSTEM.md` | `~/.claude/settings.json` | `~/.config/opencode/AGENTS.md` | `~/.skillset/copilot/copilot-instructions.md` |
+| `context` | `~/.pi/agent/AGENTS.md` | — | — | — |
 | agent | `~/.pi/agent/agents/<name>.md` | `~/.claude/agents/<name>.md` | — | — |
+
+`context` is pi-only, and it is the one mode whose local form is **not** under `<root>/.pi`: pi
+loads `AGENTS.md` from the working directory and its parents, so a local `context` install writes
+`<root>/AGENTS.md` and `<root>/.pi/AGENTS.md` would be dead content. claude-code reads that same
+project file — its `instructionFiles` default is `claude-md-or-agents-md`, i.e. `AGENTS.md` is
+loaded where `CLAUDE.md` would be — which means one rendered project file serves both harnesses; a
+project carrying its own `CLAUDE.md` gets that file instead, and our block is then invisible to
+claude-code.
+
+**Never scaffold `<root>/.pi/APPEND_SYSTEM.md`.** pi gives the trusted project file precedence over
+the agent-directory one and does not combine them, so writing it would silence every global `always`
+block (`instruction-ownership`, `standing-rules`) inside that project.
 
 Local scope mirrors under the project (`<root>/.pi`, `<root>/.claude`, `<root>/.opencode`, `<root>/.github`) with two exceptions: opencode's and copilot's `always` anchors are `<root>/AGENTS.md` and `<root>/.github/copilot-instructions.md`, and copilot has no user-global prompt location documented, so its global `slash` mirrors under `~/.skillset/copilot/` for the user to copy or symlink.
 
 Two pi paths are not install records. `~/.pi/agent/extensions/skillset.ts` ships from the `skillset-status` skill's `assets/pi-extension.ts`, and `flow` ships its own skills from its package (`packages/flow/skills/`, declared as `pi.skills`) — those are never copied into `~/.pi/agent/skills`.
+
+## A project's own declarations
+
+`<root>/.skillset/config.json` is a **second declaration root**, read whenever skillset runs inside that project (`skillset init project` writes the skeleton). It exists so a project can declare — and so override — installs for itself without editing this repository.
+
+- The shape is the repository file's `installs` block and nothing else: `siblings`, `requires` and `agents` are bundle facts and are refused by name rather than ignored.
+- **Local installs only.** A `"global"` entry is a declaration problem naming that file (exit 2) — a cloned repository must not be able to write into a home.
+- `projectPath` is derived from the working directory, never authored, so the same file works in every checkout.
+- Merging is additive: the repository's global declarations reconcile alongside the project's, so a shadowed skill reports both installs in one run instead of silently winning. A malformed project file is reported against its own path rather than falling back to the repository file alone.
 
 ## Skill payloads — declared siblings
 
@@ -101,6 +123,13 @@ writing a field anyway and hoping.
 
 Every bundled skill's `slug:` starts with `sk-`. That prefix is the whole reason our installs cannot
 shadow a harness's own commands, and a test pins it against each target's recorded built-in list.
+
+**An anchor mode renders no frontmatter at all** — `expresses.always` and `expresses.context` are
+empty, because a marker block in a shared file has no YAML to read. So for `always` and `context`
+the body *is* the artifact: anything a session must know goes in the body, and a skill's
+`description` is metadata for `skillset list` in those modes rather than text the harness reads.
+Nothing is silently lost — the field is simply not part of what that mode delivers, which is why no
+warning fires for it.
 
 `SKILLSET_CONFIG=<path>` points a run at a different declarations file — the seam end-to-end tests
 use to exercise a declaration shape without editing the repository's own.

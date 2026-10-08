@@ -213,6 +213,12 @@
         "mode": "slash"
       }
     ],
+    "context-pointer": [
+      {
+        "agent": "pi",
+        "mode": "context"
+      }
+    ],
     "convention": [
       {
         "agent": "pi",

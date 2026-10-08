@@ -241,3 +241,78 @@ describe("sync — undeclared installs", () => {
     ).toBe(false);
   });
 });
+
+describe("sync — a project's own declarations", () => {
+  const configPath = () => join(sb.projectRoot, ".skillset", "config.json");
+  const localPrompt = () => join(sb.projectRoot, ".pi", "prompts", "sk-confidence.md");
+
+  const declare = (installs: unknown) =>
+    writeFile(configPath(), `${JSON.stringify({ version: 1, installs }, null, 2)}\n`);
+
+  async function declaredScopes(): Promise<string[]> {
+    const raw = JSON.parse(await readFile(statePath(), "utf8"));
+    return (raw.installs as Array<{ skill: string; agent: string; scope: string }>)
+      .filter((i) => i.skill === "confidence" && i.agent === "pi")
+      .map((i) => i.scope)
+      .sort();
+  }
+
+  beforeEach(async () => {
+    await mkdir(join(sb.projectRoot, ".skillset"), { recursive: true });
+  });
+
+  it("reconciles a declared local install beside the repository's global set", async () => {
+    await declare({ confidence: [{ agent: "pi", mode: "slash" }] });
+
+    const dry = run(["sync", "--dry-run"], sb.projectRoot, sb.env);
+    expect(dry.status).toBe(0);
+    expect(dry.stdout).toMatch(/confidence → pi \(slash, local:/);
+
+    expect(run(["sync"], sb.projectRoot, sb.env).status).toBe(0);
+    expect(await exists(localPrompt())).toBe(true);
+
+    const again = run(["sync", "--dry-run"], sb.projectRoot, sb.env);
+    expect(again.status).toBe(0);
+    expect(again.stdout).not.toMatch(/drifted|missing|foreign/);
+  });
+
+  it("is read where it lives — the same home from another cwd declares nothing extra", async () => {
+    await declare({ confidence: [{ agent: "pi", mode: "slash" }] });
+
+    const elsewhere = run(["sync", "--dry-run"], sb.home, sb.env);
+    expect(elsewhere.status).toBe(0);
+    expect(elsewhere.stdout).not.toMatch(/confidence → pi \(slash, local:/);
+  });
+
+  it("refuses a global install declared in a project file, and writes nothing", async () => {
+    await declare({ confidence: [{ agent: "pi", mode: "slash", scope: "global" }] });
+
+    const out = run(["sync"], sb.projectRoot, sb.env);
+    expect(out.status).toBe(2);
+    expect(out.stderr).toContain(configPath());
+    expect(out.stderr).toMatch(/local installs only/);
+    expect(await exists(statePath())).toBe(false);
+    expect(await exists(localPrompt())).toBe(false);
+  });
+
+  it("refuses a malformed project file rather than falling back silently", async () => {
+    await writeFile(configPath(), "{ not json");
+
+    const out = run(["sync", "--dry-run"], sb.projectRoot, sb.env);
+    expect(out.status).toBe(2);
+    expect(out.stderr).toContain(configPath());
+    expect(out.stderr).toMatch(/not valid JSON/);
+  });
+
+  it("the escape hatch stays visible: both the project's install and the global one reconcile", async () => {
+    await declare({ confidence: [{ agent: "pi", mode: "slash" }] });
+
+    const out = run(["sync"], sb.projectRoot, sb.env);
+    expect(out.status).toBe(0);
+    expect(await declaredScopes()).toEqual(["global", "local"]);
+
+    const report = run(["sync", "--dry-run"], sb.projectRoot, sb.env).stdout;
+    expect(report).toMatch(/in-sync\s+confidence → pi \(slash, global\)/);
+    expect(report).toMatch(/in-sync\s+confidence → pi \(slash, local:/);
+  });
+});

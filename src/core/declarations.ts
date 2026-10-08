@@ -28,7 +28,7 @@ import {
   skillSourcePath,
 } from "./bundle.js";
 import { fileExists, readMaybe, readMaybeBytes } from "./fs.js";
-import { declarationsFilePath } from "./locations.js";
+import { declarationsFilePath, projectDeclarationsPath } from "./locations.js";
 import { MD, extract } from "./markers.js";
 import { applyConfigToSkill } from "./template.js";
 import type {
@@ -43,7 +43,7 @@ import type {
   SiblingFile,
   SkillsetState,
 } from "./types.js";
-import { MODES, SKILLSET_AGENT_FIELDS, SKILLSET_FIELDS } from "./types.js";
+import { MODES, SKILLSET_AGENT_FIELDS, SKILLSET_FIELDS, isAnchorMode } from "./types.js";
 
 export type InstallStatus =
   /** Recorded, and the on-disk bytes match what we would write. */
@@ -321,9 +321,7 @@ export function parseDeclarations(raw: unknown): DeclarationParseResult {
 }
 
 /** Read and parse `skillset.config.json`. */
-export async function loadDeclarations(
-  path = declarationsFilePath(),
-): Promise<DeclarationParseResult> {
+async function readDeclarationsFile(path: string): Promise<DeclarationParseResult> {
   const none: DeclarationParseResult = {
     declarations: [],
     siblings: {},
@@ -343,6 +341,121 @@ export async function loadDeclarations(
     return { ...none, problems: [`${path} is not valid JSON: ${(err as Error).message}`] };
   }
   return parseDeclarations(parsed);
+}
+
+/**
+ * Parse a project's own declarations. The `installs` shape is the repository
+ * file's, with two rules that make the file safe to commit: a project declares
+ * **local** installs only — a global entry here would let any clone write into
+ * somebody's home — and `projectPath` is derived from the working directory
+ * rather than authored, so one file works in every checkout. `siblings`,
+ * `requires` and `agents` are repository facts about the bundle, so a project
+ * file may not carry them; saying so beats ignoring them.
+ */
+export function parseProjectDeclarations(
+  raw: unknown,
+  projectRoot: string,
+  label: string,
+): DeclarationParseResult {
+  const empty: DeclarationParseResult = {
+    declarations: [],
+    siblings: {},
+    requires: {},
+    problems: [],
+  };
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { ...empty, problems: [`${label}: must contain a JSON object`] };
+  }
+  const problems: string[] = [];
+  const declarations: InstallDeclaration[] = [];
+  const record = raw as Record<string, unknown>;
+  if (record.version !== 1) {
+    problems.push(`${label}: unsupported declarations version: ${String(record.version)}`);
+  }
+  for (const key of Object.keys(record)) {
+    if (key !== "version" && key !== "installs") {
+      problems.push(`${label}: a project declares installs only — drop \`${key}\``);
+    }
+  }
+  const installs = record.installs;
+  if (typeof installs !== "object" || installs === null || Array.isArray(installs)) {
+    problems.push(`${label}: \`installs\` must be an object keyed by skill name`);
+    return { declarations, siblings: {}, requires: {}, problems };
+  }
+
+  for (const [skill, entries] of Object.entries(installs as Record<string, unknown>)) {
+    if (!Array.isArray(entries) || entries.length === 0) {
+      problems.push(`${label}: ${skill}: must declare at least one install`);
+      continue;
+    }
+    for (const entry of entries) {
+      if (typeof entry !== "object" || entry === null) {
+        problems.push(`${label}: ${skill}: each install must be an object`);
+        continue;
+      }
+      const { agent, mode, scope, projectPath, kind } = entry as Record<string, unknown>;
+      if (typeof agent !== "string" || agent.length === 0) {
+        problems.push(`${label}: ${skill}: install must name a harness`);
+        continue;
+      }
+      if (!isKnown(MODES, mode)) {
+        problems.push(`${label}: ${skill}: unknown mode ${JSON.stringify(mode)}`);
+        continue;
+      }
+      if (scope !== undefined && scope !== "local") {
+        problems.push(
+          `${label}: ${skill}: a project declares local installs only (scope ${JSON.stringify(scope)})`,
+        );
+        continue;
+      }
+      if (projectPath !== undefined) {
+        problems.push(
+          `${label}: ${skill}: \`projectPath\` is derived from the working directory — drop it`,
+        );
+        continue;
+      }
+      if (kind !== undefined) {
+        problems.push(
+          `${label}: ${skill}: agent installs are declared in the repository file — drop \`kind\``,
+        );
+        continue;
+      }
+      declarations.push({ skill, agent, mode, scope: "local", projectPath: projectRoot });
+    }
+  }
+
+  return { declarations, siblings: {}, requires: {}, problems };
+}
+
+/**
+ * Read the declarations in force at `projectRoot`: the repository's own file,
+ * plus that project's own when it has one. Additive on purpose — the
+ * repository's global set is reconciled alongside the project's local entries,
+ * which is what makes an override visible instead of silent.
+ */
+export async function loadDeclarations(
+  projectRoot = process.cwd(),
+): Promise<DeclarationParseResult> {
+  const repo = await readDeclarationsFile(declarationsFilePath());
+  const path = projectDeclarationsPath(projectRoot);
+  if (!(await fileExists(path))) return repo;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await readFile(path, "utf8"));
+  } catch (err) {
+    return {
+      ...repo,
+      problems: [...repo.problems, `${path} is not valid JSON: ${(err as Error).message}`],
+    };
+  }
+  const project = parseProjectDeclarations(parsed, projectRoot, path);
+  return {
+    declarations: [...repo.declarations, ...project.declarations],
+    siblings: repo.siblings,
+    requires: repo.requires,
+    problems: [...repo.problems, ...project.problems],
+  };
 }
 
 /**
@@ -645,7 +758,7 @@ function standInRecord(
     mode: declaration.mode,
     location: dirname(path),
     files: [basename(path)],
-    insertions: declaration.mode === "always" ? [path] : undefined,
+    insertions: isAnchorMode(declaration.mode) ? [path] : undefined,
     projectPath: declaration.projectPath,
     installedAt: "",
   };
@@ -822,7 +935,7 @@ async function classifyPrimary(
       : { declaration, status: "drifted", path, record, currentBytes: current, nextBytes: next };
   }
 
-  if (declaration.mode === "always") {
+  if (isAnchorMode(declaration.mode)) {
     // The anchor file belongs to the user as much as to us; only our own marker
     // block being present without a record is a conflict.
     const existing = (await readMaybe(path)) ?? "";

@@ -59,6 +59,9 @@ skillset init convention
 - **`caveman`** — compresses your communication to terse, telegraphic style for fast iteration loops. Governs how the agent *talks*, not what it builds — pair with `ponytail` for minimal code. `/sk-caveman on` (default) or `/sk-caveman off`. Slash-only — `auto`/`always` make no sense for a manual mode switch.
 - **`ponytail`** — lazy-senior-dev mode for what the agent *builds*: a YAGNI ladder (needs to exist at all? → reuse the codebase → stdlib → native platform → installed dependency → one line → only then minimum code), root-cause bug fixes, `skipped: X, add when Y` reporting. Never simplifies away validation, error handling, security, or accessibility. Sharpens `builder`; pairs with `caveman` for terse prose. `/sk-ponytail on` (default) or `/sk-ponytail off` — or install it `always`, so fresh sessions inherit the ladder without anyone remembering to toggle it. (Unlike `caveman`, this is a build posture, not a communication switch.)
 - **`retro`** — end-of-session retrospective: mines the session for friction (re-derivation, repeated searches, corrections, wasted tokens) and audits the standing context for what to save, update, create, or slim. **Harness-aware** — it first works out which harness it's in (Claude Code, opencode, pi, Copilot) and audits *that* harness's surfaces (memory store, instruction files, always-loaded docs, skills, conventions, tools), in both local and global scope. Turns each finding into a concrete edit — a new/updated memory, a convention, a skill stub, tool feedback, or relocating rarely-needed detail out of always-loaded files into on-demand `docs/`. Reports first, applies on approval. Deliberately *not* token-frugal: it runs at session end, so it reads back thoroughly rather than skimming. `/sk-retro` or `/sk-retro <focus>`. Slash-only — an explicit end-of-session moment.
+- **`instruction-ownership`** — the ownership rule itself: owned content is changed in this repository and propagated with `skillset sync`, never hand-written into an installed harness directory; one provider per name per harness; and a session in any other project files `skillset suggest "…"` instead of editing. Install it `always` (pi) — it has to bind before the first edit, not after one.
+- **`standing-rules`** — commits carry no trailers, code carries no comments, and a blocked command is a decision point rather than a stop: read the reason the denial printed, take the path that respects it, and never stall the task on the step that was refused. Install it `always` — every session inherits them without anyone remembering to toggle.
+- **`context-pointer`** — the pointer block skillset renders into pi's **context file** (`AGENTS.md`) at global scope: where installed artifacts come from, and the two facts no doc carries. `context` mode, pi-only — the channel a session loads besides the system prompt.
 - **`skillset-status`** — shows which **slash-installed** skills are currently active (toggled on) in this session. `/sk-status`. Installing it also wires per-agent tracking so `/<skill>` and `/<skill> off` flip a skill on and off (see **Active-skill status** below). Slash-only.
 
 ## The review loop
@@ -110,10 +113,17 @@ The Copilot CLI hook + statusline install on `--global` only (CLI config is user
 | `slash` | invoke explicitly with `/<name>` | `.claude/commands/` | `.pi/prompts/` | `.opencode/commands/` | `.github/prompts/*.prompt.md` |
 | `auto` | model auto-loads by description match | `.claude/skills/` | `.pi/skills/` | `.opencode/skills/` | *(not supported)* |
 | `always` | injected every session | SessionStart hook in `settings.json` | `APPEND_SYSTEM.md` | `AGENTS.md` | `copilot-instructions.md` |
+| `context` | loaded as context, not as the system prompt | *(not supported)* | `AGENTS.md` — the project's, or `~/.pi/agent/AGENTS.md` | *(not supported)* | *(not supported)* |
 
 Copilot doesn't have an auto-trigger concept; `auto` is rejected with a clear message. Use `slash` or `always` instead.
 
-`always` artifacts cost tokens every session. Keep bodies tight — the installer prints a warning when the rendered body is over **80 lines**. Override with `SKILLSET_ALWAYS_WARN_LINES=<n>`.
+`always` and `context` are **anchor modes**: they append a marker-wrapped block to a file you also
+own, so your own text in that file is never touched. On pi the two are different files —
+`APPEND_SYSTEM.md` for `always`, `AGENTS.md` for `context` — and a project's `AGENTS.md` is the
+file claude-code reads too, when the project has no `CLAUDE.md` of its own.
+
+Anchor artifacts cost tokens every session. Keep bodies tight — the installer prints a warning when
+the rendered body is over **80 lines**. Override with `SKILLSET_ALWAYS_WARN_LINES=<n>`.
 
 ## Scopes
 
@@ -130,6 +140,7 @@ skillset sync [--dry-run|--prune]                # reconcile every declared inst
 skillset update [--force|--dry-run|--skip-customized]   # re-sync every install from bundled sources
 skillset list                         # what's available + what's installed
 skillset init <skill>                 # scaffold a skill's templates into cwd
+skillset init project                 # scaffold this project's own declarations file
 skillset emit <skill>                 # used by SessionStart hooks; prints JSON
 skillset status [--session <id>]      # print the slash skills active in a session
 skillset track <skill> [on|off]       # record a toggle (used by the write surfaces)
@@ -209,6 +220,33 @@ silently.
 A declared path that is not a file in `src/skills/<skill>/` is a reported error (exit 2). Each
 sibling is classified through the same six statuses as the skill file: edited → `drifted` (rewritten
 from source, prior content reported), present, unrecorded and different → `foreign` (refused).
+
+### A project's own declarations
+
+A project can declare installs for itself in `<root>/.skillset/config.json` — created by
+`skillset init project`, and read whenever skillset runs inside that project:
+
+```json
+{
+  "version": 1,
+  "installs": { "confidence": [{ "agent": "pi", "mode": "slash" }] }
+}
+```
+
+This is the **local-override door**, and the one deliberate way to deviate from what the global
+declarations say. Three rules keep it safe:
+
+- **Local installs only.** `scope` may be omitted or `"local"`; a `"global"` entry is a declaration
+error naming the file (exit 2), because a cloned repository must never be able to write into
+somebody's home.
+- **`projectPath` is derived**, not authored — the working directory skillset ran in — so one file
+works in every checkout.
+- **It is additive, and an override stays visible.** The global declarations are reconciled
+alongside the project's, so a shadowed skill reports both installs in one run rather than silently
+winning. The harness is what picks between them.
+
+`skillset init project` never overwrites the file. `siblings`, `requires` and `agents` are repository
+facts about the bundle and are refused in a project file rather than ignored.
 
 ## What each harness can carry
 

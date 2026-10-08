@@ -99,7 +99,7 @@ function reportPriorContent(current: string, next: string, maxLines = 60): strin
 
 export async function sync(opts: SyncOptions = {}): Promise<number> {
   const projectRoot = opts.projectRoot ?? process.cwd();
-  const { declarations, siblings, requires, problems } = await loadDeclarations();
+  const { declarations, siblings, requires, problems } = await loadDeclarations(projectRoot);
   const coverage =
     declarations.length > 0
       ? await declarationCoverage(
@@ -300,7 +300,9 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
 export async function classifyReport(
   opts: { projectRoot?: string } = {},
 ): Promise<{ items: ClassifiedInstall[]; problems: string[]; state: SkillsetState }> {
-  const { declarations, siblings, problems } = await loadDeclarations();
+  const { declarations, siblings, problems } = await loadDeclarations(
+    opts.projectRoot ?? process.cwd(),
+  );
   const coverage =
     declarations.length > 0
       ? await declarationCoverage(declarations, siblings, {}, BRIDGE_NAMES, AGENT_BRIDGE_NAMES)

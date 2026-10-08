@@ -19,6 +19,7 @@ export interface Layout {
   slash(slug: string, scope: Scope, projectRoot: string): string;
   auto?(name: string, scope: Scope, projectRoot: string): string;
   always(scope: Scope, projectRoot: string): string;
+  context?(scope: Scope, projectRoot: string): string;
 }
 
 /** Resolve the artifact path for one (mode, scope). */
@@ -31,6 +32,9 @@ export function resolveArtifactPath(layout: Layout, opts: ArtifactPathOptions): 
       return layout.auto(opts.name, opts.scope, opts.projectRoot);
     case "always":
       return layout.always(opts.scope, opts.projectRoot);
+    case "context":
+      if (!layout.context) throw new Error(`this harness does not support mode "context"`);
+      return layout.context(opts.scope, opts.projectRoot);
   }
 }
 

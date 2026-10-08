@@ -10,6 +10,7 @@ import {
   declaredModes,
   fieldSupport,
   parseDeclarations,
+  parseProjectDeclarations,
 } from "./declarations.js";
 import { parseSkill } from "./parse.js";
 import type { SiblingFile } from "./types.js";
@@ -430,5 +431,88 @@ describe("classifySiblings", () => {
     const [state] = await classify([rel]);
     expect(state?.status).toBe("missing");
     expect(state?.currentBytes).toBeUndefined();
+  });
+});
+
+describe("parseProjectDeclarations", () => {
+  const LABEL = "/proj/.skillset/config.json";
+  const parse = (raw: unknown) => parseProjectDeclarations(raw, "/proj", LABEL);
+
+  it("derives scope and projectPath from where skillset ran", () => {
+    const { declarations, problems } = parse({
+      version: 1,
+      installs: { confidence: [{ agent: "pi", mode: "slash" }] },
+    });
+    expect(problems).toEqual([]);
+    expect(declarations).toEqual([
+      { skill: "confidence", agent: "pi", mode: "slash", scope: "local", projectPath: "/proj" },
+    ]);
+  });
+
+  it("accepts an explicit local scope", () => {
+    const { declarations, problems } = parse({
+      version: 1,
+      installs: { "code-review": [{ agent: "pi", mode: "auto", scope: "local" }] },
+    });
+    expect(problems).toEqual([]);
+    expect(declarations[0]?.scope).toBe("local");
+    expect(declarations[0]?.projectPath).toBe("/proj");
+  });
+
+  it("refuses a global install, naming the file — a clone must not write a home", () => {
+    const { declarations, problems } = parse({
+      version: 1,
+      installs: { confidence: [{ agent: "pi", mode: "slash", scope: "global" }] },
+    });
+    expect(declarations).toEqual([]);
+    expect(problems[0]).toContain(LABEL);
+    expect(problems[0]).toMatch(/local installs only/);
+  });
+
+  it("refuses an authored projectPath, because it is derived", () => {
+    const { problems } = parse({
+      version: 1,
+      installs: { confidence: [{ agent: "pi", mode: "slash", projectPath: "/elsewhere" }] },
+    });
+    expect(problems[0]).toContain(LABEL);
+    expect(problems[0]).toMatch(/derived from the working directory/);
+  });
+
+  it("refuses an agent install, which the repository file owns", () => {
+    const { problems } = parse({
+      version: 1,
+      installs: { "diff-auditor": [{ agent: "pi", mode: "auto", kind: "agent" }] },
+    });
+    expect(problems[0]).toContain(LABEL);
+    expect(problems[0]).toMatch(/repository file/);
+  });
+
+  it("refuses the repository-only blocks by name", () => {
+    const { problems } = parse({
+      version: 1,
+      installs: {},
+      siblings: { confidence: ["x.mjs"] },
+      requires: { confidence: { pi: ["contract"] } },
+      agents: {},
+    });
+    expect(problems).toHaveLength(3);
+    for (const key of ["siblings", "requires", "agents"]) {
+      expect(problems.some((p) => p.includes(key) && p.includes(LABEL))).toBe(true);
+    }
+  });
+
+  it("reports shape problems with the file named", () => {
+    expect(parse(["nope"]).problems[0]).toContain(LABEL);
+    expect(parse({ installs: {} }).problems[0]).toMatch(/unsupported declarations version/);
+    expect(parse({ version: 1, installs: [] }).problems[0]).toMatch(/keyed by skill name/);
+    expect(parse({ version: 1, installs: { confidence: [] } }).problems[0]).toMatch(
+      /at least one install/,
+    );
+    expect(
+      parse({ version: 1, installs: { confidence: [{ agent: "pi", mode: "nope" }] } }).problems[0],
+    ).toMatch(/unknown mode/);
+    expect(
+      parse({ version: 1, installs: { confidence: [{ mode: "slash" }] } }).problems[0],
+    ).toMatch(/must name a harness/);
   });
 });

@@ -7,6 +7,7 @@ import { compose } from "../../core/frontmatter.js";
 import { readMaybe, writeAtomic } from "../../core/fs.js";
 import { MD, extract, remove, upsert } from "../../core/markers.js";
 import type { InstallRecord } from "../../core/types.js";
+import { isAnchorMode } from "../../core/types.js";
 import { STATUSLINE_COMMAND, addStatusLine, dropStatusLine } from "../_shared/settings.js";
 import { artifactPath, layout, skillDirectory } from "./paths.js";
 
@@ -144,7 +145,7 @@ export const copilotBridge: Bridge = {
         await writeAtomic(record.statusLinePath, `${JSON.stringify(next, null, 2)}\n`);
       }
     }
-    if (record.mode === "always" && record.insertions) {
+    if (isAnchorMode(record.mode) && record.insertions) {
       for (const anchor of record.insertions) {
         const existing = (await readMaybe(anchor)) ?? "";
         const next = remove(existing, record.skill, MD).trimEnd();
@@ -158,7 +159,7 @@ export const copilotBridge: Bridge = {
   },
 
   async preview(ctx, record) {
-    if (ctx.mode === "always") {
+    if (isAnchorMode(ctx.mode)) {
       // Marker interior in .github/copilot-instructions.md.
       const anchor = record.insertions?.[0];
       const existing = anchor ? await readMaybe(anchor) : null;

@@ -6,9 +6,20 @@
  */
 export type BridgeName = string;
 
-export type Mode = "slash" | "auto" | "always";
+export type Mode = "slash" | "auto" | "always" | "context";
 
-export const MODES: readonly Mode[] = ["slash", "auto", "always"] as const;
+export const MODES: readonly Mode[] = ["slash", "auto", "always", "context"] as const;
+
+/**
+ * The modes that append a marker block to a file the user also owns, instead of
+ * writing an artifact of their own: `always` in the system prompt,
+ * `context` in the context file a harness loads besides it.
+ */
+export const ANCHOR_MODES: readonly Mode[] = ["always", "context"] as const;
+
+export function isAnchorMode(mode: Mode): boolean {
+  return (ANCHOR_MODES as readonly Mode[]).includes(mode);
+}
 
 export type ArtifactKind = "skill" | "agent";
 

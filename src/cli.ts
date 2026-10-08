@@ -127,8 +127,10 @@ program
 
 program
   .command("init")
-  .description("Scaffold a skill's templates into the current project (idempotent).")
-  .argument("<skill>", "skill name with bundled templates (e.g. convention)")
+  .description(
+    "Scaffold a skill's templates into the current project, or `project` for its own declarations (idempotent).",
+  )
+  .argument("<skill>", "skill name with bundled templates (e.g. convention), or `project`")
   .option("--no-apps", "skip per-app scaffolding in monorepos (root only)")
   .option("--yes", "never prompt — apply the default choice (every app + root)")
   .action(async (skill: string, opts: { apps?: boolean; yes?: boolean }) => {

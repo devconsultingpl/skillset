@@ -25,6 +25,15 @@ export function suggestionsFilePath(): string {
 }
 
 /**
+ * Path of a project's own install declarations (`<root>/.skillset/config.json`),
+ * read when skillset runs inside that project. It declares **local** installs
+ * only: a project may add installs for itself, never for a home.
+ */
+export function projectDeclarationsPath(projectRoot: string): string {
+  return join(resolve(projectRoot), ".skillset", "config.json");
+}
+
+/**
  * Path of the repository-level install declarations (`skillset.config.json`).
  * Resolved next to the bundle root, so it is the package root in both `src/`
  * (dev) and `dist/` (installed).

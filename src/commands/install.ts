@@ -27,7 +27,7 @@ import type {
   Scope,
   SkillsetState,
 } from "../core/types.js";
-import { MODES } from "../core/types.js";
+import { MODES, isAnchorMode } from "../core/types.js";
 
 export interface InstallOptions {
   skills: string[];
@@ -105,7 +105,7 @@ function warnIfBodyLarge(body: string, skillName: string): void {
   if (lines > limit) {
     console.error(
       pc.yellow(
-        `warning: ${skillName} body is ${lines} lines (>${limit}); always-mode artifacts load every session. Consider slash/auto, or trim the body.`,
+        `warning: ${skillName} body is ${lines} lines (>${limit}); anchor-mode artifacts (always, context) load every session. Consider slash/auto, or trim the body.`,
       ),
     );
   }
@@ -215,7 +215,7 @@ export async function install(opts: InstallOptions): Promise<number> {
   let failures = 0;
 
   let state = await readState();
-  const { declarations, siblings, requires } = await loadDeclarations();
+  const { declarations, siblings, requires } = await loadDeclarations(projectRoot);
   const [bundledSkills, bundledAgents] = await Promise.all([
     listBundledSkills(),
     listBundledAgents(),
@@ -257,7 +257,7 @@ export async function install(opts: InstallOptions): Promise<number> {
     for (const agent of opts.agents) {
       const mode = await resolveMode(declarations, skillName, agent, opts);
       if (mode === null) continue;
-      if (mode === "always") warnIfBodyLarge(skill.body, skillName);
+      if (isAnchorMode(mode)) warnIfBodyLarge(skill.body, skillName);
       const target = bridgeFor(agent);
       if (!target) {
         failures += 1;
