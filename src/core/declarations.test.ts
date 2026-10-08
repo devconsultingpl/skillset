@@ -254,9 +254,40 @@ describe("parseDeclarations — sibling files", () => {
     expect(siblings["code-review"]).toHaveLength(1);
     expect(siblings["code-review"]?.[0]?.rel).toBe("_helpers/review-range.mjs");
     // The source is resolved, not copied into the declaration: one source of bytes.
-    expect(siblings["code-review"]?.[0]?.source).toMatch(
+    expect(siblings["code-review"]?.[0]?.source.replaceAll("\\", "/")).toMatch(
       /skills\/code-review\/_helpers\/review-range\.mjs$/,
     );
+  });
+
+  it("canonicalises every separator to a portable rel, whatever the platform", () => {
+    // A sibling's `rel` is an identity — it is recorded, compared against the
+    // record on later runs, and read from a config file that is shared across
+    // platforms — so it cannot be built with the OS separator.
+    const { siblings, problems } = parseDeclarations({
+      version: 1,
+      installs: {},
+      siblings: {
+        architect: ["_helpers\\win.mjs", "templates/./nested/x.md", "a//b.mjs"],
+      },
+    });
+
+    expect(problems).toEqual([]);
+    expect(siblings.architect?.map((s) => s.rel)).toEqual([
+      "_helpers/win.mjs",
+      "templates/nested/x.md",
+      "a/b.mjs",
+    ]);
+  });
+
+  it("rejects a Windows-absolute path as well as a POSIX one", () => {
+    const { siblings, problems } = parseDeclarations({
+      version: 1,
+      installs: {},
+      siblings: { architect: ["\\\\server\\share\\x.mjs", "C:\\x.mjs"] },
+    });
+
+    expect(problems.filter((p) => p.includes("absolute"))).toHaveLength(2);
+    expect(siblings.architect).toBeUndefined();
   });
 
   it("rejects an absolute path, an escape, SKILL.md and a duplicate by name", () => {

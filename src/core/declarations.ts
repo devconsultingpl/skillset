@@ -18,7 +18,7 @@
  * themselves still come from the target, never from a second renderer here.
  */
 import { readFile, stat } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, normalize } from "node:path";
+import { basename, dirname, join, posix } from "node:path";
 import type { Bridge, BridgeLookup } from "./bridge.js";
 import {
   listBundledAgents,
@@ -140,11 +140,11 @@ function parseSiblings(raw: unknown, problems: string[]): Record<string, Sibling
         problems.push(`${skill}: a sibling file must be a non-empty relative path`);
         continue;
       }
-      if (isAbsolute(entry)) {
+      const rel = posix.normalize(entry.replaceAll("\\", "/"));
+      if (posix.isAbsolute(rel) || /^[A-Za-z]:\//.test(rel)) {
         problems.push(`${skill}: sibling file must be relative, not absolute: ${entry}`);
         continue;
       }
-      const rel = normalize(entry);
       if (rel.startsWith("..")) {
         problems.push(`${skill}: sibling file points outside the skill directory: ${entry}`);
         continue;

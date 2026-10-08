@@ -667,7 +667,7 @@ pnpm -r run test                # exit 0 — 16 packages
 
 **Not yet done.** Nothing is committed in either repository. Two follow-ups are named rather than implied: the other three harnesses' agent renderers (claude-code is the obvious next target, verifiable on this machine with a temp `HOME`) and the `install.ts` duplication lever above.
 
-**Commits — drafted, never run.** Both slices add files, so the command is `git add -A`, never `git commit -am` (the mistake that produced `c174158`).
+**Commit — drafted, never run.** Both slices add files, so the command is `git add -A`, never `git commit -am` (the mistake that produced `c174158`). **Re-verified 2026-10-08 against the staged tree**: 41 files, +136/−4,856; 15 roster files (1,769 lines); `agents.ts` 774, `agent-enablement.ts` 164, `update-agents-command.ts` 62, their tests 1,012 + 155 + 106; `~/.pi/agent/agents/.flow-managed.json` absent; `pnpm -r run test` exit 0 — **15 packages, not 16**, since the 16th (`pi-llm-switch`) declares no `package.json` and so has no test task; the message below is corrected accordingly.
 
 ```sh
 # skillset
@@ -700,7 +700,7 @@ models.json loses the `agents` axis plus the `extensions`/`tools` fields that on
 its injection, and /flow-models loses the agent scope. Per-agent model and thinking are
 a static declaration in the agent file now.
 
-41 files changed, +136 / -4856. pnpm -r run test: exit 0 across 16 packages.
+41 files changed, +136 / -4856. pnpm -r run test: exit 0 across the 15 packages that declare one.
 MSG
 ```
 
@@ -1356,9 +1356,11 @@ node dist/cli.js sync --dry-run  # checked undeclared 8 · in-sync 62
 - **A discovery, recorded rather than fixed: the config `requires` block is skill-keyed.** `declarationCoverage` validates `requires.<name>` against skill declarations, so `requires` naming an *agent* is a coverage problem (`declares required fields but no install`) and never reaches `agentFieldSupport`. That is pre-existing, unchanged here, and it is why the required-`tools` rule is declared by the bridge: for the agent kind the bridge is the only channel that binds. An e2e test written on the config route failed for exactly this reason and was replaced by the falsification in AC-4, which tests the rule through the channel that actually exists.
 - **`consequence.tools` does double duty** — it is the field's consequence for a `targets.<harness>` entry the harness ignores (2c's use) *and* the tail of the required-undeclared error. Reusing the existing map kept `AgentCapability` at one new member.
 
-**Not yet done.** **Nothing is committed.** Three things stay open and named rather than implied: the commit itself (the message is drafted below for the developer to run), the **`CLAUDE_CONFIG_DIR` finding** (recorded above; the loader honours it, this repository's claude-code paths do not, and it affects the skill installs identically — its own go), and the **opencode and copilot agent renderers**, which stay unbuilt until their loaders can be exercised.
+**Not yet done.** The commit itself has run (below). Two things stay open and named rather than implied: the **`CLAUDE_CONFIG_DIR` finding** (recorded above; the loader honours it, this repository's claude-code paths do not, and it affects the skill installs identically — its own go), and the **opencode and copilot agent renderers**, which stay unbuilt until their loaders can be exercised.
 
-**Commit — drafted, never run.** This slice adds a file, so the command is `git add -A`, never `git commit -am`.
+**Commit — run by the developer as `748d318`** (`skillset: claude-code installs agent definitions too (0023 slice 3d)`); the working tree is clean afterwards. This slice adds a file, so the command was `git add -A`, never `git commit -am`.
+
+**The label on that commit is wrong, and it is this plan's error.** The message says `(0023 slice 3d)`, but **3d in this plan is the FLOW skill triage** — a different, unstarted piece of work. This slice is item **(d)**, *the agent renderers for the other three harnesses, claude-code first*, and the two share nothing but a letter. `748d318` is already pushed (`origin/main` = `748d318`), so the label stands unless the developer chooses to amend; the honest reading for anyone grepping the log for the triage is: this commit is not it. The drafted text below is kept as it was run rather than silently corrected, so the record matches the history.
 
 ```sh
 git add -A && git commit -F - <<'MSG'
@@ -1383,6 +1385,56 @@ tools block deleted from the built bundle install exits 1 with nothing written.
 31 files / 314 tests, biome clean, sync --dry-run = in-sync 62.
 MSG
 ```
+
+### CI fix — colour on every platform, separators on Windows — 2026-10-08
+
+**Symptom.** The GitHub workflow (`ci.yml`: ubuntu, macos and windows × node 20/22) failed on `test/agents-kind.test.ts` — expected `'\u001b[32minstalled\u001b[39m diff-au…'` to match `/installed diff-auditor → pi/`, and the same for `/checked in-sync 62/`. Both pass locally, and both passed in every gate transcript this plan records.
+
+**Cause, reproduced rather than reasoned.** `picocolors` enables colour when `CI` is in the environment **and unconditionally on `win32`**, so no local `npm test` — and no transcript in this plan — ever ran the condition CI runs in. `sync` prints its summary as `pc.bold("checked")` beside `pc.dim(summary)` (`src/commands/sync.ts:285-286`), so an ANSI reset lands *between* the two words the regex spans; the install line has the same shape (`pc.green("installed")`). Measured with the CLI's own predicate:
+
+```sh
+$ CI=true node -e "const pc=require('picocolors'); console.log(JSON.stringify(pc.green('installed')))"
+"\u001b[32minstalled\u001b[39m"
+$ CI=true NO_COLOR=1 node -e "…"
+"installed"
+```
+
+**Fix — one line, at the single place every CLI test spawns through.** `test/helpers.ts` `run()` sets `NO_COLOR: "1"` in the child environment, before the caller's `env` so a test can still opt in to colour. The tests assert text, not rendering, and the child now behaves as it does when piped — which is what CI is.
+
+**Verified.** `CI=true npm test` reproduced the failure before the fix (`2 failed | 312 passed`) and reports **31 files / 314 tests passed** after it; the workflow's other steps are green locally as well (`npm run lint` · 78 files; `npm run typecheck`; `npm run build`).
+
+**Lesson, and why two slices of green gates missed it.** The gate this plan has been recording — `npm test` — is not the CI gate: it differs in exactly the variable that decides colour. `CI=true npm test` is the cheap reproduction and joins the slice gate list from here on.
+
+**Still open — the Windows jobs, reported red "since several commits".** The mechanism above is also a Windows trigger (`win32` forces colour regardless of TTY), so this fix removed one proven cause there. The other two were found the moment the Windows log arrived, and they were a **different bug**: a `rel` path built with the OS separator.
+
+#### The second bug, from the same log — a platform-dependent sibling identity
+
+The Windows job showed **four** failures, not two. Alongside the colour pair:
+
+```
+FAIL test/agents/pi.test.ts > pi target > sibling files > copies a declared sibling …
+  Array [ "SKILL.md", "_helpers\\review-range.mjs", "templates\\review.md" ]
+FAIL src/core/declarations.test.ts > parseDeclarations — sibling files > …
+  expected '_helpers\review-range.mjs' to be '_helpers/review-range.mjs'
+```
+
+**One call caused both:** `parseSiblings` did `const rel = normalize(entry)` — `node:path`'s platform `normalize`, which turns `_helpers/review-range.mjs` into `_helpers\review-range.mjs` on Windows. A sibling's `rel` is an **identity**, not just a path: it is written into the install record, compared against that record on every later `sync`, read out of a config file that is shared across platforms, and joined to the install directory for the copy. Built with the OS separator it is a different string per platform, so the same repository installs to two different records and a state file stops travelling.
+
+```
+$ node -e "…"
+path.win32.normalize  -> "_helpers\\review-range.mjs"      ← the old call, on Windows
+posix.normalize(win-style input) -> "_helpers/win.mjs"    ← the new one, on any platform
+```
+
+**Fix.** `const rel = posix.normalize(entry.replaceAll("\\", "/"))`, with a drive-letter guard beside `posix.isAbsolute` so `C:\\x.mjs` and `\\\\server\\share\\x.mjs` are refused on **every** platform rather than only where `isAbsolute` happens to catch them. This is not a new convention: `src/core/workspaces.ts:186` already canonicalises exactly this way (`rel.split(sep).join("/")`) — the sibling parser was the one place that used the raw platform call.
+
+**Two tests came with it**, both of which run on macOS and pin the Windows behaviour: `\`, `./` and `//` all canonicalise to one portable form, and both absolute forms are rejected. The `source` assertion below the failing one was fixed too — it matched an *absolute OS path* with `/`, so it was Windows-broken as well and had merely never been reached, the `rel` assertion failing first.
+
+**Verified.** `npm run lint` (78 files), `npm run typecheck`, `npm run build`, `npm test` → **31 files / 316 tests** (was 314; +2 cases), and the same suite under `CI=true` → 31 / 316.
+
+**Honest limit.** Windows cannot be run here, so the confirmation is the next CI run. What is established is narrower and stated as such: the identity path no longer calls an OS-separator API at all, the canonical form is pinned by tests that execute on this machine, and the demonstration above is `node:path`'s own win32 implementation, not a guess about it.
+
+### Finding — the comment rule binds nobody, and the mechanism explains why (2026-10-07)
 
 The developer asked why the "no comments" instruction had no effect on this slice. Traced: the rule exists in exactly one place — **a completed plan**, `docs/plans/completed/0012-skill-architect.md:143,145` (*"Default to no comments. Self-documenting identifiers first."*, *"Never comment the *what*; the code says what."*). It is in **no skill body**, and `docs/conventions.md` has no comment policy at all.
 
