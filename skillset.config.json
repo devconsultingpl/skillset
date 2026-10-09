@@ -123,7 +123,27 @@
     ]
   },
   "siblings": {
-    "code-review": ["_helpers/review-range.mjs", "templates/review.md"]
+    "annotate-guidance": [
+      "examples/root-dotnet-clean-arch.md",
+      "examples/root-nodejs-monorepo.md",
+      "examples/subfolder-database-layer.md",
+      "examples/subfolder-dotnet-application.md",
+      "examples/subfolder-schemas-layer.md",
+      "templates/root-architecture.md",
+      "templates/subfolder-architecture.md"
+    ],
+    "annotate-inline": [
+      "examples/root-dotnet-clean-arch.md",
+      "examples/root-nodejs-monorepo.md",
+      "examples/subfolder-database-layer.md",
+      "examples/subfolder-dotnet-application.md",
+      "examples/subfolder-schemas-layer.md",
+      "templates/root-claude-md.md",
+      "templates/subfolder-claude-md.md"
+    ],
+    "changelog": ["_helpers/changelog-bootstrap.mjs"],
+    "code-review": ["_helpers/review-range.mjs", "templates/review.md"],
+    "discover": ["templates/frd.md"]
   },
   "requires": {
     "code-review": {
@@ -131,6 +151,26 @@
     }
   },
   "installs": {
+    "annotate-guidance": [
+      {
+        "agent": "claude-code",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
+      }
+    ],
+    "annotate-inline": [
+      {
+        "agent": "claude-code",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
+      }
+    ],
     "appsec-review": [
       {
         "agent": "claude-code",
@@ -179,6 +219,16 @@
         "mode": "slash"
       }
     ],
+    "changelog": [
+      {
+        "agent": "claude-code",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
+      }
+    ],
     "code-review": [
       {
         "agent": "claude-code",
@@ -213,6 +263,16 @@
         "mode": "slash"
       }
     ],
+    "create-handoff": [
+      {
+        "agent": "claude-code",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
+      }
+    ],
     "context-pointer": [
       {
         "agent": "pi",
@@ -233,6 +293,26 @@
       {
         "agent": "pi",
         "mode": "slash"
+      }
+    ],
+    "discover": [
+      {
+        "agent": "claude-code",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
+      }
+    ],
+    "frontend-design": [
+      {
+        "agent": "claude-code",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
       }
     ],
     "instruction-ownership": [
@@ -271,6 +351,16 @@
       {
         "agent": "pi",
         "mode": "slash"
+      }
+    ],
+    "resume-handoff": [
+      {
+        "agent": "claude-code",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
       }
     ],
     "retro": [

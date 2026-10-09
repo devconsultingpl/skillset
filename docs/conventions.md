@@ -152,11 +152,26 @@ harness's roster. The portable shape, first used by `code-review`:
   could not execute — each is reported as not run, with the reason.
 
 The roster lives in `src/agents/<name>.md`, rendered per harness for pi and claude-code (see
-*Agent definitions* in `README.md`). A body that names a pi-only tool or calls a FLOW `_shared/`
-script is not portable, and each target's tool set is declared per harness under
+*Agent definitions* in `README.md`). Each target's tool set is declared per harness under
 `targets.<agent>.tools` — a claude-code agent with no `tools` declaration is refused, because
-Claude Code reads that absence as *every* tool. See
-`docs/plans/0023-skillset-owns-instructions.md`, slice 3.
+Claude Code reads that absence as *every* tool.
+
+Naming a tool is **not** disqualifying: a body describes the capability and the harness supplies
+the tool ("ask the developer with options", "if this session exposes an adjudication tool"). What
+a portable body must not carry is a token only a workspace extension expands, and the widget
+surface of one harness's dialog:
+
+- `${SKILL_DIR}`, `$ARGUMENTS` / `$1`, `shell-timeout` and fenced ```` ```! ```` blocks come from
+the `flow-args` pi extension — not from pi, and not from any harness. In this repository they are
+written as a relative path from the skill's own directory (the sibling mechanism above), plain
+prose about the arguments, and a fenced command the agent runs itself.
+- A tool's dialog detail — a header-length cap, an auto-appended free-text row, a label convention
+— is that harness's UI. Describe the question, not the widget.
+
+A body the pi workflow engine dispatches **by name** stays with that harness's package, however
+neutral its prose: moving it would make the engine's stages depend on an installed artifact. The
+per-skill verdict for all 30 bodies of FLOW's pipeline is in
+`docs/plans/0023-skillset-owns-instructions.md`, *3d*. The rule itself is ADR 0009.
 
 ## Tests
 

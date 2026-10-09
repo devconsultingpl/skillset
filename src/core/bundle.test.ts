@@ -4,14 +4,18 @@ import { listBundledSkills, loadBundledSkill } from "./bundle.js";
 describe("bundled skills", () => {
   it("includes the known skills", async () => {
     const names = await listBundledSkills();
+    expect(names).toContain("annotate-guidance");
+    expect(names).toContain("annotate-inline");
     expect(names).toContain("appsec-review");
     expect(names).toContain("architect");
     expect(names).toContain("builder");
+    expect(names).toContain("changelog");
     expect(names).toContain("code-review");
     expect(names).toContain("commit-suggestion");
     expect(names).toContain("confidence");
     expect(names).toContain("convention");
     expect(names).toContain("declutter");
+    expect(names).toContain("frontend-design");
     expect(names).toContain("remediate");
   });
 

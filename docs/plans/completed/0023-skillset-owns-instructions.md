@@ -472,9 +472,9 @@ Three consequences for this program, recorded rather than acted on:
 - **3a — an agent-definition concept.** Today this repository installs skills and prompts and has no concept of a *subagent definition* at all, so FLOW's 15 agents cannot move however portable they are. The roster's dialect is pi's: `packages/pi-subagents/src/config/custom-agents.ts:56-68` parses exactly `display_name`, `description`, `tools`, `model`, `thinking`, `max_turns`, `prompt_mode`, `inherit_context`, `run_in_background`, `enabled`, while 14 of FLOW's files add `isolated: true` and one adds `extensions:` — keys nothing parses. Rendering agents per harness therefore needs the same thing 2c is building for skills: a per-target declaration of the fields a target can express. Until then the roster stays FLOW's (slice-2 decision 7, unchanged). `model` is one of the ten fields pi does parse, which is where the developer's multi-model intent for `pi-llm-switch` meets this step: an agent that names a model is a declaration, and only the harness can honour it.
 - **3b — the guidance channel** (already scoped in this plan): the ownership rule rendered here instead of hand-written.
 - **3c — project scaffolds**: project `.pi/`, project `AGENTS.md`, with a documented local-override escape hatch.
-- **3d — the FLOW skill triage** (31 skills). Per skill, one question: does the body name a pi-only tool, or call a `_shared/` script? Portable method moves here — 2b's review is the first case, already in flight — and a body that only means something against pi's tool surface stays with FLOW, under a name this repository does not own.
-- **3e — workflow declarations.** FLOW's stage graph (`built-in-workflows.ts`) is a declaration over skill names: content by the rule above. Moving it needs a workflow concept here *and* a per-harness story for the harnesses with no workflow engine — pi has `flow-workflow`, GitHub now advertises dynamic and agentic workflows, the other two have nothing comparable.
-- **3f — prompts and commands.** `pi-extensions` ships no `prompts/` directory; this repository's `slash` mode already covers that shape for all four targets, so the remaining gap is only that FLOW's stage skills install as skills rather than prompts.
+- **3d — the FLOW skill triage** (30 skills, not 31 — corrected and scoped 2026-10-08: *3d — scoped and awaiting go* below). **Done, 3d-i and 3d-ii both implemented.** The roster is one smaller than this list first said, because 2b deleted `code-review` and renamed `remediate`. The triage's question turned out sharper than "does it name a pi-only tool": the bodies' pi coupling is mostly **`flow-args`**, an extension in the same workspace, and what must stay is what the workflow engine dispatches. **Seven moved** (annotate-guidance, annotate-inline, changelog, create-handoff, discover, frontend-design, resume-handoff), **twenty-one stay**, and **two are decided** (`commit`, `revise`). All 30 verdicts are recorded below.
+- **3e — workflow declarations. CLOSED 2026-10-08, not moved** — see *Closed — 3e and 3f* below for the measurement. FLOW's stage graph (`built-in-workflows.ts`) is the pi engine's own configuration: 1,443 lines of TypeScript calling that engine's DSL, with exactly one reader, in the package that also holds that reader.
+- **3f — prompts and commands. CLOSED 2026-10-08, already satisfied** — the premise this line carried was false (there *is* a `prompts/` directory, holding one extension asset), and the harness-facing shape it existed to add is `slash` mode, live for all four targets. Same section.
 
 ### 3a — scoped and awaiting go: the agent-definition concept, and the roster moves for pi — 2026-10-07
 
@@ -1434,6 +1434,51 @@ posix.normalize(win-style input) -> "_helpers/win.mjs"    ← the new one, on an
 
 **Honest limit.** Windows cannot be run here, so the confirmation is the next CI run. What is established is narrower and stated as such: the identity path no longer calls an OS-separator API at all, the canonical form is pinned by tests that execute on this machine, and the demonstration above is `node:path`'s own win32 implementation, not a guess about it.
 
+#### The third instance — the context anchor's local path assertion — 2026-10-08
+
+That next CI run confirmed the two fixes and surfaced **one more instance of the same class**, in a test 3c wrote:
+
+```
+FAIL src/bridges/bridges.test.ts > declares the context anchor for pi alone, at the paths pi actually loads
+AssertionError: expected '\proj\AGENTS.md' to be '/proj/AGENTS.md'
+  expect(piBridge.artifactPath({ ...artifact, scope: "local", projectRoot: "/proj" })).toBe(
+    "/proj/AGENTS.md",
+  );
+```
+
+**One line, and the same mistake as the two before it:** the expectation was a POSIX literal for a path the *code* builds with `join`, while the assertion three lines below it — the global anchor — was written with `join(homedir(), …)` and therefore platform-neutral. `artifactPath` is right; the test encoded one platform's separator.
+
+**Reproduced without Windows, which is what makes this a fix rather than a guess:**
+
+```sh
+$ node -e "const {win32,posix}=require('node:path'); console.log(win32.join('/proj','AGENTS.md'), posix.join('/proj','AGENTS.md'))"
+\proj\AGENTS.md /proj/AGENTS.md        # the received value CI printed, and the expected one
+```
+
+**Fix.** `join("/proj", "AGENTS.md")`, matching the file's own idiom and `src/bridges/paths.test.ts`, which builds every expectation that way and passes on Windows.
+
+**The class was swept, not just the report.** Every string literal in the suite that starts with `/` was read and classified (`grep -rnE '"/[A-Za-z0-9._/-]+"'` over `src` and `test`): the `/proj` values in `active.test.ts`, `state.test.ts` and `declarations.test.ts` are **inputs or echoed fields**, not joined outputs — asserted by the declaration tests passing on Windows in the same run — and `bridges.test.ts:216` was the only expectation standing on the wrong side of a `join`. The source side was re-checked in the same pass: `record.files` entries come from `copySiblings` (`sibling.rel`, canonicalised to POSIX by the fix above) or from `relative()` calls whose second argument is the file itself, so they are basenames — no identity in the state file is built with an OS separator after 2069691.
+
+**Verified.** `npm run build`, `npx biome check .` (81 files), `CI=true npm test` → **33 files / 344 tests**, and the fixed test alone (15/15). The Windows confirmation is again the next CI run — but this time the failing value itself was produced here by `node:path.win32`, so the only thing left unverified is that the suite has no *fourth* instance.
+
+**Commit — drafted, never run.** One file, one line; it is not part of 3d-i's change set, so it commits on its own — the shape `2069691` used for the first two instances.
+
+```sh
+git add src/bridges/bridges.test.ts && git commit -F - <<'MSG'
+skillset tests: the context anchor's local path is joined, not a literal (windows ci)
+
+The 3c test asserted '/proj/AGENTS.md' against a path the bridge builds with
+join, which is '\proj\AGENTS.md' on Windows — the third instance of the class
+2069691 fixed two of. The assertion three lines below was already written with
+join; this one was not.
+
+Swept the class rather than the report: every '/'-leading literal in the suite,
+plus the state-file identities. This was the only expectation on the wrong side
+of a join. Reproduced with node:path.win32, and the whole suite is green with
+CI=true.
+MSG
+```
+
 ### Finding — the comment rule binds nobody, and the mechanism explains why (2026-10-07)
 
 The developer asked why the "no comments" instruction had no effect on this slice. Traced: the rule exists in exactly one place — **a completed plan**, `docs/plans/completed/0012-skill-architect.md:143,145` (*"Default to no comments. Self-documenting identifiers first."*, *"Never comment the *what*; the code says what."*). It is in **no skill body**, and `docs/conventions.md` has no comment policy at all.
@@ -2168,7 +2213,7 @@ That window is deliberate (decision 7) and the developer closed it the same sess
 
 Probe 2 as first written asked the temp project to reproduce the string `skillset:begin standing-rules` — which also exists in the **global** `APPEND_SYSTEM.md`, so the "negative" run answered with it too. The probe was wrong, not the code: questions about a string that is installed globally cannot distinguish a project block from a global one, so probes 2 and 3 now ask for a token that exists only in the project's own file. Cleanup afterwards: `uninstall` removed the block and left the file standing (the temp project's own token was still in it, so deleting it would have been the bug), the state file carries **0** records for temp projects, and the temp directories are gone.
 
-**Not yet done.** Nothing is committed. The commit below is drafted, never run, and this slice adds files — so `git add -A`, never `git commit -am`.
+**Committed — `5458ebc`**, run by the developer from the multi-line form below, and pushed (`origin/main` matches). This slice added files, so the command was `git add -A`, never `git commit -am`. The code block is kept as it was pasted rather than trimmed to what changed, so the record matches the history.
 
 ```sh
 git add -A && git commit -F - <<'MSG'
@@ -2235,19 +2280,461 @@ Body 13 → **26 lines**, well under the 80-line anchor warn; no other file touc
 
 Docs-only, so nothing propagated: `sync --dry-run` still reports `in-sync 64`, and the gates are unchanged (build, biome 80 files, `CI=true npm test` 32 files / 340 tests).
 
+### 3d — scoped and awaiting go: the FLOW skill triage — 2026-10-08
+
+#### Goal
+
+End the question *where does a skill live* for the last 30 bodies this programme has not judged. FLOW ships 30 skills; this repository owns 16. Per skill, decide whether the body is instruction content (a method that means something in any harness, so it moves here and FLOW stops shipping a copy) or pi surface (it only means something against the workflow engine or an extension in that workspace, so it stays), and move the ones that are portable **today** without inventing a mechanism. The verdict for every one of the 30 is recorded below, so the next session does not re-litigate it.
+
+Scope: the triage, its evidence, and a split into two slices. **Nothing moves until the go for 3d-i.**
+
+#### What was measured — by execution, 2026-10-08
+
+**The roster is 30, not 31.** `ls -d skills/*/` is 31 and one of those is `_shared/`; 2b deleted `code-review` and renamed `remediate` to `flow-remediate` after this plan's inventory was written. 30 bodies, **7,028 lines**.
+
+**The dispatch map is the engine's own, not a grep.** `builtInWorkflows` jiti-imported from `packages/flow` and walked stage by stage (`def.skill ?? stage`, `produces.prompt` and `produces.script` excluded), plus the literal `/skill:<name>` strings in `extensions/flow-core/**` excluding tests:
+
+| dispatched (17 of FLOW's 30, plus `code-review`, this repository's since 2b) | where |
+|---|---|
+| acceptance | build:acceptance, ship:acceptance |
+| amend | build:plan-fix, build:code-fix, `built-ins/reconcile.ts` |
+| architecture-review | polish:architecture-review |
+| blueprint | vet:blueprint, polish:blueprint |
+| code-review | vet:code-review, polish:code-review — **this repository's now** |
+| commit | vet:commit, polish:commit, `/skill:commit --baseline` from `built-ins/goal-baseline.ts:298` |
+| design-review | build:design-review |
+| design-slice | build:slice-design |
+| elaborate | build:code |
+| flow-remediate | build:validate-fix, ship:validate-fix |
+| grade | build:slice-grade, build:plan-grade, build:plan-confirm, build:code-grade, build:code-confirm, ship:grade |
+| implement | build:implement, vet:implement, polish:implement, ship:implement, meta:implement |
+| lens-grade | meta:research-grade, meta:plan-grade, meta:implement-grade |
+| quick-plan | ship:plan |
+| research | `/skill:research` in `built-in-workflows.ts:199,226` |
+| slice | build:slice, build:slice-fix |
+| synthesize | build:subplan, build:plan |
+| validate | vet:validate, plus `built-ins/goal-baseline.ts` |
+
+**Thirteen are not dispatched at all**: annotate-guidance, annotate-inline, changelog, create-handoff, design, discover, explore, frontend-design, migrate-to-guidance, plan, pr-triage, resume-handoff, revise. 17 + 13 = 30. Every one of the 30 is named somewhere in `flow-core` non-test code — none is orphaned — but `pipeline-pointer.ts` is the only place the thirteen appear, and that is a *listing* the model reads, not a dispatch.
+
+**The coupling is `flow-args`, not pi.** This is the correction the plan needs before any body moves. Four tokens the bodies use are provided by **`packages/flow-args`**, a pi extension in the same workspace, and by nothing else:
+
+- `$ARGUMENTS` / `$1` / `$@` — 30 of 30 bodies, 38 occurrences. Measured against pi itself: `_expandSkillCommand` substitutes nothing, it appends the raw argument string after the `<skill>` block (`dist/core/agent-session.js:1628-1641`), and the `expandPromptTemplate` that runs next does nothing because the expanded text begins with `<`, not `/` (`dist/core/prompt-templates.js`).
+- `${SKILL_DIR}` — 24 of 30, 50 occurrences. **`strings`/`grep` over the whole installed pi package returns nothing for it** — the plan's earlier "expanded by no harness" stands — but `flow-args` substitutes it "always, on both paths" (`packages/flow-args/docs/how-it-works.md`). That is why the 24 bodies' `_shared` calls work at all.
+- ```` ```! ```` and `` !`cmd` `` shell blocks — 23 of 30. Also `flow-args` (`how-it-works.md`, pipeline step 5). Zero occurrences of pi doing this: the plan's 2c finding that pi passes a skill body through verbatim is what it looks like when this extension is absent.
+- `shell-timeout` — 25 of 30. **Not a pi field and not a harness field**: `grep -rn 'shell-timeout'` over the installed pi package (dist, docs) is empty, and its only reader in this workspace is `packages/flow-args/args.ts:184` `resolveShellTimeoutMs`. So it bounds exactly one thing — how long a ```` ```! ```` fence may run.
+
+**`/skill:<name>` resolves from the loader's whole skill set**, which is what makes a move possible without touching the engine: `_expandSkillCommand` looks the name up in `this.resourceLoader.getSkills().skills` and reads that file's body (`dist/core/agent-session.js:1628-1641`; `resource-loader.js:293`), and `disable-model-invocation` only keeps a skill out of the model's list — `docs/skills.md` in the package says such skills "can only be invoked explicitly via `/skill:name` commands". Read from pi's own code, not executed: the executed half is 2b's, which installed a skill and had the loader list it.
+
+**Everything a moved body carries is renderable.** skillset's frontmatter renderer takes strings, numbers, booleans, flat arrays of strings and nested mappings of those. Measured over the 30: **no body declares an array of mappings** (the one shape the renderer refuses), and the single body with block sequences in frontmatter — `create-handoff`'s `required:` and `enum:` — renders fine, because a flat array of strings is inlined by `renderScalar` at any depth (`src/core/frontmatter.ts:44-56`).
+
+**No name collision, and no verdict field to step on.** The 30 names against this repository's 16: none equal. Exactly **two** skills declare a `verdict` field (`explore`, `validate`), and the engine's two gates read `blockers_count` (`built-in-workflows.ts:157,484`) and `verdict` (`:1399`).
+
+**`_shared/` is shared with the skills that stay** — the reason the move splits. 24 bodies call 8 plain-node scripts. Per script, who needs it:
+
+| script | non-dispatching candidates that need it | stayers that keep it |
+|---|---|---|
+| `changelog-bootstrap.mjs` | changelog | — |
+| `git-changes.mjs` | commit | — |
+| `now.mjs` | create-handoff, discover, revise | 20 skills |
+| `git-context.mjs` | create-handoff, discover | 16 skills |
+| `list-recent.mjs` | resume-handoff, revise | blueprint, design, validate |
+
+**How the thirty were read.** Four parallel read-only passes, five-to-ten bodies each, every one required to cite a line number per claim and to answer the same six questions (method; pi-bound tokens with lines; whether it emits an engine-gated verdict; whether the method survives generic phrasing; a verdict; the reason). Their per-skill reasoning is the evidence behind the table below; the grouping, the tests that decide it and the split are this plan's.
+
+#### The test, resolved — which bodies are pi surface
+
+The plan's original phrasing ("does the body name a pi-only tool, or call a `_shared/` script?") is **wrong in both directions** and is retired here. Naming a tool is not disqualifying — 2d already set the precedent of describing a tool generically ("if this session exposes an adjudication tool") — and calling a `_shared` script is not disqualifying either, since the scripts are plain node and 2a's mechanism carries them. What decides it is two questions:
+
+1. **Does any workflow dispatch it?** A body the engine runs by name is engine surface: its stage, its channel and its contract are all wired in `built-in-workflows.ts`, and moving it makes those presets depend on an installed skill (slice-2 decision 4 accepted exactly that for one skill, not for seventeen). Measured above, 17 skills.
+2. **Does it publish a gate input?** `verdict`, `blockers_count`, or an artifact channel a stage reads. Two `verdict` declarations, and the rest of the gate arms are already caught by (1).
+
+Both false → portable today. One true → stays. **`ask_user_question` is not part of the test**, and the fork is settled: it may be named generically in a moved body, because the engine's *parking* of a question is the tool's behaviour, not the body's text — `question-lifecycle.ts:29` describes "a deferred `ask_user_question`" as the registry's own mechanism, `siblings.ts:35` declares the tool a package sibling, and `sdk-workflow-host.ts:356` degrades it in the lane dock. What a moved body **must** stop carrying is the pi implementation detail around it: the `MAX_HEADER_LENGTH = 16` header cap (14 bodies), the auto-appended `Type something.` row (10) and the `(Recommended)` label convention (16) are that tool's option surface.
+
+#### The verdict — all 30, no cross-hatching
+
+**Move (7)** — no dispatch, no gate input, method portable:
+
+- **annotate-guidance** (312) and **annotate-inline** (307) — a brownfield annotation pipeline: map with two locator agents, select targets by depth rules plus a developer confirmation, run analyzer + pattern-finder per folder, self-review against a checklist, batch-write from templates. The only harness references are `allowed-tools` (a name list) and the `Agent({ subagent_type: … })` call shape. Their siblings travel: 2 templates each, and 5 `examples/` each (two of the five differ between them — measured, not assumed).
+- **changelog** (185) — git-log classification into Keep a Changelog sections. Its `contract` is `kind: side-effect` / `effect: changelog-edit`; nothing gates on it. `changelog-bootstrap.mjs` is used by this skill alone, so its helper moves cleanly.
+- **frontend-design** (279) — scan the tree, then one aesthetic question per dimension, then emit guidelines. Two lines are pi-shaped and both are one-line edits: it says *do not* use `pi.sendMessage` (line 264) and it inherits pi tool names.
+- **create-handoff** (126) and **resume-handoff** (230) — the handoff pair: compact the session into a document, then read it back and verify the tree against it. `kind: produces` with `artifactKind: handoff`, consumed by the other half and by nothing that gates.
+- **discover** (238) — the requirements interview (one question at a time, intent before probes, a lazily expanded decision tree) into an FRD. `grep` for `frd` across `built-in-workflows.ts` and `built-ins/*.ts` is **empty**: no workflow reads it.
+
+**Stay (21)** — the engine's arms, each with the reason that binds it:
+
+acceptance (its inventory is the completeness gate's anchor; `required: [items, item_count]`), amend (reads the grade gate's channel flags and re-emits latest-wins), architecture-review (Step 8 rewrites the `phases:` array the contract declares), blueprint (`phases`/`phase_count` the implement fanout derive-checks; its metadata fence is `${SKILL_DIR}`), design-review (announces every design path into the `designs` channel), design-slice (`filename_slice` is parsed by the build workflow and "never authored"), elaborate (its `## Phase N:` heading is the splice anchor for `stitch-elaborations`), flow-remediate (its success *is* the presence of the closing block the gate looks for), grade (the verdict schema folded across the panel), implement (parallel-lane write-scope plus the `reconcile` directives it must record), lens-grade (verdict JSON addressed by `unit/lens/round/generation` for the loop), quick-plan (the plan-time checks it exists to satisfy), slice (the re-slice half is gate plumbing; the fresh-cut half is not, and splitting it is a product decision), synthesize (the `sources:` coverage floor and the `files:` contract the fanout derives edges from), validate (`blockers` is "the ONLY handles the workflow's remediation arm may act on"), research (`status` enum plus `consumes: artifactKind: [frd]`), **design** (hand-run, but its one-slice-per-session resume protocol and `${SKILL_DIR}` metadata fence are its spine), **explore** (one of the two `verdict` declarations), **plan** (pure transcription of one engine artifact into the shape the next one validates), **pr-triage** (`required: [security_flag, blockers_count]` — a gate field), **migrate-to-guidance** (the method *is* FLOW's own `scripts/migrate.js` writing `.flow/guidance/`).
+
+**Decided — both stay (2)**, closed 2026-10-08 rather than left open:
+
+- **commit** (93) — the method is entirely git (diffstat, `git log --pretty=%s -n 20` for style, group by purpose, `git add` by path, never `-A`) and its `contract` is `kind: side-effect`, so it passes both tests. **It stays because three sites dispatch it** — `vet:commit`, `polish:commit` and `/skill:commit --baseline` from the goal-baseline built-in — so moving it would put every preset's last stage behind an installed skill. `commit-suggestion` here is a near-neighbour, not a collision (it suggests a message and never runs git), so dispatch is the whole reason.
+- **revise** (317) — **it stays because it edits FLOW's plan-artifact schema**: the `- [x]` checkbox semantics `implement` trusts, and `phases:` kept in step with the headings. Measured while closing this: **no workflow dispatches it either** — only `pipeline-pointer.ts` names it — so the *"the orchestrator wires both upstream artifacts in"* line in its body is stale, the same class of dead claim as `BUNDLED_SKILL_NAMES` and `isolated: true`. That does not change the decision: the artifact format is what binds it, exactly as it binds `plan`/`slice`/`synthesize`. Recorded as a finding, not fixed here.
+
+#### What a move costs — the normalisation, measured
+
+A moved body keeps working in pi untouched, because `flow-args` is installed and hooks `/skill:<name>` for every skill the loader knows, bundled or not. It does **not** keep working in the other harnesses, which is the point of moving it — so each moved body is normalised in the same pass, and the list is exactly what the measurements above produced:
+
+| token | occurrences | becomes |
+|---|---|---|
+| `$ARGUMENTS` | 30 bodies, 38 uses | "the arguments you were given", or the documented `$ARGUMENTS` where the harness supports it (claude-code's command fields include it; pi's prompt templates use `$@`) |
+| `${SKILL_DIR}` | 24 bodies, 50 uses | the skill's own directory — 2b's normalisation, and the reason 2a's siblings exist |
+| ```` ```! ```` fences | 23 bodies | a fenced command plus "run it" — inert text otherwise, which is what a moved body must not ship |
+| `shell-timeout` | 25 bodies | **dropped.** It bounds fence execution only, and there are no fences left to bound |
+| `ask_user_question` | 98 uses, 26 bodies | "ask the developer", with the tool's *machinery* dropped — `MAX_HEADER_LENGTH`, the auto-appended `Type something.` row, and the rule about not authoring an `Other` option. The engine's parking is unaffected — see *The test, resolved*. `(Recommended)` **stays**: it is plain wording inside an option's label, not a widget, and every harness's picker renders it. *(Corrected 2026-10-08, after 3d-i shipped: the table first listed `(Recommended)` as removed, and the built bodies keep it.)* |
+| `allowed-tools` | 16 bodies | per-target names: `targets.pi.tools`-style mapping, the shape (d) established — FLOW writes claude-code's `Read, Grep, Glob` in bodies that only ever ran on pi |
+| `pi.sendMessage`, `/skill:`, `/new` | frontend-design 264, several bodies | generic phrasing |
+
+#### Split: 3d-i and 3d-ii
+
+The *mechanism* the move needs is in place — siblings land beside `SKILL.md` and are removed by `uninstall` (2a, executed), a `contract:` under `targets.pi` is read back by FLOW's own harvester from the installed skill (2b, executed), `disable-model-invocation` and `allowed-tools` are expressible in pi `auto`, and `/skill:<name>` resolves against the loader's whole skill set (pi's `agent-session.js`, read — the end-to-end command is 3d-i's first check, named under *Confidence*). What is not settled is `_shared/`. Three of the seven candidates need a script that the twenty-one stayers keep: `now.mjs` (20 stayers), `git-context.mjs` (16), `list-recent.mjs` (3). Moving them means **two copies of the same script in two repositories**, which is the drift this programme exists to remove — and 2a's sibling rule refuses `../_shared/x.mjs` by construction (a path that escapes the skill directory is a declaration problem), so there is no third option inside today's mechanism.
+
+So: **3d-i moves the four that need no shared script** — annotate-guidance, annotate-inline, changelog, frontend-design. **3d-ii moves discover, create-handoff and resume-handoff**, and is blocked until the `_shared` question is answered (per-skill copies with the duplication named, or a shared-asset concept in this repository, or `_shared` moving wholesale when the stayers retire). 3d-ii gets its own go.
+
+**Superseded 2026-10-08, before 3d-ii started: that was the wrong blocker.** The paragraph above is kept because it is what the go was given on and the replacement should be readable beside it. Read on.
+
+#### Acceptance criteria (3d-i)
+
+1. `src/skills/` holds the four bodies, and each is **byte-identical to `git show f67d744:packages/flow/skills/<name>/SKILL.md`** apart from the normalisation table above — the diff is pasted into this plan, per file, and names every changed line's reason.
+2. Every `targets.claude-code` value that survives is claude-code's own vocabulary, and `grep -rnE '\$\{SKILL_DIR\}|^```!|\$ARGUMENTS|shell-timeout|pi\.sendMessage' src/skills/{annotate-guidance,annotate-inline,changelog,frontend-design}/` returns **nothing**.
+3. The three pi-only things a moved body must keep are declared where pi reads them: `disable-model-invocation: true`, the `contract:` block, and `allowed-tools` — each under `targets.pi`, each reported expressible by `sync` (no unsupported-field warning for these four).
+4. `grep -rn 'ask_user_question\|MAX_HEADER_LENGTH' src/skills/{annotate-guidance,annotate-inline,changelog,frontend-design}/` returns nothing, and the same bodies in `packages/flow/skills/` are **deleted** — one provider per harness, so `pi` must not find two skills named either one.
+5. Every sibling the body resolves by relative path is declared and lands: annotate-guidance and annotate-inline install 7 files each beside `SKILL.md` (2 templates + 5 examples), changelog 1 (`_helpers/changelog-bootstrap.mjs`), frontend-design none — and every installed copy is byte-identical to **this repository's** bundle source under `src/skills/<name>/`, compared from the installed path, never from the committed one.
+6. `/skill:<name>` resolves for each of the four from the installed skill directory, and the pipeline pointer's text is unchanged (the names did not move) — `grep -c 'annotate-guidance\|annotate-inline\|changelog\|frontend-design' packages/flow/extensions/flow-core/pipeline-pointer.ts` is the same before and after.
+7. Nothing else moves: from the repository root `sync --dry-run` reports the four as the only new installs — **8 new records**, pi `auto` and claude-code `auto` each, so the total moves from `in-sync 64` to **72** — `undeclared 8` unchanged, nothing `foreign`, and a second run reports `drifted 0 · missing 0`.
+8. The twenty-one stayers are still FLOW's: `packages/flow/skills/` holds **26 skills (27 directories with `_shared/`)** — the four deleted here and `code-review` deleted by 2b — `pnpm -r run test` from the workspace root is green, and no stayer's installed artifact changed byte for byte (hash the four harness directories before and after, as 2e and (d) did).
+9. Documentation lands where the dependency is stated: `README.md` and `docs/conventions.md` gain the four skills, and `packages/flow/docs/` states the new dependency (these four are installed, not bundled) the way 2b did for the review.
+10. Gates and standing rules: `npm run build` → `npx biome check .` → `CI=true npm test`; no new dependency, **no new runtime module**, and no comment added to any body beyond what it already carries.
+
+#### Budget (3d-i)
+
+| area | file | what | est. |
+|---|---|---|---|
+| content | `src/skills/annotate-guidance/SKILL.md` (new) | 312 lines moved + normalisation | — |
+| content | `src/skills/annotate-inline/SKILL.md` (new) | 307 moved + normalisation | — |
+| content | `src/skills/changelog/SKILL.md` (new) | 185 moved + normalisation | — |
+| content | `src/skills/frontend-design/SKILL.md` (new) | 279 moved + normalisation | — |
+| payload | `annotate-guidance/{templates,examples}/` 7 files | verbatim | ~378 |
+| payload | `annotate-inline/{templates,examples}/` 7 files | verbatim | ~378 |
+| payload | `changelog/_helpers/changelog-bootstrap.mjs` (+ its test, not installed) | verbatim | ~35 |
+| config | `skillset.config.json` | 4 installs (pi `auto`, claude-code `auto`), 2 `siblings` blocks | ~+50 |
+| content edit | 4 bodies | the normalisation table, per file | ~+80 / −120 |
+| tests | `src/skills/skills.test.ts` or a new `test/skills/flows.test.ts` | the four render, the siblings land, the deletions hold, `sync` round trip | ~130 |
+| docs | `README.md`, `docs/conventions.md` | 4 rows, the dependency note | ~+35 |
+| docs | `packages/flow/docs/skills.md` | these four are a dependency now | ~+10 |
+| docs | this plan | this section, its review log, the handoff update | ~+230 |
+
+- New dependencies **none**. New runtime modules **0** — the slice is content, declarations and tests, like 3b. Estimated implementation logic **0 lines**; edited body lines **~200**; physical **~800–1,050** including payload and tests.
+- **Base rate, stated so the estimate is not read as precision:** every slice that added a mechanism overran; this one adds none, and the two slices that were also content-and-tests only (3b, 3c) came in at **under** and **−24%** against their estimates.
+
+#### Decisions
+
+1. **The test is "is it dispatched" and "does it publish a gate input", not "does it name a pi tool".** Naming is not binding — 2d proved a tool can be described generically with the engine's behaviour intact — and the measured coupling turned out to be `flow-args`, not pi.
+2. **`ask_user_question` may be named generically in a moved body; its option surface may not travel.** The parking is the tool's; the 16-character header cap and the auto-appended free-text row are pi's UI, and a body that tells another harness to respect them is documenting someone else's implementation.
+3. **A body the engine dispatches stays**, even when its prose is neutral. Seventeen skills, measured, and the alternative is that every preset's stage depends on an installed skill — a dependency this programme accepted once (2b, deliberately, for one skill) and should not accept seventeen times without a decision.
+4. **`shell-timeout` is dropped in the normalisation**, because it bounds fence execution and the fences go with it. It is not a pi field and reading it as one would put a falsehood in `expresses`.
+5. **The four moved skills install as pi `auto` and claude-code `auto`** — `auto` because only a skill directory carries siblings, and pi `auto` because that is the mode `/skill:<name>` resolves from. Not opencode and copilot: their skill loaders cannot be exercised on this machine (opencode's arm64 binary is `invalid signature`, Copilot CLI is installed nowhere), and declaring them would be the unverifiable renderer this programme keeps refusing.
+6. **`argument-hint` goes only where it is read.** It is a pi *prompt-template* field (`docs/prompt-templates.md:14`) and claude-code reads it for skills — so it stays under `targets.claude-code` and leaves the pi side, where `auto` cannot express it and a warning would be reported for every one of the four.
+7. **3d is split, and the split is `_shared/`.** The three script-dependent movers are held until that question is answered; the four clean ones are not.
+
+**Road not taken.** *Move the seventeen dispatched skills too, contract and all* — mechanically possible (2b proved a gate arm can live here, keep its name and still be read by the harvester), but it converts FLOW's self-contained pipeline into a set of installed skills, and that is a dependency decision the plan has not made. *Keep the bodies pi-shaped and let the other harnesses get inert text* — the moved copy would carry `${SKILL_DIR}` fences that never run and `$1` placeholders nothing substitutes, which is shipping a broken artifact to three harnesses to save a rewrite. *Move a `_shared/` copy per skill and call the duplication temporary* — it is two copies of a script in two repositories with no test that keeps them equal, which is the failure ADR 0006 exists to prevent; if the developer wants the three movers now, the honest price is a shared-asset concept, and that is 3d-ii's blocker.
+
+→ **worth an ADR: 0009 — what a portable body may not name, and which bodies stay with the engine.** Its rule outlives this plan: a body this repository owns names no harness tool's *option surface* and no *extension-provided substitution*, and a body the engine dispatches by name does not move, however neutral its prose. Draft below.
+
+**ADR appendix — 0009: portable bodies and engine arms.**
+
+**Context.** This repository owns skill bodies rendered for four harnesses. Two classes of coupling were found while triaging 30 bodies that came from a pi package: tokens no harness provides but a *workspace extension* does (`flow-args` substitutes `${SKILL_DIR}`, `$ARGUMENTS` and ```` ```! ````; it alone reads `shell-timeout`), and bodies whose entire purpose is to publish a value a pi workflow gate reads. Naming an extension's token and naming a harness tool look identical in a diff, and both survived three slices of review here.
+
+**Decision.** A body this repository owns must be executable in a harness that has none of this workspace's extensions: it names no extension-provided substitution, and it names no harness tool's option surface (option-count limits, auto-appended rows, label conventions). Naming a *capability* generically is allowed and preferred — "ask the developer with options", "if this session exposes an adjudication tool". Separately, a body whose dispatch the harness engine performs by name stays with that harness's package: moving it makes the engine's stages depend on an installed artifact, which is a dependency decision, not a portability one.
+
+**Consequences.** Bodies move less often and are rewritten more when they do; the rewrite is mechanical and its list is measurable (the normalisation table above). Two failure modes become visible instead of silent: a body carrying a token nothing expands, and a stage whose skill is no longer bundled. The cost is that a genuinely useful pi convenience (`${SKILL_DIR}`) cannot be used in owned content — accepted, because the alternative is a body that half-works.
+
+#### Confidence
+
+**~96%.** Every load-bearing claim above is executed or read from the implementation, and each is cited where it is made: the dispatch map (jiti-imported workflows, not a grep), the roster count, the per-token coupling counts, the `_shared` sharing matrix, `/skill:` resolution and `disable-model-invocation` semantics (pi's own `agent-session.js` / `resource-loader.js`), the renderer's accepted shapes (its code and a sweep of all 30 frontmatters), the absence of `shell-timeout` in pi and its single reader in `flow-args`, and the empty `frd` channel. What is judgment, and is marked as judgment: the six stay-rules that rest on "the engine parses this" rather than on a token count, and the two bodies left as DISCUSS, where the developer's answer — not more evidence — is what decides.
+
+What is **not** verified and would be 3d-i's first check: that a skillset-installed `auto` skill is reachable as `/skill:<name>` in a **live** pi session. The mechanism is read from pi's code and 2b's loader probe showed the skill is discovered; the end-to-end command, through a session, has not been run. The fallback if it fails is cheap and named: the four skills would then need a pi `slash` install beside the `auto` one, which 2b already does for the review.
+
+Nothing is authorised. ~~The go for 3d-i is a separate step.~~ **Go given 2026-10-08; implemented below — and 3d-ii with it, which closed slice 3d.**
+
+### Implemented — 3d-i, the four standalone bodies move — 2026-10-08 (Review log)
+
+The developer gave **go** on rule 3 as scoped. Four bodies left the FLOW package for this repository, normalised off every `flow-args` token on the way, and FLOW's copies are deleted so each name has one provider per harness.
+
+**What landed.** `src/skills/{annotate-guidance,annotate-inline,changelog,frontend-design}/SKILL.md` (new); their payload beside them — 7 template/example files for each annotate skill, `_helpers/changelog-bootstrap.mjs` for `changelog`; `skillset.config.json` declarations (pi `auto` + claude-code `auto` each, three `siblings` blocks); `src/core/portable-body.test.ts`; `docs/decisions/0009-portable-bodies-and-engine-arms.md`; README rows and the *Portable bodies* section of `docs/conventions.md`; and in `pi-extensions`, 19 deletions plus the dependency note in `packages/flow/docs/skills.md`.
+
+**Criteria as built.**
+
+1. Holds, with the diff measured per file rather than pasted whole (each is 53-54 changed lines and the two output blocks are the body plus its payload, which is noise at this size): the four bodies differ from `git show f67d744:packages/flow/skills/<name>/SKILL.md` by **54 / 54 / 53 / 54** lines, and `git diff` shows every one of them is a line the normalisation table names. No body line was reflowed, reordered or dropped.
+2. Holds — `grep -rnE '\$\{SKILL_DIR\}|^```!|\$ARGUMENTS|shell-timeout|pi\.sendMessage|ask_user_question|MAX_HEADER_LENGTH|subagent_type' src/skills/{annotate-guidance,annotate-inline,changelog,frontend-design}/` returns **nothing**.
+3. Holds **as amended** — `disable-model-invocation: true` and the `contract:` block travel under `targets.pi`, `sync` reports no unsupported field for any of the four, and every rendered pi artifact lets pi's loader mark them hidden (transcript below). The clause about `allowed-tools` does not: see *Deviations*.
+4. Holds — the same sweep, and `packages/flow/skills/` no longer holds the four (27 directories: 26 skills + `_shared/`).
+5. Holds — 7 / 7 / 1 / 0 sibling files per skill, declared and landing beside `SKILL.md` in both harnesses: **30 installed copies checked against the bundle source, 0 differing**.
+6. Holds — pi's own loader finds all four at `~/.pi/agent/skills/<name>/SKILL.md` with `disableModelInvocation` set, **0 collisions**, no name loaded twice; and `git diff --stat packages/flow/extensions/flow-core/pipeline-pointer.ts` is empty, with all four names still in the pointer (3 references).
+7. Holds — `reconciled missing 8 · undeclared 8 · in-sync 64 · 8 written`, then `checked undeclared 8 · in-sync 72`.
+8. Holds, by hash — 5,810 files across `~/.pi/agent` and `~/.claude` hashed before and after **sync**: 40 new lines, of which 38 are this slice's artifacts and the remaining two are files that changed in place for reasons outside it — this session's own transcript and `pi-permission-system/logs/…jsonl`. **No skillset-owned artifact changed byte for byte**, and `~/.config/opencode` / `~/.skillset/copilot` were not touched at all. `pnpm -r run test`: **68 files / 1668 tests passed**.
+9. Holds — README gained four rows, `docs/conventions.md` replaces its retired rule and states the new one, and `packages/flow/docs/skills.md` says the four are installed now rather than bundled, and that nothing in `/wf` needs them.
+10. Holds — `npm run build` · `npx biome check .` (81 files) · `CI=true npm test` → **33 files / 344 tests** (was 32 / 340); no new dependency, no new runtime module, and **no comment added to any body** — the four were rewritten at the token sites only.
+
+**Verification, in the order it ran.**
+
+```sh
+npm run build                   # tsc + copy-skills + copy-agents, clean
+npx biome check .               # 81 files clean
+CI=true npm test                # 33 files / 344 tests
+node dist/cli.js sync           # reconciled missing 8 · undeclared 8 · in-sync 64 · 8 written
+node dist/cli.js sync --dry-run # checked undeclared 8 · in-sync 72
+# pi-extensions
+pnpm -r run test                # 68 files / 1668 tests
+```
+
+`pi --print` cannot answer the command question (a skill with `disable-model-invocation` is absent from the model's list by design), so the check is the loader's own: `loadSkills()` from the installed package's `dist/core/skills.js`, called against the real agent directory.
+
+```
+annotate-guidance    /Users/joozik/.pi/agent/skills/annotate-guidance/SKILL.md (hidden)
+annotate-inline      /Users/joozik/.pi/agent/skills/annotate-inline/SKILL.md (hidden)
+changelog            /Users/joozik/.pi/agent/skills/changelog/SKILL.md (hidden)
+frontend-design      /Users/joozik/.pi/agent/skills/frontend-design/SKILL.md (hidden)
+loaded skills: 9 | collisions: 0
+names loaded twice: none
+```
+
+That closes the *Confidence* gap this scope named — discovery and the hidden flag are now observed rather than read from `agent-session.js`. What is still unobserved is the end of the chain: `_expandSkillCommand` reading one of these bodies in a live session. Its mechanism is four lines (`getSkills().skills.find(…)`) and its fallback is unchanged (a pi `slash` install beside the `auto` one).
+
+**Measured against the budget.**
+
+| area | budget | measured | verdict |
+|---|---|---|---|
+| moved bodies | 312 + 307 + 185 + 279 = 1,083 lines | **1,102** (318 + 313 + 188 + 283) | +19, the four frontmatter blocks growing |
+| body edits | ~200 changed lines | **215** (54 + 54 + 53 + 54) | met |
+| payload | 378 + 378 + ~35 | **798** across 15 files | met |
+| `skillset.config.json` | ~+50 | **+60** | over by 10 |
+| tests | ~130 | **99** new + 19 amended (5 in skillset, 14 in pi-extensions) | under |
+| docs | ~+35 tracked | **+27** (README 4, conventions 14, pi-extensions 9) + ADR 26 | met |
+| **runtime logic** | **0 lines** | **0** | met |
+| new dependencies / runtime modules | none / 0 | none / 0 | met |
+| this plan | ~+230 | over | it carries the scope and this record |
+| physical, headline | ~800-1,050 | **~2,300 added**, of which **1,900 is moved content** (1,102 bodies + 798 payload) | see the note |
+
+**The headline number, stated honestly.** 800-1,050 was always going to exclude the moved bodies — the budget table listed them with no estimate, because they are not written so much as relocated — but the whole-file total is roughly twice that, and a reader comparing the two should see both. What was *authored* is 392 tracked lines (config 60, conventions 14, README 4, test files 118, ADR 26, plus small amendments); what was *carried* is 1,900. This is the same shape 2b measured and counted the same way.
+
+**Deviations, each deliberate.**
+
+- **`allowed-tools` does not travel to pi.** Criterion 3 asked for it under `targets.pi` and reported expressible, and pi's field list does accept the key. It is dropped anyway: pi's documentation calls it an *"Experimental pre-approved tool list"* with no documented value format, and the four bodies' values are **claude-code's** vocabulary — `Bash(git *), Read, Edit`, `Agent, Read, Write, Glob, Grep` — applied to bodies that until this slice could only ever run on pi. Writing them under `targets.pi` would have preserved the wrong vocabulary in a format nothing documents; claude-code keeps them verbatim, where they mean what they say. A criterion amended rather than a format invented.
+- **The four `contract:` blocks travel, and nothing reads them.** They are carried verbatim under `targets.pi` because removing them would be an unforced behaviour change, but the measurement in *3d* stands: nothing gates on these four (no workflow reads `frd`, and none of the four is dispatched). Recorded as an open finding, not fixed here.
+- **Test amendments in both repositories.** `test/agents-kind.test.ts` pinned `checked in-sync 64` and now pins **72** — the slice's own arithmetic, and the count the criteria predicted. In pi-extensions, `skill-contracts-source.test.ts` lost the four names from three lists (declared size 30 → **26**, the not-harvested set 15 → **11**, the side-effect list 8 → **4**), each amended with the reason rather than deleted — the same class of amendment 2b recorded when a test enumerates bundled skill names.
+- **A new test file rather than an extension of an existing one.** `src/core/portable-body.test.ts` is the ADR as an executable ratchet: the residual-token sweep over every bundled body (so a future body cannot ship `${SKILL_DIR}` silently), the install shape for the four, the frontmatter placement rule, and the sibling declaration checked against the filesystem. The sweep matches `${SKILL_DIR}/` and not the bare token, because `code-review`'s body *mentions* `${SKILL_DIR}` to say that no harness expands it — a test that failed on the sentence documenting the rule would be the wrong test.
+
+**Not yet done.** Nothing is committed in either repository. 3d-ii (`discover`, `create-handoff`, `resume-handoff`) stays blocked on the `_shared` question, and `commit` + `revise` stay open — all three as scoped.
+
+**Commit — drafted, never run.** Both add **and** remove files, so `git add -A`, never `git commit -am`. **Run the Windows CI fix first**, on its own (`git add src/bridges/bridges.test.ts`, drafted under *The third instance* above) — otherwise this `git add -A` sweeps that one-line fix into a slice it does not belong to.
+
+```sh
+# skillset
+git add -A && git commit -F - <<'MSG'
+skillset: four standalone FLOW bodies move in, off the flow-args tokens (0023 slice 3d-i)
+
+annotate-guidance, annotate-inline, changelog and frontend-design are invoked by
+hand rather than dispatched by the pi workflow engine, so nothing in /wf needs
+them and they can live where every harness can read them. FLOW's copies are gone:
+one provider per harness, same names, and its pipeline pointer is unchanged.
+
+Each body was normalised off the tokens a workspace extension expands and no
+harness does — $ARGUMENTS, ${SKILL_DIR}, the ```! fences, and shell-timeout,
+which is read by flow-args alone. What stays pi's (disable-model-invocation, the
+contract block) is declared under targets.pi; claude-code keeps the allowed-tools
+values, written in its own vocabulary. allowed-tools is dropped for pi rather
+than inventing a format for a field pi calls experimental and does not document.
+
+Siblings travel: 7 template/example files per annotate skill, one helper for
+changelog. sync wrote 8 installs; 30 installed payload copies verified
+byte-identical to the bundle, 5,810 files hashed across ~/.pi/agent and ~/.claude
+with no owned artifact changed. New test file pins the rule for every future body.
+
+Gates: build, biome 81 files, CI=true 33 files / 344 tests. sync --dry-run: in-sync 72.
+MSG
+
+# pi-extensions
+git add -A && git commit -F - <<'MSG'
+flow: four standalone skills retire to skillset (0023 slice 3d-i)
+
+annotate-guidance, annotate-inline, changelog and frontend-design are owned by
+skillset now, rendered for pi and claude-code from one body. None of them is
+dispatched by a workflow, so the pipeline is unaffected and pipeline-pointer.ts
+is untouched — the names still resolve, from the installed skill.
+
+docs/skills.md says so, and says what breaks without `skillset sync`: their
+/skill:<name> commands are simply absent, and nothing in /wf notices.
+
+skill-contracts-source.test.ts loses the four from its three lists (declared
+30 -> 26, not-harvested 15 -> 11, side-effect 8 -> 4) — a test enumerating
+bundled names, amended rather than relaxed.
+
+pnpm -r run test: 68 files / 1668 tests.
+MSG
+```
+
+### Implemented — 3d-ii, the last three bodies, and the `_shared` question dissolved — 2026-10-08 (Review log)
+
+The developer gave **go** on closing slice 3d: `commit` and `revise` decided (both stay — see *Decided* above), and 3d-ii run.
+
+**The blocker was the wrong blocker, and the reason is in the scripts.** Measured before writing a line:
+
+- `now.mjs` prints `<iso>\t<slug>` — one `date` call twice.
+- `git-context.mjs` prints six labelled git facts — `branch`, `commit`, `repo`, `root`, `in_repo`, `author`.
+- `list-recent.mjs` is `ls -t <dir> | head -n N` plus a git-root resolution.
+
+Both consumers use them **to fill artifact frontmatter** — `create-handoff` and `discover` run them inside a fence and copy the values verbatim. That is precisely the case **2d already solved**: *"frontmatter values derived with plain `git` and `date` commands written in the body — no `${SKILL_DIR}`-relative sibling script, no `_shared` call."* So the choice was never *copy the script or build a shared-asset concept*; it was *carry a script at all, for six shell commands*. Inlined, there is no copy, no duplication, and no new mechanism — and the bodies got **more** portable, because a `date` and a `git rev-parse` work in every harness.
+
+**What landed.** `src/skills/{discover,create-handoff,resume-handoff}/SKILL.md` (new) with `templates/frd.md` beside `discover`; the three `Metadata` fences replaced by six/bash commands; `skillset.config.json` declarations (pi `auto` + claude-code `auto` each, one `siblings` block); README rows; `packages/flow/docs/skills.md` updated; and in `pi-extensions`, 21 deletions plus three amended lists in `skill-contracts-source.test.ts`.
+
+**Criteria — the same ten, applied to three bodies.**
+
+1. Diff against `git show f67d744:…`: **84 / 78 / 56** changed lines, every one a line the normalisation table names (the two Metadata blocks are the bulk).
+2. Residual sweep clean across the three — including `/skill:` and `` `Agent(` ``, which the 3d-i sweep did not check and which these bodies used in help blocks and dispatch shapes.
+3. `disable-model-invocation` and `contract:` under `targets.pi`; `argument-hint` only under `targets.claude-code`; **no `allowed-tools` on either side** — none of the three declared it.
+4. The three are gone from `packages/flow/skills/`, which now holds **23 skills (24 directories with `_shared/`)**.
+5. `discover` carries one sibling (`templates/frd.md`), landing beside `SKILL.md` in both harnesses, byte-identical; the other two carry none, and **no `.mjs` was carried anywhere**.
+6. pi's loader finds all three at `~/.pi/agent/skills/<name>/SKILL.md`, hidden, **0 collisions**, none twice.
+7. `reconciled missing 6 · undeclared 8 · in-sync 72 · 6 written`, then `checked undeclared 8 · in-sync 78`.
+8. Hashing `~/.pi/agent` and `~/.claude` before and after: **8 new files** (3 skills × 2 harnesses + `frd.md` × 2) and **zero files changed in place**.
+9. README and `packages/flow/docs/skills.md` — which now says seven skills are installed rather than bundled, and 23 are shipped.
+10. `npm run build` · `npx biome check .` (81 files) · `CI=true npm test` → **33 files / 344 tests**; pi-extensions `pnpm -r run test` → **68 files / 1668 tests**; no new dependency, no new runtime module, no comment added.
+
+**The three `_shared` scripts stay where they are**, serving the 20/16/3 stayers that still call them. Nothing was duplicated and nothing was moved out of that directory — which is the outcome the blocked framing had assumed was impossible without a new mechanism.
+
+**Finding recorded, not fixed.** The sweep over *bodies* is clean, but a sweep over everything under `src/skills/` flags `code-review/_helpers/review-range.mjs` — its docstring explains how **pi** passes arguments (`$ARGUMENTS`, "ask the user via ask_user_question"), and it is a **payload file carried verbatim** by 2a, not a body. The ratchet in `portable-body.test.ts` reads `SKILL.md` alone and is deliberately scoped that way; editing the helper would break the property that it is FLOW's file unchanged, whose only deviation is the one docstring line 2a normalised. Recorded so the next person reading a full-tree grep does not read two comment lines as two violations.
+
+**Measured against the budget.** There was no separate budget for 3d-ii: it was scoped only as "blocked". Measured from the diff: **612 body lines** (218 changed by the normalisation: 84 + 78 + 56), one sibling (`templates/frd.md`, 78 lines), **config +31** (the three install blocks and one `siblings` entry; 3d-i's was +60), **docs +7/−1** (`packages/flow/docs/skills.md`) plus three README rows, and the test side is the three amended lists in `skill-contracts-source.test.ts` (shared with 3d-i's amendment: 9 added / 30 removed across both) and the extended `MOVED`/`SIBLINGS` tables in `portable-body.test.ts`. No implementation logic, no dependency, no new runtime module.
+
+**Not yet done.** Nothing is committed. `revise`'s stale orchestrator claim is recorded as a finding rather than fixed — it is FLOW's body, and changing it is not this slice's.
+
+**Commit — drafted, never run.** Adds and removes, so `git add -A`.
+
+**Read this before running the drafts above: 3d-i and 3d-ii share a tree, and `git add -A` cannot tell them apart.** `skillset.config.json`, `README.md`, `docs/plans/0023-…md` and `skill-contracts-source.test.ts` each carry both slices, so running 3d-i's message with `git add -A` sweeps 3d-ii's files into it and leaves the second command with nothing to commit. Two honest options:
+
+- **One commit for the slice (recommended, and what the messages below are written for).** 3d was one authorisation — the triage and its moves — and splitting it needs `git add -p` over four shared files for no gain in the history.
+- **Two commits**, if the split matters: `git add -p` for the four shared files, path-scoped adds for everything else (`git add src/skills/annotate-guidance src/skills/annotate-inline src/skills/changelog src/skills/frontend-design` and the pi-extensions deletions for 3d-i; the rest for 3d-ii), using the per-slice drafts above.
+
+Combined, in the order to run them: **the Windows CI fix on its own first** (`git add src/bridges/bridges.test.ts`), then one commit per repository.
+
+```sh
+# skillset — after the CI fix
+git add -A && git commit -F - <<'MSG'
+skillset: the seven portable FLOW bodies move in (0023 slice 3d)
+
+annotate-guidance, annotate-inline, changelog, create-handoff, discover,
+frontend-design and resume-handoff are invoked by hand rather than dispatched by
+the pi workflow engine, so nothing in /wf needs them and they can live where
+every harness can read them. FLOW's copies are gone: one provider per harness,
+same names, its pipeline pointer untouched.
+
+Each body was normalised off the tokens a workspace extension expands and no
+harness does — $ARGUMENTS, ${SKILL_DIR}, the ```! fences, and shell-timeout, which
+is read by flow-args alone — and off the question tool's dialog surface. Where a
+helper did the work of six shell commands (a timestamp, six git facts, ls -t |
+head), the commands are inline now: no copy, no shared-asset mechanism, and the
+bodies are portable to harnesses that have neither extension.
+
+What is pi's (disable-model-invocation, contract) is declared under targets.pi;
+allowed-tools travels only where its values mean what they say, claude-code.
+
+sync wrote 14 installs; 46 files added under ~/.pi/agent and ~/.claude with no
+owned artifact changed. A new test file pins the rule for every future body.
+
+Gates: build, biome 81 files, CI=true 33 files / 344 tests. sync --dry-run: in-sync 78.
+MSG
+
+# pi-extensions
+git add -A && git commit -F - <<'MSG'
+flow: seven standalone skills retire to skillset (0023 slice 3d)
+
+annotate-guidance, annotate-inline, changelog, create-handoff, discover,
+frontend-design and resume-handoff are owned by skillset now, rendered for pi and
+claude-code from one body each. None is dispatched by a workflow, so the pipeline
+is unaffected and pipeline-pointer.ts is untouched — the names still resolve, from
+the installed skill.
+
+docs/skills.md says so, and says what breaks without `skillset sync`: their
+/skill:<name> commands are simply absent, and nothing in /wf notices.
+
+skill-contracts-source.test.ts loses them from its three lists (declared 30 -> 23,
+not-harvested 15 -> 8, side-effect 8 -> 3), amended rather than relaxed.
+
+pnpm -r run test: 68 files / 1668 tests.
+MSG
+```
+
+```sh
+# skillset
+git add -A && git commit -F - <<'MSG'
+skillset: discover and the handoff pair move in, and the _shared blocker dissolves (0023 3d-ii)
+
+The last three portable bodies. They looked blocked because each calls a _shared
+helper the 21 stayers keep, and a copy would have been the drift this programme
+exists to remove. The helpers are now.mjs (a timestamp), git-context.mjs (six git
+facts) and list-recent.mjs (ls -t | head), and both consumers use them to fill
+artifact frontmatter — 2d had already replaced exactly that with plain date and
+git commands for the review. Inlined here too: no copy, no shared-asset concept,
+and the bodies are more portable than before.
+
+sync wrote 6 installs; 8 files added under ~/.pi/agent and ~/.claude and none
+changed in place; pi's loader finds all three hidden with no collisions.
+
+Gates: build, biome 81 files, CI=true 33 files / 344 tests. sync --dry-run: in-sync 78.
+MSG
+
+# pi-extensions
+git add -A && git commit -F - <<'MSG'
+flow: discover and the handoff pair retire to skillset (0023 slice 3d-ii)
+
+23 skills ship here now. None of the three is dispatched by a workflow, so the
+pipeline is unaffected and pipeline-pointer.ts is untouched.
+
+skill-contracts-source.test.ts loses them from its three lists (declared 26 -> 23,
+not-harvested 11 -> 8, side-effect 4 -> 3), amended rather than relaxed.
+
+pnpm -r run test: 68 files / 1668 tests.
+MSG
+```
+
+### Closed — `(e)`, `(g)`, `3e` and `3f` — 2026-10-08
+
+Four items were carried as pending with nothing left to decide. Each is closed here with the evidence and the condition that would reopen it, so none of them reads as open work again.
+
+**`(e)` — `install.ts`'s skill/agent duplication. Not pursued.** It was named as "the lever if 3a's +191 and (d)'s +71 logic overruns are not acceptable". Nobody has said they are unacceptable: both overruns are recorded with their per-file breakdown, and the duplication is the price of two kinds of artifact being covered by the same guarantees. *Reopens when a third artifact kind arrives* — at which point the two branches become three and a per-kind prepare helper pays for itself.
+
+**`(g)` — `CLAUDE_CONFIG_DIR` / `PI_CODING_AGENT_DIR`. Not acted on.** On a machine where either is set, `sync` writes where the harness never looks. **Neither variable is set here**, so the finding cannot be verified on this machine without a temp dir, and acting on it would move the location of 78 recorded installs and needs a migration story. *Reopens when a machine that sets either variable needs skillset* — at which point the fix is per-bridge resolution (`sessionKeyFromEnv`'s shape), never a core one.
+
+**`3e` — workflow declarations. Not moved.** Measured before closing it, because the entry read plausibly:
+
+- `packages/flow/extensions/flow-core/built-in-workflows.ts` is **1,443 lines of TypeScript**, importing 16 symbols from `@joozik/flow-workflow/registration` (`acts`, `gate`, `match`, `produces`, `defineWorkflow`, …) plus ~40 helpers from its own `built-ins/`. Not a declaration file — code calling the engine's DSL.
+- `@joozik/flow-workflow` is a **peerDependency**: the engine is a sibling at runtime, and it is the graph's **only reader**.
+- **17 of its stages dispatch skills**, and by 3d's decision 16 of those stay with that package — so a graph living here would reference names owned next door.
+- **Only pi can execute it.** The other three harnesses have no workflow engine at all, so a rendered copy would be one reader and three files nobody can run.
+
+So the move would not be a move. `sync`'s entire contract is *harness directories* (`~/.pi/agent/**`, `~/.claude/**`, `~/.config/opencode/**`, `~/.skillset/copilot/**`), and a workflow graph lives in none of them: owning it here means a **projection** — source here, rendered back into a node package, kept in sync — which is the mechanism slice 2 deleted for being a second writer. The cost of leaving it is **zero**: one file, one reader, one package, and its name references are already checked (the harvest test is what made 3d-i's and 3d-ii's deletions show up as three failing lists rather than silent breakage). *Reopens when the graph becomes data rather than code calling a DSL, or when a second harness gains a comparable engine* — either would give it more than one consumer and make ownership meaningful.
+
+**`3f` — prompts and commands. Already satisfied; the entry's premise was false.** It read: *"`pi-extensions` ships no `prompts/` directory; this repository's `slash` mode already covers that shape for all four targets, so the remaining gap is only that FLOW's stage skills install as skills rather than prompts."* Measured:
+
+- There **is** a `prompts/` directory — `packages/flow-advisor/prompts/advisor-system.txt`, **8 lines**, declared in that package's `files` and read by the advisor extension at runtime. An extension's own system prompt for a sub-model: installed into no harness directory, addressed to no session. It stays with its extension, the same way `permission-policy-change` stays with `pi-permission-system`.
+- Everything else the workspace matches on "prompt" is `.ts` code — formatters, sanitizers, the subagent prompt builder — runtime, not instruction content.
+- The harness-facing shape the item existed to add — prompt templates and slash commands — **is `slash` mode**, live for all four targets, and it is what 2b and 3d installed wherever a skill needed it.
+
+*Reopens when a prompt asset appears that a harness **loads*** — content addressed to a session rather than to one extension's internal model.
+
 ## Handoff — prompt for the next session
 
 Paste this into a skillset session to continue. It assumes nothing that is not written above.
 
 > Continue the skillset instruction-ownership programme. Read `docs/plans/0023-skillset-owns-instructions.md` in full first — it is the spec. Do not re-derive anything marked verified; it was checked by execution and the transcripts are in the plan. **Start with `git log` and `git status` in both repositories, never with this file's prose** — the prose has claimed "not committed" twice after the fact, and the 3b-ii entry says in as many words that its commit was still unrun when it was written.
 >
-> **State — 2026-10-08, re-verified with `git log` and `git status` rather than with this file's prose.** skillset: slices 1 (`880fdfe`), 2a (`7e65d1a`), 2c (`c8cc22d`), 2b (`7eb7f75` here, `4b66b55` in `pi-extensions`), 2d (`cea2963`), (b) (`90610ef`), 2e (`4852681` + `c174158`), 3a (`c917d4e`), (d) the claude-code agent renderer (`748d318`), the CI fix (`2069691`) and **3b + 3b-ii (`d9f8c7d`, committed but not pushed at the time 3c started — check `git status -sb`)** are committed. **3c is implemented and awaiting sign-off**: the tree is dirty with **27 modified files** (this plan among them — 26 others) and **2 new paths** (`docs/decisions/0008-…md`, `src/skills/context-pointer/`), its commit is drafted in *Implemented — 3c*. `pi-extensions` is clean at `f67d744`, untouched since 3a. Counts on the 3c tree: `npm run build` clean, biome **80 files clean**, `CI=true npm test` **32 files / 340 tests**, `sync --dry-run` → `checked undeclared 8 · in-sync 64`.
+> **State — 2026-10-08, re-verified with `git log` and `git status` rather than with this file's prose.** skillset: slices 1 (`880fdfe`), 2a (`7e65d1a`), 2c (`c8cc22d`), 2b (`7eb7f75` here, `4b66b55` in `pi-extensions`), 2d (`cea2963`), (b) (`90610ef`), 2e (`4852681` + `c174158`), 3a (`c917d4e`), (d) the claude-code agent renderer (`748d318`), the CI fix (`2069691`), 3b + 3b-ii (`d9f8c7d`) and **3c (`5458ebc`, `skillset: a project declares its own installs, and the context file is rendered (0023 slice 3c)`)** are committed and pushed — `git status -sb` reads `## main...origin/main` with no divergence, and the tree is **clean**. `pi-extensions` is clean at `f67d744`, untouched since 3a. Counts on the committed tree: `npm run build` clean, biome **80 files clean**, `CI=true npm test` **32 files / 340 tests**, `sync --dry-run` → `checked undeclared 8 · in-sync 64`. **On the uncommitted working tree (3d-i + 3d-ii + the Windows CI fix): biome 81 files, `CI=true npm test` 33 files / 344 tests, `sync --dry-run` → `in-sync 78`, and pi-extensions `pnpm -r run test` 68 files / 1668 tests.** **What is not readable from this machine: the CI run logs** (`gh` is installed but unauthenticated, no `GH_TOKEN`), so greenness rests on the local equivalent of what CI runs, not on a run log — as it has since slice 1.
 >
 > **One label to know about.** `748d318` reads `(0023 slice 3d)`, but **3d in this plan is the FLOW skill triage** — that commit is item **(d)**, the harness agent renderers, and the two share nothing but a letter. It is pushed, so the label stands unless you amend; the plan carries the correction.
 >
-> **What is built.** `src/agents/<name>.md` installs for pi **and** claude-code — `claude --agent zzz-sentinel -p "hi"` lists all 15 from the loader's own registry. `APPEND_SYSTEM.md` carries **two** marker blocks: `instruction-ownership` (the ownership rule; the one-provider rule; and the branch — in this repository edit the source and run `sync`, in any other project `skillset suggest "…"` and stop) and `standing-rules` (commits carry no trailers; code carries no comments; **a blocked command is a decision point, not a stop** — read the reason the denial printed, take the path that respects it, never re-issue the denied command or the same intent under another spelling, and never stall the task on the blocked step: do the rest, report it, ask). **`skillset suggest "<what should change, and why>"`** appends one JSON line (`at`, `cwd`, `session` when the environment supplies one) to `~/.skillset/suggestions.jsonl`; it works from any project because the global bin is a symlink into this repository's `dist/cli.js`. `retro` carries the suggestion step where it decides a finding's destination. `AGENTS.md` is a 99-estToken pointer; the artifact map lives in `docs/conventions.md` and the rules in the always blocks.
+> **What is built.** `src/agents/<name>.md` installs for pi **and** claude-code — `claude --agent zzz-sentinel -p "hi"` lists all 15 from the loader's own registry. `APPEND_SYSTEM.md` carries **two** marker blocks: `instruction-ownership` (the ownership rule; the one-provider rule; and the branch — in this repository edit the source and run `sync`, in any other project `skillset suggest "…"` and stop) and `standing-rules` (commits carry no trailers; code carries no comments; **a blocked command is a decision point, not a stop** — read the reason the denial printed, take the path that respects it, never re-issue the denied command or the same intent under another spelling, and never stall the task on the blocked step: do the rest, report it, ask). **`skillset suggest "<what should change, and why>"`** appends one JSON line (`at`, `cwd`, `session` when the environment supplies one) to `~/.skillset/suggestions.jsonl`; it works from any project because the global bin is a symlink into this repository's `dist/cli.js`. `retro` carries the suggestion step where it decides a finding's destination. `~/.pi/agent/AGENTS.md` is **rendered** now (pi `context`, global) from `src/skills/context-pointer/` — the same 99-estToken pointer it was by hand, no longer hand-written; the artifact map lives in `docs/conventions.md` and the rules in the anchor blocks.
 >
-> **Go state — nothing is authorised, and each item needs its own go.** **3c is implemented and awaiting sign-off** (see *Implemented — 3c*; its commit is drafted there and not run). What it built: `Mode` gains `context`, the second anchor mode (pi local `<root>/AGENTS.md`, global `~/.pi/agent/AGENTS.md` — **not** `<root>/.pi/AGENTS.md`, measured dead); `<root>/.skillset/config.json` is a second declaration root read additively, **local entries only**, with `projectPath` derived and `siblings`/`requires`/`agents` refused by name; `skillset init project` writes that skeleton once; and `~/.pi/agent/AGENTS.md` is now rendered from `src/skills/context-pointer/`. Two consequences a next session must know: the hand-written text above the new block was **deleted the same session** (`~/.pi/agent/AGENTS.md` is now the rendered block alone, 14 lines, still `in-sync 64`), and claude-code reads that same project `AGENTS.md` only where the project has no `CLAUDE.md` of its own — strings-level evidence, not loader-level. Next, in the plan's order: **3d** the FLOW skill triage — 31 skills, the largest remaining chunk, per-skill judgment about what is portable and a rename for what stays; **3e** workflow declarations (`built-in-workflows.ts` is a declaration over skill names, and opencode and copilot have no comparable engine, so the per-harness story is the hard half); **3f** prompts and commands (largely covered by `slash` mode already). Separately: **(e)** `install.ts`'s skill/agent duplication — the lever if 3a's +191 and (d)'s +71 logic overruns are not acceptable; **(g)** the `CLAUDE_CONFIG_DIR` / `PI_CODING_AGENT_DIR` question — both loaders prefer those variables over `$HOME` and this repository's bridges know neither, so on such a machine `sync` writes where the harness never looks. **Neither variable is set on this machine**, so (g) can only be verified with a temp dir, and moving recorded locations needs a migration story.
+> **Go state — nothing is authorised, and each item needs its own go.** **3c is committed and signed off** (`5458ebc`). **Slice 3d is closed** — the triage of all 30 of FLOW's skills is done, the seven portable ones have moved (3d-i: annotate-guidance, annotate-inline, changelog, frontend-design; 3d-ii: discover, create-handoff, resume-handoff), the twenty-one that the engine dispatches or that publish a gate input stay, and the last two are **decided**, not open (`commit` — three dispatch sites; `revise` — it edits FLOW's plan-artifact schema). Read *3d — scoped and awaiting go*, *Implemented — 3d-i* and *Implemented — 3d-ii* before touching a skill body; the per-skill verdict for all 30 is there, so it does not need re-litigating. **`(e)` and `(g)` are closed as decided-not-to-act**, each with the condition that would reopen it, in *Closed as decided-not-to-act* below — do not carry them as pending work. **Three things are uncommitted and drafted**: the Windows CI fix (one line in `src/bridges/bridges.test.ts`), then **one commit per repository covering slice 3d** — the two 3d slices share a tree, so their files cannot be separated by `git add -A`; the messages and the running order are at the end of *Implemented — 3d-ii* and none of them has been run. The plan's own move to `completed/` is part of that pending rename: `git add -A` picks it up. Everything built and live stands as before: `Mode` gains `context`, the second anchor mode (pi local `<root>/AGENTS.md`, global `~/.pi/agent/AGENTS.md` — **not** `<root>/.pi/AGENTS.md`, measured dead); `<root>/.skillset/config.json` is a second declaration root read additively, **local entries only**, with `projectPath` derived and `siblings`/`requires`/`agents` refused by name; `skillset init project` writes that skeleton once; `~/.pi/agent/AGENTS.md` is the rendered `context-pointer` block alone. Two consequences a next session must know: claude-code reads that same project `AGENTS.md` only where the project has no `CLAUDE.md` of its own — strings-level evidence, not loader-level — and a project must never scaffold `<root>/.pi/APPEND_SYSTEM.md`, which *replaces* the agent-dir one and would silence both global `always` blocks inside that project. **The programme has no unstarted work left.** `3e` and `3f` joined `(e)` and `(g)` in *Closed — `(e)`, `(g)`, `3e` and `3f`*: 3e is the pi engine's own configuration (1,443 lines of TypeScript calling its DSL, one reader, in the package that holds that reader) and 3f's premise was false — the only prompt asset is an extension's own system prompt. **The programme is complete, and this plan moved to `docs/plans/completed/` on 2026-10-08 on the developer's instruction** — with the commits drafted the same session and **not yet run**, which is the one place the record runs ahead of the paperwork. The work itself is described above and measured; the commands are in *The third instance*, *Implemented — 3d-i* and *Implemented — 3d-ii*; the Windows CI run is the last thing left to confirm. This was the first time in this programme the move was due rather than premature.
 >
 > **Recorded findings, not fixed** — do not fold them into another slice silently: the copilot target writes `mode: agent` where VS Code documents `agent:`; the classifier's drifted message says "edited locally" when it was the *source* that moved (seen again during 3b); `requires` in `skillset.config.json` is skill-keyed, so an agent name there is a coverage problem rather than a rule; `expresses` for claude-code agents comes from the field vocabulary, of which only `name`/`description`/`tools` are exercised; `skillset suggest` has no `--list` flag (the file is the interface until the queue argues otherwise); and a suggestion filed from *this* repository is distinguishable from one filed elsewhere only by its `cwd`.
 >
@@ -2255,7 +2742,7 @@ Paste this into a skillset session to continue. It assumes nothing that is not w
 >
 > **No comments. This is a standing instruction, and as of 3b it binds mechanically** — it is rendered from `src/skills/standing-rules/SKILL.md` into `APPEND_SYSTEM.md`, so it is in the block you are already carrying: no explanatory blocks, no "why" essays above functions, no invented section banners. Name things so the code reads.
 >
-> **Rules that are not negotiable.** Gates — skillset: `npm run build` *before* `npm test` (tests spawn `dist/cli.js`), then `npx biome check .`, **and `CI=true npm test`** — that variable is what CI runs in, and a red CI hid behind two slices of green local gates because `picocolors` colours output under `CI` and on `win32`; pi-extensions: `pnpm -r run test` from the workspace root (there is no root `npm test`). Commit messages are drafted, never run, carry no trailers of any kind, and a slice that adds files uses `git add -A`, never `git commit -am`. **Never use `rm -rf`** — the permission policy blocks it and the blocked call takes the rest of the command with it; use a unique `mktemp -d` scratch and a plain `rm <file>`. Never hand-write into `~/.pi/agent/**`, `~/.claude/**`, `~/.config/opencode/**` or an installed copy: change the source, run `skillset sync`, paste its report. **A slice that changes `src/skills/` or `src/agents/` is not finished until `sync` has run** — a commit is not a propagation. Keep the plan's criteria and budget current, and report overruns honestly.
+> **Rules that are not negotiable.** Gates — skillset: `npm run build` *before* `npm test` (tests spawn `dist/cli.js`), then `npx biome check .`, **and `CI=true npm test`** — that variable is what CI runs in, and a red CI hid behind two slices of green local gates because `picocolors` colours output under `CI` and on `win32`; pi-extensions: `pnpm -r run test` from the workspace root (there is no root `npm test`). Commit messages are drafted, never run, carry no trailers of any kind, and a slice that adds files uses `git add -A`, never `git commit -am`. **Never use `rm -rf`** — the permission policy blocks it and the blocked call takes the rest of the command with it; use a unique `mktemp -d` scratch and a plain `rm <file>`, and when a blocked removal is the last step, leave it, report it, and ask rather than stalling the task on it (the standing-rules block now carries this: a blocked command is a decision point, not a stop). Never hand-write into `~/.pi/agent/**`, `~/.claude/**`, `~/.config/opencode/**` or an installed copy: change the source, run `skillset sync`, paste its report. **A slice that changes `src/skills/` or `src/agents/` is not finished until `sync` has run** — a commit is not a propagation. Keep the plan's criteria and budget current, and report overruns honestly.
 >
 > **Verification methods — use them rather than reading.** **The always channel and the context file are observable**: run a **fresh** `pi --print` process from `/tmp` and have it reproduce text that exists only in the installed file. Slices 1 and 3b both used this; it proves a block reaches the system prompt and that a second block did not displace the first, and it is the check for anything rendered into `APPEND_SYSTEM.md` or `AGENTS.md`. **Claude Code's agent loader is the registry probe**: install into `<temp>/.claude/agents/`, then `HOME=<temp> claude --agent zzz-sentinel -p "hi"` — the unknown name makes it print `Available agents: …` (`claude agents --json` is *not* that probe on 2.1.286; there the subcommand means background sessions). **pi's agent parser** is the authority for an agent artifact: from `packages/flow`, jiti-import `pi-subagents/src/config/custom-agents.ts` and call `loadCustomAgents(cwd)` with `PI_CODING_AGENT_DIR` pointed at a directory — run it twice to compare parsed fields. **FLOW's contract harvester** the same way (`buildUserSkillContracts()`). **claude-code's skill loader** via `HOME=<temp> claude --debug-file … -p "…"` and its `Loaded N unique skills (… user: N, …, legacy commands: N)` line; auth failing is irrelevant, no model call means the log is the loader's. **A byte-neutral move is proved by hashing the destination directories before and after** (`find <dir> -type f | sort | xargs shasum` then `diff`), never by a test count — and name any file that changed for a reason outside the change (a live session's own log and transcript did, on 2026-10-08). **An unrecorded artifact at an owned path whose bytes differ from the render is `foreign`** — expect a refusal, not an adoption; reach for `install --force` deliberately. **Verify the installed copy, not the committed one**: grep the changed markers under `~/.pi/agent/` and `~/.claude/` after `sync`. **Claude Code's tool and field names come from the build, not from memory** — `strings` the installed binary for the name before declaring it.
 >
