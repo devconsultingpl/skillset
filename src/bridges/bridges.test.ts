@@ -214,7 +214,7 @@ describe("frontmatter capability matrix", () => {
 
     const artifact = { mode: "context" as const, slug: "sk-probe", name: "probe" };
     expect(piBridge.artifactPath({ ...artifact, scope: "local", projectRoot: "/proj" })).toBe(
-      "/proj/AGENTS.md",
+      join("/proj", "AGENTS.md"),
     );
     expect(piBridge.artifactPath({ ...artifact, scope: "global", projectRoot: "/proj" })).toBe(
       join(homedir(), ".pi", "agent", "AGENTS.md"),
