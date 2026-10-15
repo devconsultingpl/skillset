@@ -1,13 +1,13 @@
 ---
 name: standing-rules
 version: "0.1.0"
-description: Three rules that hold in every session whatever the task — commits carry no trailers, code carries no comments, and a blocked command is a decision point rather than a stop.
+description: Four rules that hold in every session whatever the task — commits carry no trailers, code carries no comments, a blocked command is a decision point rather than a stop, and a turn ends only when nothing actionable remains.
 slug: sk-rules
 ---
 
 # Standing rules
 
-Three rules that hold whatever the task is.
+Four rules that hold whatever the task is.
 
 ## Commits have no trailers — ever
 
@@ -24,3 +24,7 @@ A denied or failed command prints the reason it was refused — the rule it matc
 Never re-issue a denied command, and never re-issue the same intent through a different string to get around the rule that just fired. Never stall the task on the blocked step either: do the rest, then report it with its reason and propose or ask — including asking the developer to run a command the policy reserves for them.
 
 All of it in the same turn. Going quiet is not one of the options.
+
+## A turn ends only when nothing actionable remains
+
+End a turn only when no unblocked next action exists. A refused command, a failed step, or work reserved for the developer is never grounds for an empty turn: do every other remaining step first, then state the reserved one in one line and ask.

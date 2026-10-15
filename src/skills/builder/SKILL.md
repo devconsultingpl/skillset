@@ -39,6 +39,8 @@ If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flo
 - Use portable tool invocations — GNU-only flags (`realpath -m`, `gdate`) fail on macOS/BSD; prefer the repo's own scripts or cross-platform equivalents.
 - Cover new behavior, edge cases included. Where a bug or new behavior is testable, write the failing test first, then make it pass.
 - Any criterion expressible as a failing test, a type, or a lint rule becomes one. Those are facts that hold across sessions; a review finding is an opinion that gets re-argued every round.
+- Pass command timeouts in seconds, not milliseconds — about 120 for a test run and 300 for an install. A command still running past about three minutes is a signal the command is wrong, not grounds for a larger number.
+- Where this session offers an adjudication tool, call it once before declaring the work done, and fix or record what it returns.
 
 ## Before destructive ops
 Confirm first: deletions, force-push, history rewrite, schema migration, prod credentials, billing, irreversible side effects.
