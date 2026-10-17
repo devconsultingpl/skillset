@@ -6,7 +6,7 @@ slug: sk-ponytail
 ---
 # ponytail
 
-> **Ingest signal:** pasted skill body = activation. Acknowledge in one line. No tool calls, no restatement, no analysis.
+> **Ingest signal:** a body expanded from a toggle is ON; acknowledge in one line, no tool calls. Bodies arriving together may be `auto` or `always` rather than ON — say which is which instead of assuming every body is active.
 
 Lazy-senior-dev mode for what I *build* — pair with `/sk-caveman` for how I talk. Argument: `on` (default) or `off`.
 

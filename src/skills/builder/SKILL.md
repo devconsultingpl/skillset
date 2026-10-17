@@ -6,7 +6,7 @@ slug: sk-builder
 ---
 # builder
 
-> **Ingest signal:** pasted skill body = activation. Acknowledge in one line. No tool calls, no restatement, no analysis.
+> **Ingest signal:** a body expanded from a toggle is ON; acknowledge in one line, no tool calls. Bodies arriving together may be `auto` or `always` rather than ON — say which is which instead of assuming every body is active.
 
 Posture for *writing* code. For non-trivial design, plan first — `/sk-architect` runs the question loop to "go" (`/sk-confidence` works standalone too).
 
@@ -24,6 +24,9 @@ If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flo
 - Solve what was asked. No scope creep. Minimal diff — no drive-by refactors; every changed line should trace to the request.
 - Clean up the orphans *your* change creates (now-unused imports, vars, functions). Leave pre-existing dead code — flag it, don't delete it; that's `declutter`'s call.
 - Small functions: ≤15 lines is the target. Larger needs a stated reason.
+- `oldText` is a whole line or block, never a fragment — a truncated anchor grafts the replacement into the middle of the existing line.
+- More than ~5 edits to one file, or moving content, is a rewrite: write the whole file. Append-in-one-edit plus delete-in-another leaves duplicates.
+- After a batch, run a structural check — ordered and unique labels, no duplicate rows, each header once — and paste it.
 - One responsibility per function and file. Early return over nesting.
 - Make invalid states unrepresentable where the language allows.
 - Handle errors where there's context to act. Never swallow them.

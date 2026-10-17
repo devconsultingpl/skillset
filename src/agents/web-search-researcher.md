@@ -4,6 +4,7 @@ description: "Deep web research for topics beyond training data; use for current
 targets:
   pi:
     tools: read, grep, find, ls, ext:flow-web-tools/web_search, ext:flow-web-tools/web_fetch
+    model: deepseek-flash
   claude-code:
     tools: Read, Grep, Glob, WebSearch, WebFetch
 ---

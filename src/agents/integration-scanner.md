@@ -4,6 +4,7 @@ description: "Finds what connects to a component: callers, deps, registrations, 
 targets:
   pi:
     tools: grep, find, ls
+    model: deepseek-flash
   claude-code:
     tools: Grep, Glob
 ---

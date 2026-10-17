@@ -4,6 +4,7 @@ description: "Finds relevant docs in .flow/artifacts/; research-side of codebase
 targets:
   pi:
     tools: grep, find, ls
+    model: deepseek-flash
   claude-code:
     tools: Grep, Glob
 ---

@@ -13,3 +13,5 @@ Report which **slash-mode** skills are currently active (toggled on) in this ses
 - On any other agent, run `skillset status` (or read `~/.skillset/active/<session>.json` and list its `active` array). If the file is missing or the set is empty, say no slash skills are active.
 
 Only slash-mode skills are tracked — auto- and always-mode skills never appear here. A skill stays active until `/<skill> off` or the session ends.
+
+A body being visible is not proof of ON: `auto` skills are listed as available and `always` skills are injected into every session, and neither appears in this list. Say which state applies instead of reporting every body you can see as active.

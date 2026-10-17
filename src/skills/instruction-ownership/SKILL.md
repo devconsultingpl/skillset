@@ -28,10 +28,8 @@ skillset suggest "<what should change, and why>"
 
 It appends one line to a single queue, carrying the project you ran it from. A session working in the skillset repository reads that queue, decides what is real, applies it and takes the line out — that is the only channel a project agent has into owned content.
 
-## One provider per name
-
-Never two providers of one name in one harness — not "never a colliding name". A capability useful in any harness belongs to skillset and is served from there; one that depends on a single harness's own surface stays with that harness's package. When both exist for one capability they keep the same name and the harness picks the provider, so every harness installs exactly one. Where a skill needs harness-specific rendering that no renderer provides, say so — never skip it silently.
-
 ## Why this is a rule
 
-The pi auto-skill directory drifted from `src/skills/` twice before this rule existed, because the installed copies could not be recorded (ADR 0005) and nothing detected the divergence. A second copy of a rule means the two copies disagree eventually, and the copy nobody edits wins by accident.
+The pi auto-skill directory drifted from `src/skills/` twice before this rule existed, because the installed copies could not be recorded (ADR 0005); a second copy of a rule means the two disagree eventually, and the copy nobody edits wins by accident.
+
+Where a *new* capability lives follows one further rule — **One provider per name**, in this repository's `docs/conventions.md`. Read it before choosing a home for something that does not exist yet.

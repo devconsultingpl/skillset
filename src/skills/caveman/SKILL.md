@@ -6,7 +6,7 @@ slug: sk-caveman
 ---
 # caveman
 
-> **Ingest signal:** pasted skill body = activation. Acknowledge in one line. No tool calls, no restatement, no analysis.
+> **Ingest signal:** a body expanded from a toggle is ON; acknowledge in one line, no tool calls. Bodies arriving together may be `auto` or `always` rather than ON — say which is which instead of assuming every body is active.
 
 Compress my communication to telegraphic style for fast iteration loops — governs how I talk, not what I build (pair with `/sk-ponytail` for minimal code). Argument: `on` (default) or `off`.
 

@@ -4,6 +4,7 @@ description: "Finds similar implementations and usage patterns to model after."
 targets:
   pi:
     tools: grep, find, read, ls
+    model: deepseek-flash
   claude-code:
     tools: Read, Grep, Glob
 ---

@@ -24,6 +24,16 @@ Every bundled skill's `slug:` **must** start with `sk-`. The slug becomes the sl
 
 When creating a new skill, set the slug explicitly in frontmatter even if it equals `sk-<name>` — making the convention visible at the top of every SKILL.md.
 
+## One provider per name
+
+Never two providers of one name in one harness — not "never a colliding name". A capability useful in any harness belongs to skillset and is served from there; one that depends on a single harness's own surface stays with that harness's package. When both exist for one capability they keep the same name and the harness picks the provider, so every harness installs exactly one. Where a skill needs harness-specific rendering that no renderer provides, say so — never skip it silently.
+
+This section used to live in the `instruction-ownership` always-channel body. It is authoring guidance no task session needs, so it pays per-repository tokens here instead of per-session tokens in `APPEND_SYSTEM.md`.
+
+## Agent model pins
+
+A bundled agent may pin a model **tier** (`deepseek-flash`, `haiku`, `sonnet`) and never a full id, declared per target — an alias is only meaningful against the catalogue that harness resolves against. Pin only retrieval agents; anything that synthesizes or reviews inherits the session model so the orchestrator can escalate it per call (ADR 0010).
+
 ## Rules every session loads
 
 A rule that must bind *before* an agent acts — rather than when it chooses to read something — belongs in the `always` channel: `src/skills/<name>/`, declared `"mode": "always"`, rendered as its own marker block in `APPEND_SYSTEM.md`. This file carries how *this repository* is built; the always channel carries what any session obeys. Everything there is paid on every request, so it holds rules, never explanations.

@@ -1,13 +1,13 @@
 ---
 name: standing-rules
 version: "0.1.0"
-description: Four rules that hold in every session whatever the task — commits carry no trailers, code carries no comments, a blocked command is a decision point rather than a stop, and a turn ends only when nothing actionable remains.
+description: Five rules that hold in every session whatever the task — commits carry no trailers, code carries no comments, secret values never enter the context, a blocked command is a decision point rather than a stop, and a turn ends only when nothing actionable remains.
 slug: sk-rules
 ---
 
 # Standing rules
 
-Four rules that hold whatever the task is.
+Five rules that hold whatever the task is.
 
 ## Commits have no trailers — ever
 
@@ -16,6 +16,12 @@ No `Co-Authored-By`, no `Generated-With`, no tool attribution of any kind, in an
 ## Code carries no comments
 
 Code explains itself; if you need a comment you already wrote the wrong code. No explanatory blocks, no "why" essays above functions, no invented section banners. Name things so the code reads. Test names, diagnostics and messages a user reads are not comments — they are output, and they stay.
+
+A repository's comment-heavy style is not a licence. The stricter rule wins; a project whose own bar differs states it in its conventions doc, and a repo's habit is not that statement.
+
+## Secret values never enter the context
+
+A secret is read only when the task needs it, and the value stays out of the transcript. Fetch it into a `0600` temp file **without reading it**, reference it as `$(cat /tmp/…)` inside the command that needs it, and delete the file afterwards. Never `cat`, `echo`, `grep` or paste the value — and never accept a recipe shaped `VAR=$(… secretsmanager …) cmd`, which puts the value inline one echo away from a permanent leak. Name the variable, not its contents.
 
 ## A blocked command is a decision point, not a stop
 

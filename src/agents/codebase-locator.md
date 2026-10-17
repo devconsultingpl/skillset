@@ -4,6 +4,7 @@ description: "Locates files, dirs, components for a task; super grep/find/ls."
 targets:
   pi:
     tools: grep, find, ls
+    model: deepseek-flash
   claude-code:
     tools: Grep, Glob
 ---
