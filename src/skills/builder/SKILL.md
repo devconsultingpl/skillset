@@ -22,7 +22,9 @@ If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flo
 ## While building
 - Boring, obvious solution. New abstraction needs a concrete second caller.
 - Solve what was asked. No scope creep. Minimal diff — no drive-by refactors; every changed line should trace to the request.
-- Clean up the orphans *your* change creates (now-unused imports, vars, functions). Leave pre-existing dead code — flag it, don't delete it; that's `declutter`'s call.
+- Delete, don't note. Orphans *your* change creates go with it, and so does any code you can prove is dead: every caller grepped, dynamic references checked (reflection, dispatch tables, registry or DI keys, string lookups, `eval`), config and fixtures, public exports outside the module. Where a name can be reached without being written — macros, generated code, symbol lookup — the proof is the language's own cross-reference pass (a Lisp `xref`/`macroexpand`, a compiler's unused-symbol warning); with no such tool the candidate is reported, not deleted. Unprovable means not dead.
+- A simplification is yours to take when it changes no public interface, adds no module boundary, moves nothing across packages and changes no behaviour — and removes lines. Past that list it is architecture: one line to the developer, never an inline refactor.
+- Say what you removed and what you left: `simplified: path:line — what, −N lines` and `opportunity: path:line — what, why now, rough size`. Three items at most, one line each; nothing found prints nothing.
 - Small functions: ≤15 lines is the target. Larger needs a stated reason.
 - `oldText` is a whole line or block, never a fragment — a truncated anchor grafts the replacement into the middle of the existing line.
 - More than ~5 edits to one file, or moving content, is a rewrite: write the whole file. Append-in-one-edit plus delete-in-another leaves duplicates.

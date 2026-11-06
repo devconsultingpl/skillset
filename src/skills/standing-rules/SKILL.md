@@ -1,13 +1,13 @@
 ---
 name: standing-rules
 version: "0.1.0"
-description: Six rules that hold in every session whatever the task — commits carry no trailers, code carries no comments, secret values never enter the context, a blocked command is a decision point rather than a stop, delete only what you created, and a turn ends only when nothing actionable remains.
+description: Seven rules that hold in every session whatever the task — commits carry no trailers, code carries no comments, secret values never enter the context, a blocked command is a decision point rather than a stop, delete only what you created, leave it smaller, and a turn ends only when nothing actionable remains.
 slug: sk-rules
 ---
 
 # Standing rules
 
-Six rules that hold whatever the task is.
+Seven rules that hold whatever the task is.
 
 ## Commits have no trailers — ever
 
@@ -38,6 +38,10 @@ All of it in the same turn. Going quiet is not one of the options.
 Remove by exact path, and only paths this session created. Never a glob — `rm -f <dir>/*` takes a file you did not create with it, and an untracked one is gone for good — and never `-rf`.
 
 Scratch files go in the repository's gitignored scratch directory (`tmp/`, `.pi/tmp/`); the one path kept outside it is the `0600` secret file, whose own rule keeps it out of the repo.
+
+## Leave it smaller
+
+Read for deletion while you read for the task. Code your change makes unreachable goes with it, and so does code you can prove is dead: callers, dynamic references, config and exports, and the language's own cross-reference pass wherever a name can be reached without being written. Unprovable means not dead — report it, do not delete it. A simplification that changes no public interface and removes lines is worth taking. An architectural opportunity is one line to the developer, never a rewrite; three such lines is the cap, and finding none prints nothing.
 
 ## A turn ends only when nothing actionable remains
 

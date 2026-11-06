@@ -198,7 +198,19 @@
     "builder": [
       {
         "agent": "claude-code",
+        "mode": "auto"
+      },
+      {
+        "agent": "claude-code",
         "mode": "slash"
+      },
+      {
+        "agent": "opencode",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
       },
       {
         "agent": "pi",

@@ -24,6 +24,14 @@ in one harness, while a Claude Code or opencode session in any project inherited
 Declare `always` for every harness whose bridge can carry it, and state the guarantee per harness in
 the plan and here, rather than withholding a rule from a harness that can only express it weakly.
 
+**The channel holds obligations, never explanations.** A body here is paid on every request in every
+harness that carries it, so it states what must be done and how it is proved — not why, not history, not
+worked examples. An explanation that a session needs only when it acts belongs in a slashed skill that
+loads at that moment: `standing-rules` says *delete what is provably dead*, `builder` says what counts
+as proof. That split is why the seventh rule costs ~100 words rather than a section.
+
+Plan: 0026, 0027.
+
 The strongest available mechanism per harness wins even where it is not equal: pi's system-prompt
 marker, then opencode's `AGENTS.md`, then Copilot's linkable instructions file, then Claude Code's
 session-start hook. Where a harness's `always` costs the user a manual step (Copilot's link), say so

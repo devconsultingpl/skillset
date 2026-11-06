@@ -21,6 +21,8 @@ If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flo
 - Bloat and maintainability first. Preserve behavior — never change what the code *does*. Note any correctness smell you trip over; don't go bug-hunting (not this skill's job).
 - "Simpler" may mean *adding* one abstraction to absorb existing duplication — but only when ≥2 real callers already exist. Never abstract speculatively (the rule `builder` follows).
 - Judge against `docs/conventions.md` if present.
+- Removal needs proof it is dead: every caller, dynamic references (reflection, dispatch tables, registry or DI keys, string lookups, `eval`), config and fixtures, exports outside the module — and where a name can be reached without being written (macros, generated code, symbol lookup), the language's own cross-reference pass. No proof, no removal: the finding stays a report.
+- The narrowed run is the post-change sweep — `/sk-declutter <area>` over what a session just touched; the whole-codebase survey is for a quiet tree.
 
 ## Out of scope
 Performance tuning, renaming for clarity, and cross-cutting architectural rewrites (those go to `architect`). This is removal of accreted bloat, not redesign.
@@ -28,6 +30,6 @@ Performance tuning, renaming for clarity, and cross-cutting architectural rewrit
 ## Operate: report first, then apply
 1. **Survey, then report.** Rank findings biggest-maintenance-win first; each: `file:line`, what it is, the payoff (lines/maintenance saved), the risk of changing it, suggested action. Group by category second.
 2. **Wait for approval.** The user picks which items to act on — apply nothing unasked. A whole codebase is too big to edit blind.
-3. **Apply** the approved items, then run tests / type-check / lint. Not done until green.
+3. **Apply** the approved items, then run tests / type-check / lint. Not done until green. A removal without its proof is not applied.
 
 May point ("that belongs in a fresh-diff review — `/sk-code-review`") but never invoke another skill.
