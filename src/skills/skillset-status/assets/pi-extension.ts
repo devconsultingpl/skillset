@@ -25,7 +25,7 @@ const TOGGLE = /^\/([a-z][a-z0-9-]*)\s*(on|off)?\s*$/i;
  * each body and sends it once — but only when at least one injected skill
  * carried it (posture skills), so task-skill sets stay lean. */
 const INGEST_LINE =
-  "> **Ingest signal:** a body expanded from a toggle is ON; acknowledge in one line, no tool calls. Bodies arriving together may be `auto` or `always` rather than ON — say which is which instead of assuming every body is active.";
+  "> **Ingest signal:** a body expanded from a toggle is ON; acknowledge in one line, no tool calls. A body that arrives untoggled is `auto` or `always` — never report it as active, and never inspect config to find out which.";
 
 /** Drop the ingest line (any wording under the same marker) from a body and
  * report whether one was found. */

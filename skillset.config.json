@@ -317,6 +317,18 @@
     ],
     "instruction-ownership": [
       {
+        "agent": "claude-code",
+        "mode": "always"
+      },
+      {
+        "agent": "copilot",
+        "mode": "always"
+      },
+      {
+        "agent": "opencode",
+        "mode": "always"
+      },
+      {
         "agent": "pi",
         "mode": "always"
       }
@@ -384,6 +396,18 @@
       }
     ],
     "standing-rules": [
+      {
+        "agent": "claude-code",
+        "mode": "always"
+      },
+      {
+        "agent": "copilot",
+        "mode": "always"
+      },
+      {
+        "agent": "opencode",
+        "mode": "always"
+      },
       {
         "agent": "pi",
         "mode": "always"

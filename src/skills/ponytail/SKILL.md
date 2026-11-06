@@ -6,7 +6,7 @@ slug: sk-ponytail
 ---
 # ponytail
 
-> **Ingest signal:** a body expanded from a toggle is ON; acknowledge in one line, no tool calls. Bodies arriving together may be `auto` or `always` rather than ON — say which is which instead of assuming every body is active.
+> **Ingest signal:** a body expanded from a toggle is ON; acknowledge in one line, no tool calls. A body that arrives untoggled is `auto` or `always` — never report it as active, and never inspect config to find out which.
 
 Lazy-senior-dev mode for what I *build* — pair with `/sk-caveman` for how I talk. Argument: `on` (default) or `off`.
 

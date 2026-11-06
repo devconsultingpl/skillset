@@ -11,7 +11,7 @@ Skills, prompts, agent definitions and the guidance that shapes work are owned b
 
 ## Never
 
-- Edit an installed copy — `~/.pi/agent/{skills,prompts,agents,APPEND_SYSTEM.md}`, `~/.claude/**`, `~/.config/opencode/**`, or the project-local equivalent. It will be overwritten by the next sync.
+- Edit an installed copy — `~/.pi/agent/{skills,prompts,agents,APPEND_SYSTEM.md}`, `~/.claude/**`, `~/.config/opencode/**`, `~/.skillset/copilot/**`, `.github/copilot-instructions.md`, or the project-local equivalent. It will be overwritten by the next sync.
 - Hand-write anything into an installed path ad hoc. The list above is where the artifacts are, not the limit of the rule.
 - Edit a settings file by hand. Those belong to the user.
 - "Fix drift" by editing the installed file. Drift is repaired from source, and the repair reports the prior content.
