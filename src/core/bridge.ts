@@ -43,6 +43,17 @@ export interface InstalledPreview {
   current: string | null;
   /** Comparable bytes an update would write. */
   next: string;
+  /** Files this install writes *beside* the primary artifact, which the record
+   * lists in `assets`. Unrecorded or absent assets are the caller's business: it
+   * owns the comparison rule, the bridge only says where they go and what they
+   * would hold. */
+  assets?: readonly PreviewAsset[];
+}
+
+/** One extra file an install writes, and the bytes it would put there. */
+export interface PreviewAsset {
+  path: string;
+  next: string;
 }
 
 /** Which artifact a path is being resolved for: the file form that names a

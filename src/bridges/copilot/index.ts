@@ -1,7 +1,7 @@
 import { readFile, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
-import type { Bridge, InstallContext } from "../../core/bridge.js";
+import type { Bridge, InstallContext, PreviewAsset } from "../../core/bridge.js";
 import { assetPath } from "../../core/bundle.js";
 import { compose } from "../../core/frontmatter.js";
 import { readMaybe, writeAtomic } from "../../core/fs.js";
@@ -19,6 +19,21 @@ function targetOverrides(skill: InstallContext["skill"]): Record<string, unknown
 // prompt files this target normally writes. The CLI hook + statusLine only ship
 // on a global install, where writing under `~/.copilot/` isn't a surprise.
 const copilotHome = () => join(homedir(), ".copilot");
+
+/** The status-reader hook a global `skillset-status` slash install writes beside
+ * its prompt (decision 9). Where it goes and what it holds is stated once, so
+ * `install` writes exactly what `preview` compares. */
+async function statusReaderAssets(ctx: InstallContext): Promise<PreviewAsset[]> {
+  if (ctx.mode !== "slash" || ctx.scope !== "global" || !ctx.skill.frontmatter.statusReader) {
+    return [];
+  }
+  return [
+    {
+      path: join(copilotHome(), "hooks", "skillset.json"),
+      next: await readFile(assetPath("skillset-status", "copilot-hook.json"), "utf8"),
+    },
+  ];
+}
 
 async function readJsonSettings(path: string): Promise<Record<string, unknown>> {
   const raw = await readMaybe(path);
@@ -82,14 +97,11 @@ export const copilotBridge: Bridge = {
       await writeAtomic(path, renderPromptFile(ctx));
       files.push(relative(installRoot, path));
       // The status-reader skill wires the Copilot CLI surface (global only).
+      for (const asset of await statusReaderAssets(ctx)) {
+        await writeAtomic(asset.path, asset.next);
+        assets.push(asset.path);
+      }
       if (scope === "global" && skill.frontmatter.statusReader) {
-        const hookDest = join(copilotHome(), "hooks", "skillset.json");
-        await writeAtomic(
-          hookDest,
-          await readFile(assetPath("skillset-status", "copilot-hook.json"), "utf8"),
-        );
-        assets.push(hookDest);
-
         const settingsDest = join(copilotHome(), "settings.json");
         const { settings, installed } = addStatusLine(await readJsonSettings(settingsDest));
         if (installed) {
@@ -170,7 +182,7 @@ export const copilotBridge: Bridge = {
     const next = renderPromptFile(ctx);
     const filePath = record.files[0] ? join(record.location, record.files[0]) : null;
     const current = filePath ? await readMaybe(filePath) : null;
-    return { current, next };
+    return { current, next, assets: await statusReaderAssets(ctx) };
   },
 
   artifactPath,

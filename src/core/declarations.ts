@@ -19,7 +19,7 @@
  */
 import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, join, posix } from "node:path";
-import type { Bridge, BridgeLookup } from "./bridge.js";
+import type { Bridge, BridgeLookup, PreviewAsset } from "./bridge.js";
 import {
   listBundledAgents,
   listBundledSkills,
@@ -74,6 +74,22 @@ export interface ClassifiedInstall {
    * has a skill directory to hold them. `status` above is the worst of these
    * and the primary artifact's. */
   siblings?: SiblingState[];
+  /** Per-file state of the extra files this install writes beside the primary
+   * artifact — the record's `assets` (an extension, a plugin, a hook). Rolled
+   * into `status` the same way siblings are. */
+  assets?: AssetState[];
+}
+
+/** One extra file an install writes beside its primary artifact, classified the
+ * same way a sibling file is: recorded and matching is `in-sync`, recorded and
+ * diverging is ours to repair, unrecorded is not. */
+export interface AssetState {
+  path: string;
+  status: InstallStatus;
+  /** Present when something is on disk: what an install would replace. */
+  currentBytes?: string;
+  /** Present for `drifted` and `foreign`: what an install would write instead. */
+  nextBytes?: string;
 }
 
 /** One declared sibling file, classified the same way a skill artifact is. */
@@ -812,6 +828,50 @@ function worstStatus(statuses: readonly InstallStatus[]): InstallStatus {
   );
 }
 
+/**
+ * Classify the files an install writes beside its primary artifact — the ones
+ * only a target knows to name, and only at preview time (an extension, a plugin,
+ * a hook). Without this, an asset whose source changed is invisible: the primary
+ * artifact still matches, the install reports `in-sync`, and sync skips the write
+ * that would refresh it.
+ *
+ * Same rule as a sibling, per file: recorded and matching is `in-sync`, recorded
+ * and diverging is ours to repair (`drifted`), unrecorded and diverging is not
+ * (`foreign`), unrecorded and matching would only need recording (`adoptable`),
+ * and a file an install would write but cannot find is `missing`.
+ */
+export async function classifyAssets(
+  assets: readonly PreviewAsset[] | undefined,
+  record: InstallRecord,
+): Promise<AssetState[]> {
+  const recorded = new Set(record.assets ?? []);
+  const states: AssetState[] = [];
+  for (const asset of assets ?? []) {
+    const path = asset.path;
+    const current = await readMaybe(path);
+    const ours = recorded.has(path);
+    if (current === null) {
+      states.push({ path, status: "missing" });
+      continue;
+    }
+    if (current === asset.next) {
+      states.push({
+        path,
+        status: ours ? "in-sync" : "adoptable",
+        currentBytes: current,
+      });
+      continue;
+    }
+    states.push({
+      path,
+      status: ours ? "drifted" : "foreign",
+      currentBytes: current,
+      nextBytes: asset.next,
+    });
+  }
+  return states;
+}
+
 /** Classify one declaration against state and disk. */
 export async function classifyInstall(
   declaration: InstallDeclaration,
@@ -923,16 +983,25 @@ async function classifyPrimary(
 ): Promise<ClassifiedInstall> {
   const { agent, scope, mode } = declaration;
   if (record) {
-    const { current, next } = await bridge.preview(
+    const preview = await bridge.preview(
       { skill, scope, mode, projectRoot: declaration.projectPath ?? process.cwd() },
       record,
     );
-    if (current === null) {
-      return { declaration, status: "missing", path, record };
-    }
-    return current === next
-      ? { declaration, status: "in-sync", path, record }
-      : { declaration, status: "drifted", path, record, currentBytes: current, nextBytes: next };
+    const assets = await classifyAssets(preview.assets, record);
+    const primary: InstallStatus =
+      preview.current === null
+        ? "missing"
+        : preview.current === preview.next
+          ? "in-sync"
+          : "drifted";
+    return {
+      declaration,
+      status: worstStatus([primary, ...assets.map((state) => state.status)]),
+      path,
+      record,
+      ...(primary === "drifted" ? { currentBytes: preview.current, nextBytes: preview.next } : {}),
+      ...(assets.length > 0 ? { assets } : {}),
+    };
   }
 
   if (isAnchorMode(declaration.mode)) {

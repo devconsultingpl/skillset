@@ -1,7 +1,7 @@
 import { readFile, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
-import type { Bridge, InstallContext } from "../../core/bridge.js";
+import type { Bridge, InstallContext, PreviewAsset } from "../../core/bridge.js";
 import { assetPath } from "../../core/bundle.js";
 import { compose } from "../../core/frontmatter.js";
 import { copySiblings, readMaybe, writeAtomic } from "../../core/fs.js";
@@ -25,6 +25,19 @@ function pluginPath(scope: Scope, projectRoot: string): string {
 function renderSkillFile(ctx: InstallContext): string {
   const { name, description } = ctx.skill.frontmatter;
   return compose({ name, description, ...targetOverrides(ctx.skill) }, ctx.skill.body);
+}
+
+/** The status-reader plugin a `skillset-status` slash install writes beside its
+ * command (decision 8). Where it goes and what it holds is stated once, so
+ * `install` writes exactly what `preview` compares. */
+async function statusReaderAssets(ctx: InstallContext): Promise<PreviewAsset[]> {
+  if (ctx.mode !== "slash" || !ctx.skill.frontmatter.statusReader) return [];
+  return [
+    {
+      path: pluginPath(ctx.scope, ctx.projectRoot),
+      next: await readFile(assetPath("skillset-status", "opencode-plugin.js"), "utf8"),
+    },
+  ];
 }
 
 /** Only the status-reader command gets a shell trailer (a project-scoped read).
@@ -86,13 +99,9 @@ export const opencodeBridge: Bridge = {
       await writeAtomic(path, renderCommandFile(ctx));
       files.push(relative(installRoot, path));
       // The status-reader skill ships the tracking plugin (decision 8).
-      if (skill.frontmatter.statusReader) {
-        const dest = pluginPath(scope, projectRoot);
-        await writeAtomic(
-          dest,
-          await readFile(assetPath("skillset-status", "opencode-plugin.js"), "utf8"),
-        );
-        assets.push(dest);
+      for (const asset of await statusReaderAssets(ctx)) {
+        await writeAtomic(asset.path, asset.next);
+        assets.push(asset.path);
       }
     } else {
       // always: marker-wrapped block in AGENTS.md.
@@ -153,7 +162,7 @@ export const opencodeBridge: Bridge = {
     const next = ctx.mode === "slash" ? renderCommandFile(ctx) : renderSkillFile(ctx);
     const filePath = record.files[0] ? join(record.location, record.files[0]) : null;
     const current = filePath ? await readMaybe(filePath) : null;
-    return { current, next };
+    return { current, next, assets: await statusReaderAssets(ctx) };
   },
 
   artifactPath,

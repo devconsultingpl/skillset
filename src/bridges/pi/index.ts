@@ -1,6 +1,11 @@
 import { readFile, rm } from "node:fs/promises";
 import { basename, dirname, join, relative } from "node:path";
-import type { AgentInstallContext, Bridge, InstallContext } from "../../core/bridge.js";
+import type {
+  AgentInstallContext,
+  Bridge,
+  InstallContext,
+  PreviewAsset,
+} from "../../core/bridge.js";
 import { assetPath } from "../../core/bundle.js";
 import { compose } from "../../core/frontmatter.js";
 import { copySiblings, readMaybe, writeAtomic } from "../../core/fs.js";
@@ -36,6 +41,19 @@ function renderAgentFile(ctx: AgentInstallContext): string {
   const { name, description } = ctx.agent.frontmatter;
   const overrides = ctx.agent.frontmatter.targets?.pi ?? {};
   return compose({ name, description, ...overrides }, ctx.agent.body);
+}
+
+/** The status-reader extension a `skillset-status` slash install writes beside
+ * its prompt (decision 8). Where it goes and what it holds is stated once, so
+ * `install` writes exactly what `preview` compares. */
+async function statusReaderAssets(ctx: InstallContext): Promise<PreviewAsset[]> {
+  if (ctx.mode !== "slash" || !ctx.skill.frontmatter.statusReader) return [];
+  return [
+    {
+      path: extensionPath(ctx.scope, ctx.projectRoot),
+      next: await readFile(assetPath("skillset-status", "pi-extension.ts"), "utf8"),
+    },
+  ];
 }
 
 export const piBridge: Bridge = {
@@ -101,13 +119,9 @@ export const piBridge: Bridge = {
       await writeAtomic(path, renderPromptFile(ctx));
       files.push(relative(installRoot, path));
       // The status-reader skill ships the tracking + footer extension (decision 8).
-      if (skill.frontmatter.statusReader) {
-        const dest = extensionPath(scope, projectRoot);
-        await writeAtomic(
-          dest,
-          await readFile(assetPath("skillset-status", "pi-extension.ts"), "utf8"),
-        );
-        assets.push(dest);
+      for (const asset of await statusReaderAssets(ctx)) {
+        await writeAtomic(asset.path, asset.next);
+        assets.push(asset.path);
       }
     } else {
       // always / context: marker-wrapped block in a file the user also owns.
@@ -168,7 +182,7 @@ export const piBridge: Bridge = {
     const next = ctx.mode === "slash" ? renderPromptFile(ctx) : renderSkillFile(ctx);
     const filePath = record.files[0] ? join(record.location, record.files[0]) : null;
     const current = filePath ? await readMaybe(filePath) : null;
-    return { current, next };
+    return { current, next, assets: await statusReaderAssets(ctx) };
   },
 
   // The contract's path surface. Resolution only, from this bridge's own layout:

@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BRIDGE_NAMES, requireBridge } from "../bridges/index.js";
+import { piBridge } from "../bridges/pi/index.js";
+import { loadBundledSkill } from "./bundle.js";
 import {
+  classifyAssets,
+  classifyInstall,
   classifySiblings,
   configPlaceholdersIn,
   declarationCoverage,
@@ -13,7 +17,8 @@ import {
   parseProjectDeclarations,
 } from "./declarations.js";
 import { parseSkill } from "./parse.js";
-import type { SiblingFile } from "./types.js";
+import { applyConfigToSkill } from "./template.js";
+import type { InstallRecord, SiblingFile, SkillsetState } from "./types.js";
 
 /** A skill carrying whatever harness frontmatter a case needs. */
 function skillWith(frontmatter: string) {
@@ -431,6 +436,139 @@ describe("classifySiblings", () => {
     const [state] = await classify([rel]);
     expect(state?.status).toBe("missing");
     expect(state?.currentBytes).toBeUndefined();
+  });
+});
+
+describe("classifyAssets", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "skillset-asset-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  const dest = () => join(dir, "extensions", "skillset.ts");
+  const record = (assets?: string[]): InstallRecord => ({
+    skill: "skillset-status",
+    slug: "sk-status",
+    version: "1.0.0",
+    agent: "pi",
+    scope: "global",
+    mode: "slash",
+    location: join(dir, "prompts"),
+    files: ["sk-status.md"],
+    ...(assets ? { assets } : {}),
+    installedAt: "",
+  });
+  const classify = (assets: string[] | undefined, recorded?: string[]) =>
+    classifyAssets(
+      assets ? [{ path: assets[0] ?? dest(), next: "ours\n" }] : undefined,
+      record(recorded),
+    );
+
+  it("labels a recorded asset that still matches in-sync, and says nothing about it", async () => {
+    await mkdir(join(dir, "extensions"), { recursive: true });
+    await writeFile(dest(), "ours\n", "utf8");
+    const [state] = await classify([dest()], [dest()]);
+    expect(state?.status).toBe("in-sync");
+  });
+
+  it("labels a recorded asset the source outran drifted, carrying both sides", async () => {
+    await mkdir(join(dir, "extensions"), { recursive: true });
+    await writeFile(dest(), "stale\n", "utf8");
+    const [state] = await classify([dest()], [dest()]);
+    expect(state?.status).toBe("drifted");
+    expect(state?.currentBytes).toBe("stale\n");
+    expect(state?.nextBytes).toBe("ours\n");
+  });
+
+  it("labels an asset an install would write but cannot find missing", async () => {
+    const [state] = await classify([dest()], [dest()]);
+    expect(state?.status).toBe("missing");
+  });
+
+  it("labels an unrecorded different asset foreign — never silently replaced", async () => {
+    await mkdir(join(dir, "extensions"), { recursive: true });
+    await writeFile(dest(), "someone else's extension\n", "utf8");
+    const [state] = await classify([dest()]);
+    expect(state?.status).toBe("foreign");
+  });
+
+  it("labels an unrecorded byte-identical asset adoptable", async () => {
+    await mkdir(join(dir, "extensions"), { recursive: true });
+    await writeFile(dest(), "ours\n", "utf8");
+    const [state] = await classify([dest()]);
+    expect(state?.status).toBe("adoptable");
+  });
+
+  it("has nothing to say about a target that writes no assets", async () => {
+    expect(await classifyAssets(undefined, record())).toEqual([]);
+  });
+});
+
+/**
+ * The bug this guards: an asset beside an unchanged primary artifact used to be
+ * invisible, because `preview` compared one file. The install reported `in-sync`
+ * and sync skipped the write that would have refreshed the asset from source.
+ */
+describe("classifyInstall — assets beside the primary artifact", () => {
+  let projectRoot: string;
+  const declaration = () =>
+    ({
+      skill: "skillset-status",
+      agent: "pi",
+      mode: "slash",
+      scope: "local",
+      projectPath: projectRoot,
+    }) as const;
+
+  beforeEach(async () => {
+    projectRoot = await mkdtemp(join(tmpdir(), "skillset-asset-install-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectRoot, { recursive: true, force: true });
+  });
+
+  const install = async () => {
+    const skill = applyConfigToSkill(await loadBundledSkill("skillset-status"));
+    return piBridge.install({ skill, scope: "local", mode: "slash", projectRoot });
+  };
+  const stateWith = (record: InstallRecord): SkillsetState => ({ version: 1, installs: [record] });
+
+  it("installs the extension beside the prompt, and records it", async () => {
+    const record = await install();
+    const [asset] = record.assets ?? [];
+    expect(asset).toBe(join(projectRoot, ".pi", "extensions", "skillset.ts"));
+    const item = await classifyInstall(declaration(), stateWith(record), piBridge);
+    expect(item.status).toBe("in-sync");
+    expect(item.assets?.map((a) => a.status)).toEqual(["in-sync"]);
+  });
+
+  it("reports drifted when only the extension moved, naming the asset", async () => {
+    const record = await install();
+    const path = join(projectRoot, ".pi", "extensions", "skillset.ts");
+    await writeFile(path, "// an older wording\n", "utf8");
+    const item = await classifyInstall(declaration(), stateWith(record), piBridge);
+    expect(item.status).toBe("drifted");
+    expect(item.currentBytes).toBeUndefined();
+    expect(item.assets).toHaveLength(1);
+    expect(item.assets?.[0]?.path).toBe(path);
+    expect(item.assets?.[0]?.status).toBe("drifted");
+    expect(item.assets?.[0]?.currentBytes).toBe("// an older wording\n");
+    expect(item.assets?.[0]?.nextBytes).toContain("INGEST_LINE");
+  });
+
+  it("repairs the extension by reinstalling, and goes back to in-sync", async () => {
+    const record = await install();
+    const path = join(projectRoot, ".pi", "extensions", "skillset.ts");
+    await writeFile(path, "// an older wording\n", "utf8");
+    const repaired = await install();
+    const item = await classifyInstall(declaration(), stateWith(repaired), piBridge);
+    expect(item.status).toBe("in-sync");
   });
 });
 

@@ -200,6 +200,22 @@ export async function sync(opts: SyncOptions = {}): Promise<number> {
       }
     }
 
+    // Assets are reported the same way: the install line's rolled-up status
+    // says *that* something drifted, not which file.
+    for (const asset of item.assets ?? []) {
+      if (asset.status === "in-sync") continue;
+      console.log(
+        `      ${pc.dim("asset")}:`,
+        STATUS_LABEL[asset.status](asset.status),
+        pc.dim(displayPath(asset.path)),
+        pc.dim(opts.dryRun ? inDryRun[asset.status] : ACTION[asset.status]),
+      );
+      if (asset.currentBytes != null && asset.nextBytes !== undefined) {
+        const report = reportPriorContent(asset.currentBytes, asset.nextBytes);
+        if (report) console.log(report);
+      }
+    }
+
     if (item.status === "foreign") {
       foreign += 1;
       // Report what is being protected: the prior content is the only record of it.
