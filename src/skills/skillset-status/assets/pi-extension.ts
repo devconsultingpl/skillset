@@ -7,11 +7,11 @@
 // ritual: activates the named skills (tracked on) and injects their bodies as a
 // single user message, because pi expands only the *first* `/command` per submit.
 //
-// Re-checked against pi 0.84.2: `pi.sendUserMessage(..., { expandPromptTemplates: true })`
-// still expands only the leading command (`_expandSkillCommand` handles a single
-// `/skill:`; `expandPromptTemplate` matches one leading `/template`). Splitting into
-// N single-command messages would cost N model turns, and each expanded template
-// re-introduces its own ingest line — so emit-and-inject in one message stays.
+// Re-checked against pi 1.5.2: bodies go out as one plain user message, so no
+// `/skill:` expansion applies; one message per skill would cost N model turns and
+// re-introduce the ingest line N times. `deliverAs` is named because pi runs
+// extension commands immediately even while the agent streams, and `prompt()`
+// throws when a streaming session gets no delivery mode.
 // Accepts skill names (`ponytail`) or `/sk-*` slugs (`sk-ponytail`); bodies come
 // from `skillset emit`, so installed-but-unbundled skills are reported as missing.
 //
@@ -106,7 +106,7 @@ export default function (pi: ExtensionAPI) {
       }
       if (bodies.length > 0) {
         const parts = ingest ? [INGEST_LINE, ...bodies] : bodies;
-        await pi.sendUserMessage(parts.join("\n\n"));
+        await pi.sendUserMessage(parts.join("\n\n"), { deliverAs: "steer" });
       }
       if (missing.length > 0) {
         await ctx.ui.notify(`not installed: ${missing.join(", ")}`, "info");
