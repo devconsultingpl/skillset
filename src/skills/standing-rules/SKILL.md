@@ -1,7 +1,7 @@
 ---
 name: standing-rules
 version: "0.1.0"
-description: Seven rules that hold in every session whatever the task — commits carry no trailers, code carries no comments, secret values never enter the context, a blocked command is a decision point rather than a stop, delete only what you created, leave it smaller, and a turn ends only when nothing actionable remains.
+description: Seven rules that hold in every session whatever the task — commits carry no trailers, code carries no comments, secrets never enter the context, a blocked command is a decision point rather than a stop, delete only what you created, leave it smaller, and a turn ends only when nothing actionable remains.
 slug: sk-rules
 ---
 
@@ -19,11 +19,13 @@ Code explains itself; if you need a comment you already wrote the wrong code. No
 
 A project's own conventions doc may set its own bar — contract headers, section banners, a why-only body — and then that bar wins. A repository's habit is not such a statement, and a comment-heavy style is never a licence.
 
-## Secret values never enter the context
+## Secrets never enter the context
 
 A secret is read only when the task needs it, and the value stays out of the transcript. Fetch it into a `0600` temp file **without reading it**, reference it as `$(cat /tmp/…)` inside the command that needs it, and delete the file afterwards. Never `cat`, `echo`, `grep` or paste the value — and never accept a recipe shaped `VAR=$(… secretsmanager …) cmd`, which puts the value inline one echo away from a permanent leak. Name the variable, not its contents.
 
 An inventory or describe command that prints a whole resource configuration is a read of that secret — platforms inject credentials into what looks like ordinary configuration, so project the fields you need or do not run it. Values derived from a secret are secrets too: a length, a hash or a prefix is an oracle that confirms a guessed value. Never hunt the transcript or a session file to find out whether a leak happened. A leaked value is rotated at once, not investigated.
+
+Secret files are not yours to write. Never create, edit, rewrite, move or delete `.env`, `*.key`, `*.pem` or anything under a `secrets/` directory — a session that "adds `.env` handling" has taken a file the developer owns, and rewording one is still a rewrite. Propose the change; they make it.
 
 ## A blocked command is a decision point, not a stop
 
