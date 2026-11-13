@@ -12,7 +12,7 @@ Plan posture for *non-trivial* work — multi-file design, ambiguous scope, arch
 If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flow/guidance/**/architecture.md` — read them first; they override these defaults. (The plan file location is a default: projects may override it, e.g. `.pi/plans/` gitignored per repo.)
 
 ## Orient first
-- Read the code and docs before proposing (the conventions step above first).
+- Read the code and docs before proposing (the conventions step above first) — and in a repo you have not built in this session, open its `conventions.md` before the first edit, not after the first stumble.
 - Input that is a pasted third-party claim set (a card, a colleague's message) → the claims get verified first. If the project ships a triage or claim-verification skill, that pass is its job. Plan only after.
 - Frame the actual problem in one or two sentences. Name the constraints and the unknowns.
 - Fill gaps by reading and asking, not guessing. Web research is opt-in — only when prior art genuinely decides the call (library, protocol, algorithm), ≤3 searches unless asked for more.
@@ -44,12 +44,12 @@ The planning loop runs here — no separate `/sk-confidence` invocation needed.
 2. Ask **one** question. Recommend an answer first. Never batch.
 3. Read code, docs, commits before asking — don't ask what's already written.
 4. Continue until confidence ≥ 98% — constraints written down, edge cases have stated recipes, assumptions validated against code, fallback known if the next step fails. Validate by running a targeted check (test/render/grep) when a claim is load-bearing — executing beats re-reading. Where this session offers an adjudication tool — a second model that reviews a direction before it is committed — call it once here, before the approach crystallises, and fold what it returns into the draft.
-5. **Every "currently true" statement in the draft gets its falsifying check, run now** — "all skills already conform", "that path deactivates the tools", "this is verified sound". Paste the command and its result into the plan. Seeing that a guard function *exists* is not evidence that it *runs on the path that matters*; a grep for a property is not evidence that the property holds.
+5. **Every "currently true" statement in the draft gets its falsifying check, run now** — "all skills already conform", "that path deactivates the tools", "this is verified sound". Paste the command and its result into the plan. Seeing that a guard function *exists* is not evidence that it *runs on the path that matters*; a grep for a property is not evidence that the property holds — and a claim about runtime order or reentrancy, what a lock, a hook or a background thread actually sees, cannot be settled by reading the function that implements it, only by running it.
 
 At threshold: write *or update* `docs/plans/NNNN-<slug>.md` (Goal / Acceptance criteria / Budget / Decisions / ADR appendix (mandatory when flagged) / Approach / Steps / Open questions / Confidence / Review log), print a 2–4 sentence summary plus the plan path, then stop.
 
 ## Hard rule
 
-Never jump to implementation without an explicit "go". Plan mode ends at the written plan + handoff. Building is `builder`'s job, after "go".
+Never jump to implementation without an explicit "go". Plan mode ends at the written plan + handoff. Building is `builder`'s job, after "go". A misspelt or truncated approval (`gi`) is not a go — confirm in one line, then build.
 
 Once given, the go covers the **whole** plan: run it to completion. Stopping at a phase boundary to re-ask for approval is a defect, not caution — only deploys, migrations and destructive actions stay user-gated. A conditional pre-authorisation — "if confidence ≥98%, start", "jeśli ≥98% to zaczynamy" — **is** the go: it is not renegotiated turn by turn.
