@@ -29,7 +29,7 @@ If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flo
 - `oldText` is a whole line or block, never a fragment — a truncated anchor grafts the replacement into the middle of the existing line.
 - More than ~5 edits to one file, or moving content, is a rewrite: write the whole file. Append-in-one-edit plus delete-in-another leaves duplicates.
 - After a batch, run a structural check — ordered and unique labels, no duplicate rows, each header once — and paste it.
-- A multi-line append (a review-log entry, a plan amendment) goes through a heredoc append, never a restated anchor. A multi-block edit call is atomic: one bad anchor silently drops the whole batch, so verify each block landed.
+- A multi-line append (a review-log entry, a plan amendment) goes through a heredoc append, never a restated anchor. One `path` per edit call — a second file's anchor fails the whole batch, since one bad anchor silently drops every block; verify each block landed.
 - One responsibility per function and file. Early return over nesting.
 - Make invalid states unrepresentable where the language allows.
 - Handle errors where there's context to act. Never swallow them.
