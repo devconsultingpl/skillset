@@ -1,13 +1,17 @@
 ---
 name: standing-rules
 version: "0.1.0"
-description: Seven rules that hold in every session whatever the task — commits carry no trailers, code carries no comments, secrets never enter the context, a blocked command is a decision point rather than a stop, delete only what you created, leave it smaller, and a turn ends only when nothing actionable remains.
+description: Eight rules that hold in every session whatever the task — project conventions outrank every skillset posture, commits carry no trailers, code carries no comments, secrets never enter the context, a blocked command is a decision point rather than a stop, delete only what you created, leave it smaller, and a turn ends only when nothing actionable remains.
 slug: sk-rules
 ---
 
 # Standing rules
 
-Seven rules that hold whatever the task is.
+Eight rules that hold whatever the task is.
+
+## Project conventions first
+
+Project conventions outrank every skillset posture: read `docs/conventions.md`, `docs/goals.md` or `.flow/guidance/**/architecture.md` first; they win.
 
 ## Commits have no trailers — ever
 
@@ -16,8 +20,6 @@ No `Co-Authored-By`, no `Generated-With`, no tool attribution of any kind, in an
 ## Code carries no comments
 
 Code explains itself; if you need a comment you already wrote the wrong code. No explanatory blocks, no "why" essays above functions, no invented section banners. Name things so the code reads. Test names, diagnostics and messages a user reads are not comments — they are output, and they stay.
-
-A project's own conventions doc may set its own bar — contract headers, section banners, a why-only body — and then that bar wins. A repository's habit is not such a statement, and a comment-heavy style is never a licence.
 
 ## Secrets never enter the context
 
@@ -33,8 +35,6 @@ A denied or failed command prints the reason it was refused — the rule it matc
 
 Never re-issue a denied command, and never re-issue the same intent through a different string to get around the rule that just fired. Never stall the task on the blocked step either: do the rest, then report it with its reason and propose or ask — including asking the developer to run a command the policy reserves for them.
 
-All of it in the same turn. Going quiet is not one of the options.
-
 ## Delete only what you created
 
 Remove by exact path, and only paths this session created. Never a glob — `rm -f <dir>/*` takes a file you did not create with it, and an untracked one is gone for good — and never `-rf`.
@@ -43,7 +43,7 @@ Scratch files go in the repository's gitignored scratch directory (`tmp/`, `.pi/
 
 ## Leave it smaller
 
-Read for deletion while you read for the task. Code your change makes unreachable goes with it, and so does code you can prove is dead: callers, dynamic references, config and exports, and the language's own cross-reference pass wherever a name can be reached without being written. Unprovable means not dead — report it, do not delete it. A simplification that changes no public interface and removes lines is worth taking. An architectural opportunity is one line to the developer, never a rewrite; three such lines is the cap, and finding none prints nothing.
+Read for deletion while you read for the task. Code your change makes unreachable goes with it, and so does code you can prove is dead: callers, dynamic references, config, exports, and the language's cross-reference pass wherever a name can be reached without being written. Unprovable means not dead — report it. A simplification that removes lines and changes no public interface is worth taking. An architectural opportunity is one line to the developer; three is the cap, and finding none prints nothing.
 
 ## A turn ends only when nothing actionable remains
 

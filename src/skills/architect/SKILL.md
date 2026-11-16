@@ -1,7 +1,7 @@
 ---
 name: architect
 version: "0.1.0"
-description: "Plan posture for non-trivial work — multi-file design, ambiguous scope, architectural impact, or should-we-do-X. Reads project conventions first, orients on code/docs, writes docs/plans/NNNN-slug.md (or the project's plan location) with mandatory acceptance criteria + budget, runs a confidence loop to ≥98%, and never jumps to implementation without an explicit go. Skip trivial edits (rename, typo, single-file localized fix): say nothing and let building proceed."
+description: "Plan posture for non-trivial work — multi-file design, ambiguous scope, architectural impact, or should-we-do-X. Writes docs/plans/NNNN-slug.md with mandatory acceptance criteria + budget, runs a confidence loop to ≥98%, never implements without an explicit go. Skip trivial edits (rename, typo, single-file localized fix)."
 slug: sk-architect
 ---
 # architect

@@ -65,7 +65,6 @@ Installed content is an output. Never hand-edit `~/.pi/agent/**`, `~/.claude/**`
 `skillset suggest "<what should change, and why>"`, which appends one line to the single queue at
 `~/.skillset/suggestions.jsonl` (beside `state.json`, never one queue per project), read and cleared
 by a session working here. See ADR 0006 and the `instruction-ownership` skill.
-the `instruction-ownership` skill.
 
 ## Where each artifact lands
 
