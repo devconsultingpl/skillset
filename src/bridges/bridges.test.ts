@@ -242,7 +242,7 @@ describe("frontmatter capability matrix", () => {
     const { declarations } = await loadDeclarations();
     const agentDeclarations = declarations.filter((d) => d.kind === "agent");
     const agentNames = [...new Set(agentDeclarations.map((d) => d.skill))];
-    expect(agentNames.length).toBe(15);
+    expect(agentNames.length).toBe(19);
     for (const declaration of agentDeclarations) {
       expect(AGENT_BRIDGE_NAMES, `${declaration.skill} on ${declaration.agent}`).toContain(
         declaration.agent,

@@ -71,7 +71,7 @@ describe("claude-code bridge — the agent half", () => {
 
   it("writes the whole roster with claude-code's own tool names, and no pi name", async () => {
     const names = await listBundledAgents();
-    expect(names).toHaveLength(15);
+    expect(names).toHaveLength(19);
 
     for (const name of names) {
       const record = await claudeCodeBridge.agents!.install({

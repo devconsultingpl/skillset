@@ -57,7 +57,7 @@ describe("agent parsing", () => {
 
   it("every bundled agent parses, and none declares a version", async () => {
     const names = await listBundledAgents();
-    expect(names.length).toBe(15);
+    expect(names.length).toBe(19);
     for (const name of names) {
       const agent = await loadBundledAgent(name);
       expect(agent.frontmatter.name).toBe(name);

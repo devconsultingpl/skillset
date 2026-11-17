@@ -73,6 +73,14 @@
         "agent": "claude-code"
       }
     ],
+    "doc-updater": [
+      {
+        "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
+      }
+    ],
     "integration-scanner": [
       {
         "agent": "pi"
@@ -106,6 +114,30 @@
       }
     ],
     "slice-verifier": [
+      {
+        "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
+      }
+    ],
+    "task-builder": [
+      {
+        "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
+      }
+    ],
+    "task-planner": [
+      {
+        "agent": "pi"
+      },
+      {
+        "agent": "claude-code"
+      }
+    ],
+    "task-reviewer": [
       {
         "agent": "pi"
       },
@@ -147,6 +179,9 @@
   },
   "requires": {
     "code-review": {
+      "pi": ["contract"]
+    },
+    "supervise": {
       "pi": ["contract"]
     }
   },
@@ -423,6 +458,20 @@
       {
         "agent": "pi",
         "mode": "always"
+      }
+    ],
+    "supervise": [
+      {
+        "agent": "claude-code",
+        "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
+        "mode": "slash"
       }
     ]
   }
