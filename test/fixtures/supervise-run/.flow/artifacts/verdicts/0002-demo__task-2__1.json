@@ -1,0 +1,7 @@
+{
+  "task": "task-2",
+  "status": "in-review",
+  "blockers_count": 2,
+  "feedback": "src/cli.ts:41 \u2014 usage line goes to stdout, criterion 2 requires a non-zero exit\nsrc/cli.ts:12 \u2014 greet imported but the empty-name branch never reaches it",
+  "rounds": 1
+}

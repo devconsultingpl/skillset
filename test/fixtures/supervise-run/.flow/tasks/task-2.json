@@ -1,0 +1,12 @@
+{
+  "id": "task-2",
+  "title": "Wire greet into the CLI",
+  "write_set": ["src/cli.ts"],
+  "criteria": [
+    "the CLI prints greet's result for --name <value>",
+    "an empty --name exits non-zero with a usage line"
+  ],
+  "deps": ["task-1"],
+  "state": "blocked",
+  "rounds": 2
+}

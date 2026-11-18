@@ -1,0 +1,9 @@
+{
+  "id": "task-1",
+  "title": "Add the greet helper and its test",
+  "write_set": ["src/greet.ts", "src/greet.test.ts"],
+  "criteria": ["greet(name) returns \"hello, <name>\"", "the test asserts the empty-name case"],
+  "deps": [],
+  "state": "done",
+  "rounds": 1
+}

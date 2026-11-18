@@ -1,0 +1,7 @@
+{
+  "task": "task-2",
+  "status": "in-review",
+  "blockers_count": 1,
+  "feedback": "src/cli.ts:41 \u2014 still prints to stdout; the exit code is set after the write",
+  "rounds": 2
+}

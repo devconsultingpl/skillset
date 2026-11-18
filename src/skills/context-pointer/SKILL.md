@@ -2,7 +2,7 @@
 name: context-pointer
 version: 1.0.0
 slug: sk-context-pointer
-description: The pointer block skillset renders into pi's context file (`AGENTS.md`) at global scope — where installed artifacts come from, and the two facts no doc carries.
+description: The pointer block skillset renders into pi's context file (`AGENTS.md`) at global scope — where installed artifacts come from, the two facts no doc carries, and the index line for the deliberate commands.
 ---
 
 # Global agent notes (all projects)
@@ -17,3 +17,6 @@ repository's `docs/conventions.md`; the rules every session obeys are in its
   (`src/skills/skillset-status/assets/pi-extension.ts`).
 - `flow` ships its own skills from its package (`packages/flow/skills/`, declared
   as `pi.skills`) — never copied into `~/.pi/agent/skills`.
+- A whole-plan run is deliberate, not inferred: `/sk-supervise <plan path>`
+  decomposes it, builds and reviews each task, and leaves one terminal artifact.
+  Hidden by design — it costs nothing until invoked.

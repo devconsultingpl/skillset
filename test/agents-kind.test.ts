@@ -47,8 +47,8 @@ describe("agents as an artifact kind", () => {
     expect(first.stdout).not.toMatch(/foreign/);
 
     const agentRecords = (await installs()).filter((i) => i.kind === "agent");
-    expect(agentRecords.filter((i) => i.agent === "pi")).toHaveLength(15);
-    expect(agentRecords.filter((i) => i.agent === "claude-code")).toHaveLength(15);
+    expect(agentRecords.filter((i) => i.agent === "pi")).toHaveLength(19);
+    expect(agentRecords.filter((i) => i.agent === "claude-code")).toHaveLength(19);
 
     const second = run(["sync"], sb.projectRoot, sb.env);
     expect(second.status).toBe(0);
