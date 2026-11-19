@@ -3,6 +3,22 @@ name: appsec-review
 version: "0.1.0"
 description: Deep, read-only security audit of the changes on this branch (local vs origin's default branch), or a path you name. Conservative — flags a vulnerability only with a concrete exploit path, ranked Critical/High/Medium/Low/Info with an OWASP/CWE category. Auto-activates on "security review / check this for vulnerabilities". Reports; never edits.
 slug: sk-appsec-review
+targets:
+  pi:
+    disable-model-invocation: true
+    contract:
+      produces:
+        kind: produces
+        meta:
+          artifactKind: review
+        data:
+          type: object
+          required: [blockers_count]
+          properties:
+            status:
+              enum: [in-progress, in-review, ready]
+            blockers_count:
+              minimum: 0
 ---
 # appsec-review
 

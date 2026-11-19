@@ -3,10 +3,29 @@ name: declutter
 version: "0.1.0"
 description: Whole-codebase anti-bloat survey — hunts pre-existing dead code, duplication, and collapsible/premature abstractions, ranks the biggest maintenance wins, and applies the fixes you approve. Slash-only (/sk-declutter or /sk-declutter <area>). Run on a quiet tree, not a fresh diff (that's code-review).
 slug: sk-declutter
+targets:
+  pi:
+    disable-model-invocation: true
+    contract:
+      produces:
+        kind: produces
+        meta:
+          artifactKind: review
+        data:
+          type: object
+          required: [blockers_count]
+          properties:
+            status:
+              enum: [in-progress, in-review, ready]
+            blockers_count:
+              minimum: 0
+              maximum: 0
 ---
 # declutter
 
 Whole-codebase anti-bloat survey: where has the project accreted dead code, duplication, and abstractions that cost more to maintain than they earn? Run `/sk-declutter`, or `/sk-declutter <area>` to scope to a module. "Simpler" means *less to maintain* — not stripping every abstraction. Run this on a quiet tree; policing a fresh diff is `code-review`'s job.
+
+**Advisory by construction.** This body is whole-codebase, not a diff lens; when a caller dispatches it over a change it reports findings a human reads and its `blockers_count` stays `0`. Bloat never fails a run — `declutter` has no diff scope to judge, and a change whose only findings are efficiency findings still ships.
 
 ## Project conventions
 If the project carries them — `docs/goals.md`, `docs/conventions.md`, or `.flow/guidance/**/architecture.md` — read them first; they override these defaults.

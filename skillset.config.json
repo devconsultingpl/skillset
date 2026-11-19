@@ -213,6 +213,10 @@
       },
       {
         "agent": "pi",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
         "mode": "slash"
       }
     ],
@@ -329,6 +333,10 @@
     "convention": [
       {
         "agent": "pi",
+        "mode": "auto"
+      },
+      {
+        "agent": "pi",
         "mode": "slash"
       }
     ],
@@ -336,6 +344,10 @@
       {
         "agent": "claude-code",
         "mode": "slash"
+      },
+      {
+        "agent": "pi",
+        "mode": "auto"
       },
       {
         "agent": "pi",

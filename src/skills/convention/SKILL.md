@@ -3,6 +3,22 @@ name: convention
 version: "0.1.0"
 description: Project goals, conventions, and decisions live under docs/. Read docs/goals.md and docs/conventions.md at session start. Reference docs/architecture.md, docs/glossary.md, docs/plans/, and docs/decisions/ on demand.
 slug: sk-convention
+targets:
+  pi:
+    disable-model-invocation: true
+    contract:
+      produces:
+        kind: produces
+        meta:
+          artifactKind: review
+        data:
+          type: object
+          required: [blockers_count]
+          properties:
+            status:
+              enum: [in-progress, in-review, ready]
+            blockers_count:
+              minimum: 0
 ---
 # convention
 
