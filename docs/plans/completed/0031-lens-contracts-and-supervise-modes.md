@@ -139,3 +139,24 @@ not as the suggested finalize-from-a-folded-path. Hand the counterparty: `superv
 One residual carried, not closed: flow reads contracts through `loadSkills`, so a machine
 that has not run `skillset sync` since this change sees no lens contract and derives no
 bucket. The fail mode is a missing bucket, not a wrong run.
+
+## Post-sign-off addition — the rendered-output assertion (third queued suggestion)
+
+Queued after sign-off, and correct: nothing in this suite would have noticed a **renderer**
+regression. `requires.<lens>.pi: ["contract"]` is undeclarable (D5), and the declaration test
+reads source frontmatter, so a bridge that stopped writing `contract` into the pi skill file
+would have shipped green.
+
+`src/bridges/pi/lens-contracts.test.ts` now renders each lens through `piBridge.install` into a
+scratch root and asserts the bytes on disk: `produces.meta.artifactKind === "review"`, the same
+`required` list and key names as `code-review`, the same `status` enum, and
+`blockers_count.maximum === 0` for `declutter` only. No install into a home directory, no
+`requires`, no mode — the renderer is the surface.
+
+**Falsified, so it is a guard and not decoration.** Dropping `contract` from `renderSkillFile`'s
+spread turns all three tests red (`code-review renders a contract into its pi skill file:
+expected undefined to be defined`); restoring it turns them green. Removing `contract` from pi's
+`expresses` list changes nothing — measured, because that list drives capability warnings, not
+rendering, which is why the first falsification attempt was the wrong knob.
+
+Suite: 35 files, 365 tests. Queue line removed.
