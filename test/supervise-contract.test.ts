@@ -142,6 +142,55 @@ describe("the supervise artifact contract", () => {
   });
 });
 
+describe("the review lenses the body dispatches", () => {
+  const declaredProperties = (skill: Awaited<ReturnType<typeof loadBundledSkill>>) =>
+    (
+      skill.frontmatter as unknown as {
+        targets?: {
+          pi?: {
+            contract?: { produces?: { data?: { required?: string[]; properties?: object } } };
+          };
+        };
+      }
+    ).targets?.pi?.contract?.produces?.data;
+
+  it("every lens named in the body's step 4 declares code-review's contract keys", async () => {
+    const body = await readFile(
+      join(import.meta.dirname, "..", "src", "skills", "supervise", "SKILL.md"),
+      "utf8",
+    );
+    const step4 = body.split("**4. Run-scope review")[1]?.split("**5. Report")[0] ?? "";
+    const named = [...step4.matchAll(/`(code-review|appsec-review|declutter|convention)`/g)].map(
+      (m) => m[1],
+    );
+    expect([...new Set(named)].sort()).toEqual([
+      "appsec-review",
+      "code-review",
+      "convention",
+      "declutter",
+    ]);
+
+    const reference = declaredProperties(await loadBundledSkill("code-review"));
+    expect(Object.keys(reference?.properties ?? {}).sort()).toEqual(["blockers_count", "status"]);
+
+    for (const lens of new Set(named)) {
+      const data = declaredProperties(await loadBundledSkill(lens));
+      expect(data, `${lens} declares a review contract`).toBeDefined();
+      expect(Object.keys(data?.properties ?? {}).sort(), lens).toEqual(
+        Object.keys(reference?.properties ?? {}).sort(),
+      );
+      expect(data?.required, lens).toEqual(reference?.required);
+    }
+  });
+
+  it("caps declutter's blockers at zero, so bloat can never fail a run", async () => {
+    const data = declaredProperties(await loadBundledSkill("declutter")) as {
+      properties: { blockers_count: { maximum?: number } };
+    };
+    expect(data.properties.blockers_count.maximum).toBe(0);
+  });
+});
+
 describe("the supervise dispatch prompt", () => {
   it("passes paths through four slots and no fifth", async () => {
     const body = await readFile(
