@@ -1,0 +1,6 @@
+{
+  "run_id": "2026-11-20_11-29-20-e175",
+  "workflow": "deliver",
+  "image": "60600cf0a8b3d50f",
+  "final_corrections": { "rounds": 1, "accepted_round": 1 }
+}

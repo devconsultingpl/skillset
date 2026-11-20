@@ -1,0 +1,9 @@
+{
+  "id": "task-2",
+  "title": "Wire probe into the entry",
+  "write_set": ["src/index.js"],
+  "criteria": ["the entry re-exports probe"],
+  "deps": ["task-1"],
+  "state": "done",
+  "rounds": 1
+}

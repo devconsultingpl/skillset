@@ -197,9 +197,9 @@ describe("the supervise dispatch prompt", () => {
       join(import.meta.dirname, "..", "src", "skills", "supervise", "SKILL.md"),
       "utf8",
     );
-    const block = body.match(/```text\n([\s\S]*?)```/);
-    expect(block, "the body carries one fenced dispatch prompt").not.toBeNull();
-    const slots = [...(block?.[1] ?? "").matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]).sort();
+    const block = body.match(/```text\n([\s\S]*?)```/g)?.find((b) => b.includes("dispatch-prompt"));
+    expect(block, "the body carries a fenced dispatch prompt").toBeDefined();
+    const slots = [...(block ?? "").matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]).sort();
     expect(slots).toEqual(["artifacts", "criteria", "task", "write_set"]);
   });
 });
@@ -207,12 +207,12 @@ describe("the supervise dispatch prompt", () => {
 describe("the supervise word budgets", () => {
   const words = (text: string): number => text.split(/\s+/).filter(Boolean).length;
 
-  it("keeps the body under 900 words, every agent under 300, every agent description under 15", async () => {
+  it("keeps the body under 1050 words, every agent under 300, every agent description under 15", async () => {
     const body = await readFile(
       join(import.meta.dirname, "..", "src", "skills", "supervise", "SKILL.md"),
       "utf8",
     );
-    expect(words(body.replace(/^---[\s\S]*?\n---\n/, ""))).toBeLessThanOrEqual(900);
+    expect(words(body.replace(/^---[\s\S]*?\n---\n/, ""))).toBeLessThanOrEqual(1050);
     for (const name of ["task-planner", "task-builder", "task-reviewer", "doc-updater"]) {
       const agent = await loadBundledAgent(name);
       const raw = await readFile(

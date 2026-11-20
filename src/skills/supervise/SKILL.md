@@ -39,9 +39,26 @@ No acceptance criteria → stop after one line saying so: a loop without a spec 
 
 - **Default** — the whole loop, ending in the one terminal artifact.
 - `--no-review` — stop after the document pass: no lens panel, no artifact. The caller reviews and reports; its report is not yours.
-- `--finalize` — no tasks, no lenses: fold `.flow/tasks/*.json` and the lens verdicts in `--lenses <dir>` (default `.flow/artifacts/verdicts/`) and write the artifact. A directory, never a verdict: a handed conclusion is not a fold, and an artifact its author could not compute is a claim nobody checked.
+- `--finalize --provenance <file>` — no tasks, no lenses: fold `.flow/tasks/*.json` and the lens verdicts in `--lenses <dir>` (default `.flow/artifacts/verdicts/`), render the provenance block, and write the artifact. A directory, never a verdict: a handed conclusion is not a fold, and an artifact its author could not compute is a claim nobody checked.
 
 Fold rule, both modes: `BLOCKED.md` iff a task is `blocked` or a lens verdict has `blockers_count > 0`.
+
+## Provenance
+
+`--finalize` renders what the caller observed — it ran neither the lenses nor the repair hops, so it derives nothing:
+
+```text
+Run: <run_id> · workflow: <workflow> · image: <image>
+Final corrections: <rounds> round, accepted at round <accepted_round>
+```
+
+The file is JSON: `run_id`, `workflow`, `image`, `final_corrections{rounds, accepted_round}`. Rules:
+
+- **Verbatim.** Every value prints as it arrived, `rounds` above 2 included — a count over the cap is the caller's bug, and the artifact exists to show it.
+- **`unknown` for anything absent** — no file, unreadable, malformed JSON, missing key, missing `final_corrections`. Every line prints; a missing line is invisible.
+- `accepted_round` of `null` prints `none`; absent prints `unknown`. Pluralise (`1 round`, `2 rounds`).
+- Provenance never fails the run and never touches the fold: `READY` / `BLOCKED` stays decided once.
+- Place it immediately after the H1 and its one-line plan title, before the first table.
 
 ## The loop
 

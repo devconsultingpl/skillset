@@ -1,0 +1,9 @@
+{
+  "id": "task-1",
+  "title": "Add the probe helper",
+  "write_set": ["src/probe.js"],
+  "criteria": ["probe() returns the argument it was given"],
+  "deps": [],
+  "state": "done",
+  "rounds": 1
+}

@@ -1,0 +1,5 @@
+{
+  "workflow": "deliver",
+  "image": "60600cf0a8b3d50f",
+  "final_corrections": { "rounds": 5, "accepted_round": 2 }
+}

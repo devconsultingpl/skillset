@@ -13,7 +13,8 @@
       "src/skills/**/templates/**",
       "src/skills/**/assets/**",
       "src/skills/**/_helpers/**",
-      ".claude/**"
+      ".claude/**",
+      "test/fixtures/**"
     ]
   },
   "formatter": {
